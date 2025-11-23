@@ -1,0 +1,409 @@
+
+import React, { createContext, useContext, useState } from 'react';
+
+export type Language = 'en' | 'ar';
+
+export const translations = {
+  en: {
+    // General
+    appName: "A2M MED",
+    logout: "Logout",
+    welcome: "Welcome",
+    // Roles
+    role_admin: "Admin",
+    role_supervisor: "Supervisor",
+    role_engineer: "Engineer",
+    role_technician: "Technician",
+    role_nurse: "Nurse",
+    role_vendor: "Vendor",
+    // Login
+    login_title: "CMMS Login",
+    select_persona: "Select a Persona to Demo:",
+    // Sidebar/Nav
+    nav_dashboard: "Dashboard",
+    nav_assets: "Assets & Equipment",
+    nav_maintenance: "Maintenance Mgmt",
+    nav_inventory: "Inventory & Supply",
+    nav_calibration: "Calibration & Quality",
+    nav_analysis: "Analysis & Knowledge",
+    // Dashboard
+    op_overview: "Operational Overview",
+    total_assets: "Total Assets",
+    open_tickets: "Open Tickets",
+    inventory_alerts: "Inventory Alerts",
+    predictive_risk: "Predictive Risk Analysis",
+    dept_map: "Live Department Map",
+    unauth_move: "Unauthorized Move",
+    kpi_mtbf: "Mean Time Between Failures (MTBF)",
+    kpi_availability: "Asset Availability",
+    alert_boundary: "Boundary Alert",
+    alert_boundary_msg: "Asset crossed unauthorized boundary",
+    justification_required: "Movement Justification Required",
+    enter_reason: "Enter reason for movement...",
+    btn_justify: "Submit Justification",
+    compliance_reports: "Compliance Reports",
+    // Assets
+    add_equipment: "Add Equipment",
+    tab_list: "Equipment List",
+    tab_tracking: "Tracking & Movement Log",
+    tab_docs: "Document Archive",
+    asset_info: "Asset Info",
+    location: "Location",
+    status: "Status",
+    purchase_date: "Purchase Date",
+    risk_score: "Risk Score",
+    actions: "Actions",
+    // Asset Details
+    asset_details: "Equipment Details",
+    manufacturer: "Manufacturer",
+    serial_number: "Serial Number",
+    warranty_exp: "Warranty Expiry",
+    uptime: "Uptime (YTD)",
+    mtbf: "MTBF",
+    maintenance_history: "Maintenance History",
+    live_readings: "Live Readings",
+    temperature: "Temperature",
+    voltage: "Voltage",
+    last_updated: "Last Updated",
+    specifications: "Specifications",
+    vendor_support: "Vendor Support",
+    // Add Asset Modal
+    modal_add_title: "Add New Equipment",
+    form_name: "Equipment Name",
+    form_model: "Model",
+    form_sn: "Asset ID / S/N",
+    form_location: "Location",
+    form_date: "Purchase Date",
+    btn_save: "Save Asset",
+    // Maintenance
+    tab_wo: "Work Orders",
+    tab_pm: "Preventive Plans (PM)",
+    tab_requests: "Requests",
+    tab_ai: "Predictive AI",
+    wo_id: "WO ID",
+    assigned: "Assigned",
+    priority: "Priority",
+    type: "Type",
+    // Inventory
+    tab_stock: "Current Stock",
+    tab_logs: "Stock Logs",
+    tab_alerts: "Reorder Alerts",
+    part_name: "Part Name",
+    stock_level: "Stock Level",
+    unit_cost: "Unit Cost",
+    btn_order: "Order Parts",
+    btn_restock: "Restock",
+    // Inventory View
+    restock_modal_title: "Restock Inventory",
+    restock_qty: "Quantity to Add",
+    confirm_large_restock_title: "Large Restock Warning",
+    confirm_large_restock_msg: "You are about to add a large quantity ({qty} units) to the inventory. This might be a mistake. Please confirm.",
+    current_stock_label: "Current Stock",
+    min_level_label: "Min Level",
+    restock_btn: "Add to Stock",
+    // Calibration
+    cal_schedule: "Calibration Schedule",
+    cal_certs: "Certificates",
+    last_cal: "Last Calib.",
+    next_due: "Next Due",
+    // Analysis
+    tab_reports: "Reports",
+    tab_kb: "Knowledge Base",
+    tab_gen_report: "Report Generator",
+    gen_report: "Generate Report",
+    report_type: "Report Type",
+    cm_report: "Corrective Maintenance (CM)",
+    ppm_report: "Preventive Maintenance (PPM)",
+    comp_report: "Compliance & Regulatory",
+    date_range: "Date Range",
+    download_pdf: "Download PDF",
+    generated_reports: "Generated Reports",
+    // Technician
+    tech_dashboard: "Technician Dashboard",
+    btn_start_job: "Start Job (Scan NFC)",
+    step_verify: "Verification",
+    step_diagnosis: "Diagnosis",
+    step_inventory: "Inventory & Data",
+    step_visual: "Visual Support",
+    step_closure: "Closure",
+    scan_tag: "Scan Tag",
+    match_verified: "Match Verified",
+    observed_symptoms: "Observed Symptoms",
+    solution_applied: "Solution Applied",
+    smart_kb: "Smart Knowledge Base",
+    get_suggestions: "Get Suggestions",
+    op_hours: "Cumulative Operating Hours",
+    spare_parts: "Spare Parts Consumed",
+    ar_guide: "Augmented Reality Guide",
+    activate_ar: "Activate AR Guide",
+    summary: "Summary",
+    digital_sig: "Technician Digital Signature",
+    close_wo: "Close Work Order",
+    back: "Back",
+    next_step: "Next Step",
+    todo: "To Do",
+    inprogress: "In Progress",
+    completed: "Completed",
+    // New Tech UI
+    tab_new_req: "New Requests",
+    tab_scheduled_pm: "Scheduled PMs",
+    tab_diagnosis: "Diagnosis",
+    tab_parts: "Spare Parts",
+    tab_checklist: "Checklist",
+    tab_finish: "Finish",
+    search_parts: "Search Inventory...",
+    start_instruction: "Scan NFC to Start Job",
+    checklist_progress: "Checklist Progress",
+    confirm_close_title: "Confirm Closure",
+    confirm_close_msg: "Are you sure you want to close this work order? This action cannot be undone.",
+    btn_confirm: "Confirm",
+    btn_cancel: "Cancel",
+    // Docs Modal
+    manuals_detected: "Reference Documents Detected",
+    relevant_docs: "Relevant Manuals & Guides",
+    continue_work: "Acknowledge & Continue",
+    // Visual Tab
+    available_guides: "Available Guides",
+    ar_overlay: "AI Overlay",
+    ar_simulation_msg: "Highlighting internal power supply unit. Verify voltage output at test points marked in blue.",
+    // Nurse
+    nurse_dashboard: "Nurse & Dept. Dashboard",
+    tab_overview: "Overview",
+    tab_report: "Report Issue",
+    my_dept: "My Department",
+    running: "Running",
+    stopped: "Stopped",
+    maintenance: "Maint.",
+    quick_report: "Report",
+    report_issue: "Report Issue",
+    report_placeholder: "What seems to be the problem? (e.g., Bed remote not working)",
+    btn_report: "REPORT FAULT NOW",
+    report_sent: "Report Sent!",
+    report_desc: "Pressing this button will immediately dispatch a CRITICAL alert and email the nearest technician.",
+    detected: "Detected",
+    reported: "Reported",
+    scan_nfc: "Scan Device NFC",
+    identifying: "Identifying Device...",
+    tap_instruction: "Tap phone to asset tag"
+  },
+  ar: {
+    // General
+    appName: "A2M MED",
+    logout: "تسجيل خروج",
+    welcome: "مرحباً",
+    // Roles
+    role_admin: "مسؤول",
+    role_supervisor: "مشرف",
+    role_engineer: "مهندس",
+    role_technician: "فني",
+    role_nurse: "ممرض/ة",
+    role_vendor: "بائع",
+    // Login
+    login_title: "تسجيل الدخول للنظام",
+    select_persona: "اختر مستخدم للتجربة:",
+    // Sidebar/Nav
+    nav_dashboard: "لوحة القيادة",
+    nav_assets: "الأصول والمعدات",
+    nav_maintenance: "إدارة الصيانة",
+    nav_inventory: "المخزون والتوريد",
+    nav_calibration: "المعايرة والجودة",
+    nav_analysis: "التحليل والمعرفة",
+    // Dashboard
+    op_overview: "نظرة عامة",
+    total_assets: "إجمالي الأصول",
+    open_tickets: "التذاكر المفتوحة",
+    inventory_alerts: "تنبيهات المخزون",
+    predictive_risk: "تحليل المخاطر التنبؤي",
+    dept_map: "خريطة الأقسام الحية",
+    unauth_move: "حركة غير مصرح بها",
+    kpi_mtbf: "متوسط الزمن بين الأعطال (MTBF)",
+    kpi_availability: "جاهزية الأصول",
+    alert_boundary: "تنبيه حدودي",
+    alert_boundary_msg: "تجاوز الأصل الحدود المصرح بها",
+    justification_required: "تبرير النقل مطلوب",
+    enter_reason: "أدخل سبب النقل...",
+    btn_justify: "إرسال التبرير",
+    compliance_reports: "تقارير الامتثال",
+    // Assets
+    add_equipment: "إضافة معدات",
+    tab_list: "قائمة المعدات",
+    tab_tracking: "سجل التتبع والحركة",
+    tab_docs: "أرشيف المستندات",
+    asset_info: "بيانات الأصل",
+    location: "الموقع",
+    status: "الحالة",
+    purchase_date: "تاريخ الشراء",
+    risk_score: "درجة المخاطرة",
+    actions: "إجراءات",
+    // Asset Details
+    asset_details: "تفاصيل الجهاز",
+    manufacturer: "الشركة المصنعة",
+    serial_number: "الرقم التسلسلي",
+    warranty_exp: "انتهاء الضمان",
+    uptime: "وقت التشغيل",
+    mtbf: "متوسط الوقت بين الأعطال",
+    maintenance_history: "سجل الصيانة",
+    live_readings: "قراءات حية",
+    temperature: "درجة الحرارة",
+    voltage: "الجهد الكهربي",
+    last_updated: "آخر تحديث",
+    specifications: "المواصفات",
+    vendor_support: "دعم البائع",
+    // Add Asset Modal
+    modal_add_title: "إضافة معدات جديدة",
+    form_name: "اسم الجهاز",
+    form_model: "الموديل",
+    form_sn: "الرقم التعريفي / التسلسلي",
+    form_location: "الموقع",
+    form_date: "تاريخ الشراء",
+    btn_save: "حفظ الأصل",
+    // Maintenance
+    tab_wo: "أوامر العمل",
+    tab_pm: "الخطط الوقائية",
+    tab_requests: "الطلبات",
+    tab_ai: "الذكاء الاصطناعي التنبؤي",
+    wo_id: "رقم الأمر",
+    assigned: "مكلف بـ",
+    priority: "الأولوية",
+    type: "النوع",
+    // Inventory
+    tab_stock: "المخزون الحالي",
+    tab_logs: "سجلات المخزون",
+    tab_alerts: "تنبيهات إعادة الطلب",
+    part_name: "اسم القطعة",
+    stock_level: "مستوى المخزون",
+    unit_cost: "تكلفة الوحدة",
+    btn_order: "طلب قطع غيار",
+    btn_restock: "إعادة تعبئة",
+    // Inventory View
+    restock_modal_title: "إعادة تعبئة المخزون",
+    restock_qty: "الكمية للإضافة",
+    confirm_large_restock_title: "تحذير: كمية كبيرة",
+    confirm_large_restock_msg: "أنت على وشك إضافة كمية كبيرة ({qty} وحدة) إلى المخزون. قد يكون هذا خطأ. يرجى التأكيد.",
+    current_stock_label: "المخزون الحالي",
+    min_level_label: "الحد الأدنى",
+    restock_btn: "إضافة للمخزون",
+    // Calibration
+    cal_schedule: "جدول المعايرة",
+    cal_certs: "الشهادات",
+    last_cal: "آخر معايرة",
+    next_due: "تاريخ الاستحقاق",
+    // Analysis
+    tab_reports: "التقارير",
+    tab_kb: "قاعدة المعرفة",
+    tab_gen_report: "منشئ التقارير",
+    gen_report: "إنشاء تقرير",
+    report_type: "نوع التقرير",
+    cm_report: "صيانة تصحيحية (CM)",
+    ppm_report: "صيانة وقائية (PPM)",
+    comp_report: "الامتثال والتنظيم",
+    date_range: "النطاق الزمني",
+    download_pdf: "تحميل PDF",
+    generated_reports: "التقارير المنشأة",
+    // Technician
+    tech_dashboard: "لوحة مهام الفني",
+    btn_start_job: "ابدأ العمل (مسح NFC)",
+    step_verify: "التحقق",
+    step_diagnosis: "التشخيص",
+    step_inventory: "المخزون والبيانات",
+    step_visual: "الدعم المرئي",
+    step_closure: "الإغلاق",
+    scan_tag: "مسح الرمز",
+    match_verified: "تم التحقق من المطابقة",
+    observed_symptoms: "الأعراض الملاحظة",
+    solution_applied: "الحل المطبق",
+    smart_kb: "قاعدة المعرفة الذكية",
+    get_suggestions: "الحصول على مقترحات",
+    op_hours: "ساعات التشغيل التراكمية",
+    spare_parts: "قطع الغيار المستهلكة",
+    ar_guide: "دليل الواقع المعزز",
+    activate_ar: "تفعيل الواقع المعزز",
+    summary: "الملخص",
+    digital_sig: "توقيع الفني الرقمي",
+    close_wo: "إغلاق أمر العمل",
+    back: "رجوع",
+    next_step: "الخطوة التالية",
+    todo: "للعمل",
+    inprogress: "جاري العمل",
+    completed: "مكتمل",
+    // New Tech UI
+    tab_new_req: "بلاغات جديدة",
+    tab_scheduled_pm: "صيانة دورية مجدولة",
+    tab_diagnosis: "خطوات التشخيص",
+    tab_parts: "قطع الغيار",
+    tab_checklist: "قائمة التحقق",
+    tab_finish: "إنهاء",
+    search_parts: "بحث في المخزون...",
+    start_instruction: "امسح علامة NFC لبدء العمل",
+    checklist_progress: "تقدم القائمة",
+    confirm_close_title: "تأكيد الإغلاق",
+    confirm_close_msg: "هل أنت متأكد من إغلاق أمر العمل؟ لا يمكن التراجع عن هذا الإجراء.",
+    btn_confirm: "تأكيد",
+    btn_cancel: "إلغاء",
+    // Docs Modal
+    manuals_detected: "تم العثور على وثائق",
+    relevant_docs: "كتيبات وأدلة ذات صلة",
+    continue_work: "فهمت، تابع العمل",
+    // Visual Tab
+    available_guides: "الأدلة المتاحة",
+    ar_overlay: "تراكب الذكاء الاصطناعي",
+    ar_simulation_msg: "تحديد وحدة الطاقة الداخلية. تحقق من خرج الجهد عند نقاط الاختبار المحددة باللون الأزرق.",
+    // Nurse
+    nurse_dashboard: "لوحة القسم",
+    tab_overview: "نظرة عامة",
+    tab_report: "إبلاغ عن عطل",
+    my_dept: "قسمي",
+    running: "يعمل",
+    stopped: "متوقف",
+    maintenance: "صيانة",
+    quick_report: "بلاغ",
+    report_issue: "إبلاغ عن مشكلة",
+    report_placeholder: "ما هي المشكلة؟ (مثال: جهاز التحكم بالسرير لا يعمل)",
+    btn_report: "إبلاغ عن عطل الآن",
+    report_sent: "تم إرسال البلاغ!",
+    report_desc: "الضغط على هذا الزر سيرسل تنبيهاً عاجلاً وبريداً إلكترونياً لأقرب فني فوراً.",
+    detected: "تم الكشف",
+    reported: "تم الإبلاغ",
+    scan_nfc: "مسح NFC للجهاز",
+    identifying: "جاري التعرف...",
+    tap_instruction: "قرب الهاتف من ملصق الجهاز"
+  }
+};
+
+interface LanguageContextType {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: keyof typeof translations['en']) => string;
+  dir: 'ltr' | 'rtl';
+  toggleLanguage: () => void;
+}
+
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+
+export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [language, setLanguage] = useState<Language>('en');
+
+  const t = (key: keyof typeof translations['en']) => {
+    return translations[language][key] || key;
+  };
+
+  const toggleLanguage = () => {
+    setLanguage(prev => prev === 'en' ? 'ar' : 'en');
+  };
+
+  const dir = language === 'ar' ? 'rtl' : 'ltr';
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, t, dir, toggleLanguage }}>
+      <div dir={dir} className={language === 'ar' ? 'font-sans' : 'font-sans'}>
+        {children}
+      </div>
+    </LanguageContext.Provider>
+  );
+};
+
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
+  return context;
+};

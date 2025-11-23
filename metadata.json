@@ -1,0 +1,8 @@
+{
+  "name": "A2M MED",
+  "description": "A full-stack style CMMS application for healthcare asset management with role-based interfaces for Supervisors, Technicians, and Nurses. Features AI-assisted diagnostics.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
