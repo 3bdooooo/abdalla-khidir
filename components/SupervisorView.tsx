@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, SystemAlert } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, restockPart, getSystemAlerts } from '../services/mockDb';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, FileBarChart } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -798,7 +798,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                     <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
                         <div className="flex items-center gap-2 mb-4">
                              <div className="p-2 bg-brand/10 text-brand rounded-lg">
-                                <FileBarChart size={20} />
+                                <BarChart2 size={20} />
                              </div>
                              <h3 className="text-lg font-bold text-gray-900">{t('gen_report')}</h3>
                         </div>
