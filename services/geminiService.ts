@@ -4,10 +4,12 @@ let aiClient: GoogleGenAI | null = null;
 
 const getAiClient = () => {
   if (!aiClient) {
-    // Robust check for process.env to prevent "process is not defined" errors in browser
-    const apiKey = typeof process !== 'undefined' && process.env && process.env.API_KEY 
-      ? process.env.API_KEY 
-      : ''; 
+    // Vite uses import.meta.env for environment variables
+    const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    
+    if (!apiKey) {
+      console.warn("Google GenAI API Key is missing. AI features will not function.");
+    }
     
     // Initialize even with empty key to allow app to load, requests will fail gracefully later
     aiClient = new GoogleGenAI({ apiKey: apiKey || 'dummy_key' });
@@ -23,8 +25,8 @@ export const analyzeRootCause = async (
   try {
     const ai = getAiClient();
     
-    // Double check key existence before call to avoid 400s if possible, though SDK handles it
-    const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+    // Check key existence before call
+    const apiKey = import.meta.env.VITE_API_KEY || '';
     if (!apiKey) {
         return "AI analysis unavailable (Missing API Key)";
     }
