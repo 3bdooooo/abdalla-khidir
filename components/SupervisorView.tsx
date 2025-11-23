@@ -1,9 +1,9 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
-import { Asset, AssetStatus, InventoryPart, WorkOrder, WorkOrderType, Priority, DetailedJobOrderReport, SystemAlert } from '../types';
-import { getLocationName, getAssetDocuments, getMovementLogs, createWorkOrder, getLocations, getDetailedReports, restockPart, getSystemAlerts } from '../services/mockDb';
-import { AlertTriangle, CheckCircle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Filter, History, ArrowRightLeft, Calendar, Sparkles, TrendingUp, BrainCircuit, Zap, FileBarChart, Package, ChevronLeft, Thermometer, Zap as ZapIcon, Cpu, HardDrive, Wrench, X, Image, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts';
+import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, SystemAlert } from '../types';
+import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, restockPart, getSystemAlerts } from '../services/mockDb';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, FileBarChart } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {

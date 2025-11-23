@@ -85,16 +85,20 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ userWorkOrders, inve
     e.stopPropagation(); // Prevent card click event
     if (!selectedWO) return;
     
+    // Capture ID to avoid closure issues in timeout
+    const currentWoId = selectedWO.wo_id;
+    const currentAssetId = selectedWO.asset_id;
+
     // Simulate 1.5s scan delay
     setTimeout(() => {
-        startWorkOrder(selectedWO.wo_id);
+        startWorkOrder(currentWoId);
         refreshData();
         
         // Update local state to reflect status change immediately for UI
-        setSelectedWO({...selectedWO, status: 'In Progress'});
+        setSelectedWO(prev => prev ? {...prev, status: 'In Progress'} : null);
 
         // Fetch and show docs
-        const docs = getAssetDocuments(selectedWO.asset_id);
+        const docs = getAssetDocuments(currentAssetId);
         if (docs && docs.length > 0) {
             setAssetDocs(docs);
             setShowDocsModal(true);
@@ -252,6 +256,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ userWorkOrders, inve
     );
   }
 
+  // Safe checks for WO type now that we know selectedWO is not null
   const isPM = selectedWO.type === WorkOrderType.PREVENTIVE || selectedWO.type === WorkOrderType.CALIBRATION;
   const currentAsset = getAssetForWO(selectedWO.asset_id);
 

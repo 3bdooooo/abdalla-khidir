@@ -1,6 +1,9 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safe access to API Key for browser environments that might not polyfill process
+const apiKey = typeof process !== 'undefined' && process.env ? process.env.API_KEY : '';
+
+const ai = new GoogleGenAI({ apiKey });
 
 export const analyzeRootCause = async (
   assetName: string,
@@ -8,6 +11,10 @@ export const analyzeRootCause = async (
   modelName: string
 ): Promise<string> => {
   try {
+    if (!apiKey) {
+        return "AI analysis unavailable (Missing API Key)";
+    }
+
     const prompt = `
       Context: You are an expert maintenance engineer assistant for a CMMS system.
       Task: Analyze the symptoms reported for a medical device and suggest a likely root cause and potential solution.
