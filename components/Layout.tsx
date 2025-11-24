@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe } from 'lucide-react';
+import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface LayoutProps {
@@ -27,7 +28,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
   );
 
   // Mobile-first simplified header for non-supervisors
-  if (user.role === UserRole.NURSE || user.role === UserRole.TECHNICIAN) {
+  if (user.role === UserRole.NURSE || user.role === UserRole.TECHNICIAN || user.role === UserRole.VENDOR) {
     return (
       <div className="min-h-screen bg-background text-text-main font-sans">
         <header className="bg-surface border-b border-border p-4 flex justify-between items-center shadow-sm sticky top-0 z-50">
@@ -59,6 +60,11 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     { id: 'calibration', label: t('nav_calibration'), icon: Activity },
     { id: 'analysis', label: t('nav_analysis'), icon: FileText },
   ];
+
+  // Only Admin sees User Management
+  if (user.role === UserRole.ADMIN) {
+    navItems.push({ id: 'users', label: t('nav_users'), icon: UsersIcon });
+  }
 
   return (
     <div className="min-h-screen bg-background flex font-sans text-text-main">

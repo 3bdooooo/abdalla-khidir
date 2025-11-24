@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Asset } from './types';
-import { getAssets, getInventory, getWorkOrders, getTechnicianWorkOrders } from './services/mockDb';
+import { User, UserRole, Asset, InventoryPart, WorkOrder } from './types';
+import { getAssets, getInventory, getWorkOrders, getTechnicianWorkOrders as getMockTechWOs } from './services/mockDb'; // Keep for fallback types/helpers if needed
+import * as api from './services/api';
 import { Layout } from './components/Layout';
 import { SupervisorView } from './components/SupervisorView';
 import { TechnicianView } from './components/TechnicianView';
@@ -12,29 +13,62 @@ import { LanguageProvider } from './contexts/LanguageContext';
 const AppContent: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
   
-  // App State (Loaded from Mock Service)
-  const [assets, setAssets] = useState(getAssets());
-  const [inventory, setInventory] = useState(getInventory());
-  const [workOrders, setWorkOrders] = useState(getWorkOrders());
+  // App State
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [inventory, setInventory] = useState<InventoryPart[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [users, setUsers] = useState<User[]>([]); // New State
   
-  // Refresh Data Handler
-  const refreshData = () => {
-    setAssets([...getAssets()]);
-    setInventory([...getInventory()]);
-    setWorkOrders([...getWorkOrders()]);
+  // Load Data from Supabase
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+        const [a, i, w, u] = await Promise.all([
+            api.fetchAssets(),
+            api.fetchInventory(),
+            api.fetchWorkOrders(),
+            api.fetchUsers() // Fetch Users
+        ]);
+        setAssets(a);
+        setInventory(i);
+        setWorkOrders(w);
+        setUsers(u);
+    } catch (e) {
+        console.error("Failed to load data", e);
+    } finally {
+        setLoading(false);
+    }
   };
 
+  // Initial Load & Seeding
+  useEffect(() => {
+    const init = async () => {
+        // Attempt to seed if empty
+        await api.seedDatabaseIfEmpty();
+        await refreshData();
+    };
+    init();
+  }, []);
+
   // Handle Add Asset
-  const handleAddAsset = (newAsset: Asset) => {
-    setAssets(prev => [...prev, newAsset]);
+  const handleAddAsset = async (newAsset: Asset) => {
+    await api.addAsset(newAsset);
+    refreshData();
   };
+
+  // Handle Add User
+  const handleAddUser = async (newUser: User) => {
+    await api.addUser(newUser);
+    refreshData();
+  }
 
   // Handle Login
   const handleLogin = (selectedUser: User) => {
     setUser(selectedUser);
     if (selectedUser.role === UserRole.SUPERVISOR || selectedUser.role === UserRole.ADMIN) setCurrentView('dashboard');
-    else if (selectedUser.role === UserRole.TECHNICIAN) setCurrentView('tasks');
+    else if (selectedUser.role === UserRole.TECHNICIAN || selectedUser.role === UserRole.VENDOR) setCurrentView('tasks');
     else setCurrentView('report');
   };
 
@@ -43,6 +77,10 @@ const AppContent: React.FC = () => {
     setUser(null);
     setCurrentView('dashboard');
   };
+
+  if (loading && !user) {
+      return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-brand font-bold animate-pulse">Connecting to Database...</div>
+  }
 
   // If not logged in
   if (!user) {
@@ -62,15 +100,17 @@ const AppContent: React.FC = () => {
           assets={assets}
           workOrders={workOrders}
           inventory={inventory}
+          users={users} // Pass users
           onAddAsset={handleAddAsset}
+          onAddUser={handleAddUser} // Pass handler
           refreshData={refreshData}
           onNavigate={setCurrentView}
         />
       )}
 
-      {user.role === UserRole.TECHNICIAN && (
+      {(user.role === UserRole.TECHNICIAN || user.role === UserRole.VENDOR) && (
         <TechnicianView 
-          userWorkOrders={getTechnicianWorkOrders(user.user_id)}
+          userWorkOrders={workOrders.filter(wo => wo.assigned_to_id === user.user_id)} // Filter from live data
           inventory={inventory}
           refreshData={refreshData}
         />

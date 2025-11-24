@@ -1,9 +1,10 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell } from 'recharts';
-import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, SystemAlert } from '../types';
-import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, restockPart, getSystemAlerts } from '../services/mockDb';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2 } from 'lucide-react';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
+import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, SystemAlert, Priority, WorkOrderType, User, UserRole } from '../types';
+import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getSystemAlerts } from '../services/mockDb';
+import * as api from '../services/api';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -11,12 +12,14 @@ interface SupervisorProps {
   assets: Asset[];
   workOrders: WorkOrder[];
   inventory: InventoryPart[];
+  users?: User[]; // New Prop
   onAddAsset: (asset: Asset) => void;
+  onAddUser?: (user: User) => void; // New Prop
   refreshData: () => void;
   onNavigate: (view: string) => void;
 }
 
-export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets, workOrders, inventory, onAddAsset, refreshData, onNavigate }) => {
+export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets, workOrders, inventory, users = [], onAddAsset, onAddUser, refreshData, onNavigate }) => {
   const [activeTab, setActiveTab] = useState('tab1');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const { t, language } = useLanguage();
@@ -28,7 +31,20 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
     model: '',
     asset_id: '',
     location_id: 101,
-    purchase_date: new Date().toISOString().split('T')[0]
+    purchase_date: new Date().toISOString().split('T')[0],
+    image: ''
+  });
+
+  // Add User Modal State (New)
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [newUserForm, setNewUserForm] = useState({
+      name: '',
+      email: '',
+      phone: '',
+      password: '',
+      role: UserRole.TECHNICIAN,
+      department: '',
+      signature: ''
   });
 
   // Inventory Restock State
@@ -41,6 +57,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
   const [reportType, setReportType] = useState<'CM' | 'PPM' | 'COMPLIANCE'>('CM');
   const [reportStartDate, setReportStartDate] = useState('2023-01-01');
   const [reportEndDate, setReportEndDate] = useState('2023-12-31');
+  const [jobOrderSearchId, setJobOrderSearchId] = useState('');
   
   // Specific Job Order View State
   const [selectedJobReport, setSelectedJobReport] = useState<DetailedJobOrderReport | null>(null);
@@ -52,16 +69,63 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
   const [selectedAlert, setSelectedAlert] = useState<SystemAlert | null>(null);
   const [justificationReason, setJustificationReason] = useState('');
   const [selectedMapZone, setSelectedMapZone] = useState<string | null>(null);
+  
+  // Maintenance View State
+  const [maintenanceViewMode, setMaintenanceViewMode] = useState<'kanban' | 'list'>('kanban');
+  const [maintenanceFilterPriority, setMaintenanceFilterPriority] = useState<string>('all');
+  const [maintenanceFilterType, setMaintenanceFilterType] = useState<string>('all');
+
+  // Simulation State
+  const [isSimulationActive, setIsSimulationActive] = useState(false);
 
   // Reset tab and selection when main view changes
   useEffect(() => {
     setActiveTab('tab1');
     setSelectedAsset(null);
     setSelectedJobReport(null);
+    // Disable simulation when leaving dashboard to prevent background updates
+    if (currentView !== 'dashboard') setIsSimulationActive(false);
   }, [currentView]);
+
+  // Real-time Simulation Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isSimulationActive && currentView === 'dashboard') {
+        interval = setInterval(async () => {
+            // Pick a random asset to update
+            const randomIdx = Math.floor(Math.random() * assets.length);
+            const targetAsset = assets[randomIdx];
+            
+            // Randomly determine new status (weighted towards running)
+            const r = Math.random();
+            let newStatus = AssetStatus.RUNNING;
+            
+            if (r > 0.90) newStatus = AssetStatus.DOWN; // 10% chance of failure
+            else if (r > 0.80) newStatus = AssetStatus.UNDER_MAINT; // 10% chance of maintenance
+            
+            // Only update if changed to avoid unnecessary renders
+            if (targetAsset.status !== newStatus) {
+                await api.updateAssetStatus(targetAsset.asset_id, newStatus);
+                refreshData(); // Trigger App re-render to update map visuals
+            }
+        }, 3000); // Update every 3 seconds for async safety
+    }
+    return () => clearInterval(interval);
+  }, [isSimulationActive, currentView, assets, refreshData]);
 
   // KPI Calculations
   const kpiData = useMemo(() => {
+    // MTTR Calculation
+    const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
+    let totalRepairTime = 0;
+    closedWOs.forEach(wo => {
+        const start = new Date(wo.start_time!).getTime();
+        const end = new Date(wo.close_time!).getTime();
+        totalRepairTime += (end - start);
+    });
+    // Ensure we don't divide by zero and format nicely (mocked slightly high to look realistic)
+    const mttrHours = closedWOs.length ? (totalRepairTime / closedWOs.length / (1000 * 60 * 60)).toFixed(1) : '4.2';
+
     return {
       totalAssets: assets.length,
       openWorkOrders: workOrders.filter(wo => wo.status !== 'Closed').length,
@@ -70,7 +134,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
           { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length },
           { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length },
           { name: 'Maint', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length },
-      ]
+      ],
+      mttr: mttrHours
     };
   }, [assets, workOrders, inventory]);
 
@@ -83,6 +148,27 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
       { month: 'May', mtbf: 550 },
       { month: 'Jun', mtbf: 590 },
   ];
+
+  // Mock Failure Trend Data
+  const failureTrendData = [
+      { month: 'Jan', Power: 12, Software: 8, Mechanical: 5, UserError: 2 },
+      { month: 'Feb', Power: 10, Software: 12, Mechanical: 4, UserError: 3 },
+      { month: 'Mar', Power: 8, Software: 15, Mechanical: 6, UserError: 1 },
+      { month: 'Apr', Power: 5, Software: 9, Mechanical: 8, UserError: 4 },
+      { month: 'May', Power: 7, Software: 11, Mechanical: 7, UserError: 2 },
+      { month: 'Jun', Power: 4, Software: 8, Mechanical: 9, UserError: 5 },
+  ];
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setNewAssetForm(prev => ({ ...prev, image: reader.result as string }));
+        };
+        reader.readAsDataURL(file);
+    }
+  };
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,7 +183,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
         risk_score: 0,
         last_calibration_date: newAssetForm.purchase_date,
         next_calibration_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-        image: 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' // Default placeholder
+        image: newAssetForm.image || 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
     };
     onAddAsset(asset);
     setIsAddModalOpen(false);
@@ -106,8 +192,50 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
         model: '',
         asset_id: '',
         location_id: 101,
-        purchase_date: new Date().toISOString().split('T')[0]
+        purchase_date: new Date().toISOString().split('T')[0],
+        image: ''
     });
+  };
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+              setNewUserForm(prev => ({ ...prev, signature: reader.result as string }));
+          };
+          reader.readAsDataURL(file);
+      }
+  };
+
+  const handleAddUserSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!onAddUser) return;
+
+      const newUser: User = {
+          user_id: Math.floor(Math.random() * 100000),
+          name: newUserForm.name,
+          email: newUserForm.email,
+          role: newUserForm.role,
+          phone_number: newUserForm.phone,
+          password: newUserForm.password,
+          department: newUserForm.department,
+          digital_signature: newUserForm.signature,
+          location_id: 101 // Default location for now
+      };
+      
+      onAddUser(newUser);
+      setIsAddUserModalOpen(false);
+      refreshData();
+      setNewUserForm({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: UserRole.TECHNICIAN,
+        department: '',
+        signature: ''
+      });
   };
 
   const initiateRestock = (part: InventoryPart) => {
@@ -127,9 +255,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
     }
   };
 
-  const submitRestock = () => {
+  const submitRestock = async () => {
      if (selectedPartForRestock && restockAmount) {
-         restockPart(selectedPartForRestock.part_id, parseInt(restockAmount));
+         await api.restockPart(selectedPartForRestock.part_id, parseInt(restockAmount));
          refreshData();
          setRestockModalOpen(false);
          setConfirmRestockOpen(false);
@@ -165,7 +293,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
 
   const submitJustification = () => {
       if (selectedAlert && justificationReason) {
-          // Mock: resolve alert
+          // Mock: resolve alert (In real app, update DB)
           setAlerts(alerts.map(a => a.id === selectedAlert.id ? {...a, status: 'resolved'} : a));
           setJustificationModalOpen(false);
           setSelectedAlert(null);
@@ -174,10 +302,20 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
       }
   };
 
+  const handleFindJobReport = () => {
+      // Logic to find specific report. Mocking 2236 for now
+      if (jobOrderSearchId === '2236' || jobOrderSearchId === '') {
+          setSelectedJobReport(getDetailedReports()[0]);
+      } else {
+          alert('Job Order Report not found. Try 2236.');
+      }
+  };
+
   const COLORS = ['#28A745', '#DC3545', '#FFC107'];
 
   // --- 1. DASHBOARD MODULE (ADMIN/HEAD UI) ---
   if (currentView === 'dashboard') {
+    // ... [Existing Dashboard Code]
     const departments = Array.from(new Set(getLocations().map(l => l.department)));
 
     return (
@@ -249,7 +387,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
         </div>
         
         {/* KPI CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <div className="bg-surface p-5 rounded-xl shadow-sm border border-border flex items-center justify-between hover:shadow-md transition-shadow">
             <div>
               <p className="text-text-muted text-xs font-bold uppercase tracking-wide">{t('total_assets')}</p>
@@ -277,6 +415,16 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
             </div>
             <div className="p-3 bg-warning/10 text-warning rounded-full">
               <Clock size={24} />
+            </div>
+          </div>
+
+          <div className="bg-surface p-5 rounded-xl shadow-sm border border-border flex items-center justify-between hover:shadow-md transition-shadow">
+            <div>
+              <p className="text-text-muted text-xs font-bold uppercase tracking-wide">{t('kpi_mttr')}</p>
+              <p className="text-2xl font-bold text-purple-600">{kpiData.mttr}h</p>
+            </div>
+            <div className="p-3 bg-purple-100 text-purple-600 rounded-full">
+              <Wrench size={24} />
             </div>
           </div>
 
@@ -313,7 +461,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                 </div>
             </div>
 
-             <div className="bg-surface p-6 rounded-xl shadow-sm border border-border flex flex-col">
+            <div className="bg-surface p-6 rounded-xl shadow-sm border border-border flex flex-col">
                  <h3 className="text-lg font-bold mb-6 text-gray-900 flex items-center gap-2">
                     <Activity size={20} className="text-text-muted" />
                     {t('kpi_availability')} Distribution
@@ -337,18 +485,56 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-             </div>
+            </div>
+
+            {/* NEW FAILURE TREND CHART */}
+            <div className="bg-surface p-6 rounded-xl shadow-sm border border-border lg:col-span-2">
+                <h3 className="text-lg font-bold mb-6 text-gray-900 flex items-center gap-2">
+                    <BarChart2 size={20} className="text-text-muted" />
+                    {t('failure_trend')}
+                </h3>
+                <div className="h-64 w-full" dir="ltr">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={failureTrendData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E9ECEF" />
+                            <XAxis dataKey="month" fontSize={12} tickLine={false} tick={{fill: '#6C757D'}} />
+                            <YAxis fontSize={12} tickLine={false} tick={{fill: '#6C757D'}} />
+                            <Tooltip contentStyle={{ backgroundColor: '#FFFFFF', borderColor: '#DEE2E6', color: '#212529', borderRadius: '8px' }} />
+                            <Legend />
+                            <Bar dataKey="Power" fill="#007BFF" stackId="a" />
+                            <Bar dataKey="Software" fill="#28A745" stackId="a" />
+                            <Bar dataKey="Mechanical" fill="#FFC107" stackId="a" />
+                            <Bar dataKey="UserError" fill="#6C757D" stackId="a" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
         </div>
 
         {/* INTERACTIVE MAP */}
         <div className="bg-surface p-6 rounded-xl shadow-sm border border-border flex flex-col">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <MapPin size={20} className="text-text-muted" />
-                    {t('dept_map')}
-                </h3>
-                <div className="flex gap-2 text-[10px] font-medium">
-                    <span className="bg-gray-100 px-2 py-1 rounded text-text-muted">Click zone to view assets</span>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                        <MapPin size={20} className="text-text-muted" />
+                        {t('dept_map')}
+                    </h3>
+                    <button 
+                        onClick={() => setIsSimulationActive(!isSimulationActive)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide transition-all border ${
+                            isSimulationActive 
+                                ? 'bg-red-50 text-red-600 border-red-100 ring-2 ring-red-500/20' 
+                                : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'
+                        }`}
+                    >
+                        <Zap size={12} className={isSimulationActive ? 'animate-pulse fill-current' : ''} />
+                        {isSimulationActive ? 'Live Feed On' : 'Simulate Traffic'}
+                    </button>
+                </div>
+                <div className="flex gap-2 text-[10px] font-medium items-center">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-success"></span> Running</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-danger"></span> Down</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-warning"></span> Maint</span>
                 </div>
             </div>
             <div className="flex-1 bg-gray-50 rounded-lg border border-dashed border-gray-300 relative overflow-y-auto p-4 min-h-[350px]" dir="ltr">
@@ -377,7 +563,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                                     {deptAssets.slice(0, 12).map(asset => (
                                         <div 
                                             key={asset.asset_id} 
-                                            className={`w-2 h-2 rounded-full ${
+                                            className={`w-2 h-2 rounded-full transition-colors duration-500 ${
                                                 asset.status === AssetStatus.RUNNING ? 'bg-success' :
                                                 asset.status === AssetStatus.DOWN ? 'bg-danger' : 'bg-warning'
                                             }`}
@@ -419,7 +605,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                                     <tr key={asset.asset_id} className="border-b border-gray-100">
                                         <td className="px-4 py-2 font-medium">{asset.name} <span className="text-xs text-gray-400">({asset.model})</span></td>
                                         <td className="px-4 py-2">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-800' : asset.status === AssetStatus.DOWN ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors duration-300 ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-800' : asset.status === AssetStatus.DOWN ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
                                                 {asset.status}
                                             </span>
                                         </td>
@@ -473,15 +659,151 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
       </div>
     );
   }
+
+  // --- 7. USERS MODULE (ADMIN ONLY) ---
+  if (currentView === 'users') {
+      return (
+          <div className="space-y-6 animate-in fade-in">
+              <div className="flex justify-between items-center">
+                  <div>
+                      <h2 className="text-2xl font-bold text-gray-900">{t('users_title')}</h2>
+                      <p className="text-text-muted text-sm">Manage system access and permissions</p>
+                  </div>
+                  <button onClick={() => setIsAddUserModalOpen(true)} className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm flex items-center gap-2">
+                      <Plus size={16} /> {t('add_user')}
+                  </button>
+              </div>
+
+              <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+                 <table className="w-full text-start border-collapse">
+                      <thead className="bg-gray-50">
+                          <tr>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('user_name')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('user_role')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('user_dept')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('user_email')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('user_phone')}</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                          {users.map(user => (
+                              <tr key={user.user_id} className="hover:bg-gray-50 transition-colors">
+                                  <td className="p-4">
+                                      <div className="font-bold text-gray-900">{user.name}</div>
+                                      <div className="text-xs text-text-muted font-mono">ID: {user.user_id}</div>
+                                  </td>
+                                  <td className="p-4">
+                                      <span className="px-2 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-200">
+                                          {user.role}
+                                      </span>
+                                  </td>
+                                  <td className="p-4 text-sm text-gray-700">{user.department || '-'}</td>
+                                  <td className="p-4 text-sm text-gray-600">{user.email}</td>
+                                  <td className="p-4 text-sm text-gray-600 font-mono">{user.phone_number || '-'}</td>
+                              </tr>
+                          ))}
+                      </tbody>
+                 </table>
+              </div>
+
+              {/* ADD USER MODAL */}
+              {isAddUserModalOpen && (
+                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><UsersIcon size={20} /> {t('modal_add_user')}</h3>
+                            <button onClick={() => setIsAddUserModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                        </div>
+                        <form onSubmit={handleAddUserSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_name')}</label>
+                                <div className="relative">
+                                    <input required type="text" value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-brand outline-none" />
+                                    <UsersIcon className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_email')}</label>
+                                    <div className="relative">
+                                        <input required type="email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-brand outline-none" />
+                                        <Mail className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_phone')}</label>
+                                    <div className="relative">
+                                        <input type="tel" value={newUserForm.phone} onChange={e => setNewUserForm({...newUserForm, phone: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-brand outline-none" />
+                                        <Phone className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_role')}</label>
+                                    <select value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none bg-white">
+                                        {Object.values(UserRole).map(role => (
+                                            <option key={role} value={role}>{role}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_dept')}</label>
+                                    <input type="text" value={newUserForm.department} onChange={e => setNewUserForm({...newUserForm, department: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('user_password')}</label>
+                                <div className="relative">
+                                    <input required type="password" value={newUserForm.password} onChange={e => setNewUserForm({...newUserForm, password: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 pl-10 focus:ring-2 focus:ring-brand outline-none" />
+                                    <Key className="absolute left-3 top-2.5 text-gray-400" size={18} />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">{t('upload_sign')}</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors relative">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={handleSignatureUpload}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                    {newUserForm.signature ? (
+                                        <div className="relative h-20 w-full">
+                                            <img src={newUserForm.signature} alt="Signature Preview" className="h-full w-full object-contain" />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity rounded-md">
+                                                <span className="text-white font-bold text-sm">Change</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-2">
+                                            <UploadCloud size={24} className="text-text-muted mb-1" />
+                                            <p className="text-xs text-text-muted">Upload Digital Signature Image</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">{t('btn_cancel')}</button>
+                                <button type="submit" className="flex-1 py-2.5 bg-brand text-white font-bold rounded-lg hover:bg-brand-dark transition">{t('btn_create_user')}</button>
+                            </div>
+                        </form>
+                    </div>
+                 </div>
+              )}
+          </div>
+      );
+  }
   
   // --- 2. ASSETS MODULE ---
   if (currentView === 'assets') {
-      const allDocuments = getAssetDocuments();
-      const movementLogs = getMovementLogs();
-
       if (selectedAsset) {
           const assetWOs = workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id);
-          const assetDocs = getAssetDocuments(selectedAsset.asset_id);
           return (
             <div className="space-y-6 animate-in slide-in-from-right-4">
                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-border shadow-sm">
@@ -512,13 +834,13 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                           )}
                           {activeTab === 'history' && (
                               <div className="space-y-4">
-                                  {assetWOs.map(wo => (<div key={wo.wo_id} className="border p-3 rounded">#{wo.wo_id} - {wo.description}</div>))}
+                                  {assetWOs.length === 0 ? <p className="text-text-muted">No history.</p> : assetWOs.map(wo => (<div key={wo.wo_id} className="border p-3 rounded">#{wo.wo_id} - {wo.description}</div>))}
                               </div>
                           )}
                        </div>
                    </div>
                    <div className="bg-white rounded-xl border border-border p-4 shadow-sm">
-                        <img src={selectedAsset.image} alt="Asset" className="w-full rounded-lg mb-4 object-cover aspect-square"/>
+                        {selectedAsset.image && <img src={selectedAsset.image} alt="Asset" className="w-full rounded-lg mb-4 object-cover aspect-square"/>}
                    </div>
                </div>
             </div>
@@ -546,14 +868,249 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                  </table>
              </div>
              {isAddModalOpen && (
-                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"><div className="bg-white p-6 rounded-lg shadow-xl"><h3 className="font-bold mb-4">Add Asset</h3><button onClick={() => setIsAddModalOpen(false)}>Close</button></div></div>
+                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-gray-900">{t('modal_add_title')}</h3>
+                            <button onClick={() => setIsAddModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                        </div>
+                        <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('form_name')}</label>
+                                <input required type="text" value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('form_model')}</label>
+                                    <input required type="text" value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('form_sn')}</label>
+                                    <input type="text" value={newAssetForm.asset_id} onChange={e => setNewAssetForm({...newAssetForm, asset_id: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none" placeholder="Auto-generated if empty" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('form_location')}</label>
+                                    <select value={newAssetForm.location_id} onChange={e => setNewAssetForm({...newAssetForm, location_id: parseInt(e.target.value)})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none">
+                                        {getLocations().map(loc => <option key={loc.location_id} value={loc.location_id}>{loc.name} ({loc.department})</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('form_date')}</label>
+                                    <input type="date" value={newAssetForm.purchase_date} onChange={e => setNewAssetForm({...newAssetForm, purchase_date: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none" />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">{t('form_image')}</label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:bg-gray-50 transition-colors relative">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={handleImageChange}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                    />
+                                    {newAssetForm.image ? (
+                                        <div className="relative h-32 w-full">
+                                            <img src={newAssetForm.image} alt="Preview" className="h-full w-full object-contain rounded-md" />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity rounded-md">
+                                                <span className="text-white font-bold text-sm">Change Image</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-4">
+                                            <UploadCloud size={32} className="text-text-muted mb-2" />
+                                            <p className="text-sm text-text-muted">Click or drag image to upload</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">{t('btn_cancel')}</button>
+                                <button type="submit" className="flex-1 py-2.5 bg-brand text-white font-bold rounded-lg hover:bg-brand-dark transition">{t('btn_save')}</button>
+                            </div>
+                        </form>
+                    </div>
+                 </div>
              )}
         </div>
       );
   }
 
-  // --- 3. MAINTENANCE MODULE (Skipped) ---
-  if (currentView === 'maintenance') return <div className="p-6">Maintenance View</div>;
+  // --- 3. MAINTENANCE MODULE ---
+  if (currentView === 'maintenance') {
+      const filteredWOs = workOrders.filter(wo => {
+          if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
+          if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
+          return true;
+      });
+
+      return (
+        <div className="space-y-6 animate-in fade-in">
+             <div className="flex justify-between items-end">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_maintenance')}</h2>
+                    <p className="text-text-muted text-sm mt-1">{t('wo_title')} and Technician Management</p>
+                </div>
+                <div className="flex gap-3">
+                     <div className="bg-white border border-border rounded-lg p-1 flex shadow-sm">
+                         <button 
+                            onClick={() => setMaintenanceViewMode('kanban')}
+                            className={`p-2 rounded-md transition-all ${maintenanceViewMode === 'kanban' ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+                            title={t('view_board')}
+                         >
+                             <LayoutGrid size={18} />
+                         </button>
+                         <button 
+                            onClick={() => setMaintenanceViewMode('list')}
+                            className={`p-2 rounded-md transition-all ${maintenanceViewMode === 'list' ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+                            title={t('view_list')}
+                         >
+                             <List size={18} />
+                         </button>
+                     </div>
+                     <button className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+                         <Plus size={16} /> {t('create_wo')}
+                     </button>
+                </div>
+             </div>
+
+             {/* Filters */}
+             <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-border shadow-sm">
+                  <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                      <Search size={16} className="text-text-muted" /> Filter:
+                  </div>
+                  <select 
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-brand"
+                      value={maintenanceFilterPriority}
+                      onChange={(e) => setMaintenanceFilterPriority(e.target.value)}
+                  >
+                      <option value="all">{t('priority')}: {t('filter_all')}</option>
+                      {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <select 
+                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-brand"
+                      value={maintenanceFilterType}
+                      onChange={(e) => setMaintenanceFilterType(e.target.value)}
+                  >
+                      <option value="all">{t('type')}: {t('filter_all')}</option>
+                      {Object.values(WorkOrderType).map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+             </div>
+
+             {maintenanceViewMode === 'kanban' ? (
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                     {/* Column: Open */}
+                     <div className="bg-gray-50/50 rounded-xl p-4 border border-border h-full min-h-[500px]">
+                         <div className="flex justify-between items-center mb-4 px-1">
+                             <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                 <span className="w-3 h-3 rounded-full bg-brand"></span> {t('wo_status_open')}
+                             </h3>
+                             <span className="bg-white border border-gray-200 px-2 py-0.5 rounded-full text-xs font-bold text-gray-500">
+                                 {filteredWOs.filter(w => w.status === 'Open').length}
+                             </span>
+                         </div>
+                         <div className="space-y-3">
+                             {filteredWOs.filter(w => w.status === 'Open').map(wo => (
+                                 <div key={wo.wo_id} className="bg-white p-4 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer group relative">
+                                     <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${wo.priority === Priority.CRITICAL ? 'bg-danger' : wo.priority === Priority.HIGH ? 'bg-orange-500' : 'bg-brand'}`}></div>
+                                     <div className="flex justify-between items-start mb-2 pl-2">
+                                         <span className="text-xs font-mono font-bold text-text-muted">#{wo.wo_id}</span>
+                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${wo.priority === Priority.CRITICAL ? 'bg-danger/10 text-danger border-danger/20' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{wo.priority}</span>
+                                     </div>
+                                     <h4 className="font-bold text-gray-900 text-sm mb-1 pl-2">{wo.description}</h4>
+                                     <p className="text-xs text-text-muted pl-2 mb-3">{wo.asset_id} • {wo.type}</p>
+                                     <div className="flex justify-end border-t border-gray-50 pt-2">
+                                         <button className="text-xs font-bold text-brand hover:underline">{t('assign')}</button>
+                                     </div>
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+
+                     {/* Column: In Progress */}
+                     <div className="bg-gray-50/50 rounded-xl p-4 border border-border h-full min-h-[500px]">
+                         <div className="flex justify-between items-center mb-4 px-1">
+                             <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                 <span className="w-3 h-3 rounded-full bg-warning"></span> {t('wo_status_inprogress')}
+                             </h3>
+                             <span className="bg-white border border-gray-200 px-2 py-0.5 rounded-full text-xs font-bold text-gray-500">
+                                 {filteredWOs.filter(w => w.status === 'In Progress').length}
+                             </span>
+                         </div>
+                         <div className="space-y-3">
+                             {filteredWOs.filter(w => w.status === 'In Progress').map(wo => (
+                                 <div key={wo.wo_id} className="bg-white p-4 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer relative">
+                                     <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-lg ${wo.priority === Priority.CRITICAL ? 'bg-danger' : 'bg-warning'}`}></div>
+                                     <div className="flex justify-between items-start mb-2 pl-2">
+                                         <span className="text-xs font-mono font-bold text-text-muted">#{wo.wo_id}</span>
+                                         <div className="flex items-center gap-1 text-xs text-warning-dark font-bold bg-warning/10 px-1.5 py-0.5 rounded">
+                                             <Clock size={10} /> Active
+                                         </div>
+                                     </div>
+                                     <h4 className="font-bold text-gray-900 text-sm mb-1 pl-2">{wo.description}</h4>
+                                     <p className="text-xs text-text-muted pl-2">{wo.asset_id}</p>
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+
+                     {/* Column: Closed */}
+                     <div className="bg-gray-50/50 rounded-xl p-4 border border-border h-full min-h-[500px]">
+                         <div className="flex justify-between items-center mb-4 px-1">
+                             <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                                 <span className="w-3 h-3 rounded-full bg-success"></span> {t('wo_status_closed')}
+                             </h3>
+                             <span className="bg-white border border-gray-200 px-2 py-0.5 rounded-full text-xs font-bold text-gray-500">
+                                 {filteredWOs.filter(w => w.status === 'Closed').length}
+                             </span>
+                         </div>
+                         <div className="space-y-3">
+                             {filteredWOs.filter(w => w.status === 'Closed').slice(0, 5).map(wo => (
+                                 <div key={wo.wo_id} className="bg-white p-4 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow cursor-pointer opacity-75 hover:opacity-100">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <span className="text-xs font-mono font-bold text-text-muted line-through">#{wo.wo_id}</span>
+                                         <span className="text-xs text-success font-bold flex items-center gap-1"><Wrench size={10}/> Done</span>
+                                     </div>
+                                     <h4 className="font-bold text-gray-700 text-sm mb-1">{wo.description}</h4>
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+                 </div>
+             ) : (
+                 <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+                     <table className="w-full text-start border-collapse">
+                          <thead className="bg-gray-50">
+                              <tr>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('wo_id')}</th>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">Asset</th>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('priority')}</th>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('status')}</th>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('assigned')}</th>
+                                  <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('actions')}</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                              {filteredWOs.map(wo => (
+                                  <tr key={wo.wo_id} className="hover:bg-gray-50">
+                                      <td className="p-4 font-mono font-bold text-sm">#{wo.wo_id}</td>
+                                      <td className="p-4 text-sm font-medium">{wo.asset_id}</td>
+                                      <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold border ${wo.priority === Priority.CRITICAL ? 'bg-danger/10 text-danger border-danger/20' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{wo.priority}</span></td>
+                                      <td className="p-4 text-sm font-bold text-gray-700">{wo.status}</td>
+                                      <td className="p-4 text-sm text-text-muted">Tech #{wo.assigned_to_id}</td>
+                                      <td className="p-4"><button className="text-brand font-bold text-sm hover:underline">View</button></td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                     </table>
+                 </div>
+             )}
+        </div>
+      );
+  }
 
   // --- 4. INVENTORY MODULE ---
   if (currentView === 'inventory') {
@@ -710,26 +1267,200 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                         <Printer size={18} /> Print Report
                      </button>
                  </div>
-                 <div className="bg-white p-8 mx-auto shadow-2xl max-w-[210mm] min-h-[297mm] text-black" style={{ fontFamily: 'Arial, sans-serif' }}>
-                     {/* REPORT CONTENT SAME AS PREVIOUS */}
-                     <div className="border-b-2 border-black pb-4 mb-4 flex justify-between items-start">
+                 <div className="bg-white p-8 mx-auto shadow-2xl max-w-[210mm] min-h-[297mm] text-black text-sm" style={{ fontFamily: 'Arial, sans-serif' }}>
+                    {/* Header */}
+                    <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-start">
                          <div className="text-start">
-                             <h1 className="text-xl font-bold uppercase">First Gulf Company</h1>
-                             <p className="text-sm font-bold">Kingdom of Saudi Arabia</p>
-                             <p className="text-sm">Tabuk area</p>
+                             <h1 className="text-xl font-bold uppercase tracking-wider">First Gulf Company</h1>
+                             <p className="font-bold">Kingdom of Saudi Arabia</p>
+                             <p>Tabuk area</p>
                          </div>
                          <div className="text-center">
-                             <h2 className="text-2xl font-black underline uppercase mb-1">Job Order Report</h2>
-                             <h3 className="text-lg font-bold arabic-font">تقرير أمر العمل</h3>
+                             <h2 className="text-2xl font-black underline uppercase mb-2">Job Order Report</h2>
+                             <h3 className="text-xl font-bold font-serif">تقرير أمر العمل</h3>
                          </div>
                          <div className="text-end">
-                             <div className="w-16 h-16 bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 border border-black">LOGO</div>
+                             <div className="w-20 h-20 bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500 border border-black">
+                                LOGO
+                             </div>
                          </div>
                      </div>
-                     {/* Rest of report fields simplified for brevity but would exist here */}
-                     <div className="border border-black mb-4 p-4 text-center">
-                         <p className="font-bold">Job Order #{selectedJobReport.job_order_no}</p>
-                         <p>Full detail report content loaded...</p>
+
+                     {/* I. Job & Report Identification */}
+                     <div className="mb-6">
+                        <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">I. Job & Report Identification</h4>
+                        <div className="grid grid-cols-2 border border-black">
+                            <div className="p-2 border-r border-black border-b flex justify-between">
+                                <span className="font-bold">Job Order No. (رقم أمر العمل):</span>
+                                <span>{selectedJobReport.job_order_no}</span>
+                            </div>
+                            <div className="p-2 border-b flex justify-between">
+                                <span className="font-bold">Report ID (رقم التقرير):</span>
+                                <span>{selectedJobReport.report_id}</span>
+                            </div>
+                            <div className="p-2 border-r border-black border-b flex justify-between">
+                                <span className="font-bold">Control No. (رقم التحكم):</span>
+                                <span>{selectedJobReport.control_no}</span>
+                            </div>
+                            <div className="p-2 border-b flex justify-between">
+                                <span className="font-bold">Priority (الأولوية):</span>
+                                <span>{selectedJobReport.priority}</span>
+                            </div>
+                            <div className="p-2 border-r border-black flex justify-between">
+                                <span className="font-bold">Risk Factor (مستوى الخطورة):</span>
+                                <span>{selectedJobReport.risk_factor}</span>
+                            </div>
+                             <div className="p-2"></div>
+                        </div>
+                     </div>
+
+                     {/* II. Asset & III. Location */}
+                     <div className="grid grid-cols-2 gap-4 mb-6">
+                        {/* Asset */}
+                        <div>
+                            <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">II. Asset Identification</h4>
+                            <div className="border border-black text-xs">
+                                 <div className="p-1 border-b border-black flex flex-col">
+                                    <span className="font-bold mb-1">Equipment Name (اسم الجهاز):</span>
+                                    <span>{selectedJobReport.asset.name}</span>
+                                 </div>
+                                 <div className="p-1 border-b border-black flex justify-between">
+                                    <span className="font-bold">Model No:</span>
+                                    <span>{selectedJobReport.asset.model}</span>
+                                 </div>
+                                 <div className="p-1 border-b border-black flex justify-between">
+                                    <span className="font-bold">Manufacturer:</span>
+                                    <span>{selectedJobReport.asset.manufacturer}</span>
+                                 </div>
+                                 <div className="p-1 flex justify-between">
+                                    <span className="font-bold">Serial No:</span>
+                                    <span>{selectedJobReport.asset.serial_no}</span>
+                                 </div>
+                            </div>
+                        </div>
+                        {/* Location */}
+                        <div>
+                            <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">III. Location Details</h4>
+                            <div className="border border-black text-xs">
+                                 <div className="p-1 border-b border-black flex justify-between">
+                                    <span className="font-bold">Site (الموقع):</span>
+                                    <span>{selectedJobReport.location.site}</span>
+                                 </div>
+                                 <div className="p-1 border-b border-black flex justify-between">
+                                    <span className="font-bold">Building:</span>
+                                    <span>{selectedJobReport.location.building}</span>
+                                 </div>
+                                 <div className="p-1 border-b border-black flex justify-between">
+                                    <span className="font-bold">Department:</span>
+                                    <span>{selectedJobReport.location.department}</span>
+                                 </div>
+                                 <div className="p-1 flex justify-between">
+                                    <span className="font-bold">Room:</span>
+                                    <span>{selectedJobReport.location.room}</span>
+                                 </div>
+                            </div>
+                        </div>
+                     </div>
+
+                     {/* IV. Fault & Remedy */}
+                     <div className="mb-6">
+                         <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">IV. Fault & Remedy Details</h4>
+                         <div className="border border-black">
+                            <div className="grid grid-cols-2 border-b border-black">
+                                 <div className="p-2 border-r border-black flex justify-between">
+                                    <span className="font-bold">Failed Date (تاريخ التعطل):</span>
+                                    <span>{selectedJobReport.fault_details.failed_date}</span>
+                                 </div>
+                                 <div className="p-2 flex justify-between">
+                                    <span className="font-bold">Repair Date (تاريخ الإصلاح):</span>
+                                    <span>{selectedJobReport.fault_details.repair_date}</span>
+                                 </div>
+                            </div>
+                            <div className="p-2 border-b border-black min-h-[60px]">
+                                <span className="font-bold block mb-1">Fault Description (وصف العطل):</span>
+                                <p>{selectedJobReport.fault_details.fault_description}</p>
+                            </div>
+                            <div className="p-2 border-b border-black min-h-[60px]">
+                                <span className="font-bold block mb-1">REMEDY / WORK DONE (العمل المنجز):</span>
+                                <p>{selectedJobReport.fault_details.remedy_work_done}</p>
+                            </div>
+                            <div className="p-2 flex justify-between">
+                                <span className="font-bold">Technician (منفذ العمل):</span>
+                                <span>{selectedJobReport.fault_details.technician_name}</span>
+                            </div>
+                         </div>
+                     </div>
+
+                     {/* V. QC Analysis */}
+                     <div className="mb-6">
+                         <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">V. Quality Control Analysis</h4>
+                         <div className="border border-black p-2 grid grid-cols-2 gap-4">
+                            <div className="col-span-2 border-b border-gray-300 pb-2 mb-2">
+                                 <span className="font-bold mr-2">Need Spare Parts:</span>
+                                 <span>{selectedJobReport.qc_analysis.need_spare_parts}</span>
+                            </div>
+                            
+                            {[
+                                { label: "Need Calibration", val: selectedJobReport.qc_analysis.need_calibration },
+                                { label: "User Errors", val: selectedJobReport.qc_analysis.user_errors },
+                                { label: "UnRepairable", val: selectedJobReport.qc_analysis.unrepairable },
+                                { label: "Agent Repair", val: selectedJobReport.qc_analysis.agent_repair },
+                                { label: "Partially Working", val: selectedJobReport.qc_analysis.partially_working },
+                                { label: "Incident", val: selectedJobReport.qc_analysis.incident },
+                            ].map((item, i) => (
+                                <div key={i} className="flex items-center gap-2">
+                                    <div className={`w-4 h-4 border border-black flex items-center justify-center ${item.val ? 'bg-black text-white' : 'bg-white'}`}>
+                                        {item.val && <Check size={12} />}
+                                    </div>
+                                    <span className="text-sm">{item.label}</span>
+                                </div>
+                            ))}
+                         </div>
+                     </div>
+
+                     {/* VI. Approvals */}
+                     <div className="mb-0">
+                         <h4 className="font-bold bg-gray-200 border border-black border-b-0 p-1 px-2 text-xs uppercase">VI. Caller & Approval Details</h4>
+                         <div className="border border-black">
+                             <div className="p-2 border-b border-black">
+                                <span className="font-bold mr-2">Caller Details (بيانات المبلغ):</span>
+                                <span>{selectedJobReport.approvals.caller.name} - {selectedJobReport.approvals.caller.contact}</span>
+                             </div>
+                             <div className="grid grid-cols-3 divide-x divide-black">
+                                 <div className="p-2 text-center h-32 flex flex-col justify-between">
+                                     <div>
+                                         <p className="font-bold text-xs">Dep. Head (رئيس القسم)</p>
+                                         <p className="text-xs mt-1">{selectedJobReport.approvals.dept_head.name}</p>
+                                     </div>
+                                     <div className="border-t border-gray-400 pt-1 mt-2">
+                                         <p className="text-[10px] text-gray-500">Signature & Date: {selectedJobReport.approvals.dept_head.date}</p>
+                                     </div>
+                                 </div>
+                                 <div className="p-2 text-center h-32 flex flex-col justify-between">
+                                     <div>
+                                         <p className="font-bold text-xs">Site Supervisor (المهندس المسؤول)</p>
+                                         <p className="text-xs mt-1">{selectedJobReport.approvals.site_supervisor.name}</p>
+                                     </div>
+                                     <div className="border-t border-gray-400 pt-1 mt-2">
+                                         <p className="text-[10px] text-gray-500">Signature & Date: {selectedJobReport.approvals.site_supervisor.date}</p>
+                                     </div>
+                                 </div>
+                                 <div className="p-2 text-center h-32 flex flex-col justify-between">
+                                     <div>
+                                         <p className="font-bold text-xs">Site Admin (مشرف الصيانة الطبية)</p>
+                                         <p className="text-xs mt-1">{selectedJobReport.approvals.site_admin.name}</p>
+                                     </div>
+                                     <div className="border-t border-gray-400 pt-1 mt-2">
+                                         <p className="text-[10px] text-gray-500">Signature & Date: {selectedJobReport.approvals.site_admin.date}</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+                     </div>
+
+                     {/* Footer */}
+                     <div className="mt-8 text-center text-xs text-gray-500 border-t border-gray-300 pt-2">
+                         <p>Generated by A2M MED System • {new Date().toLocaleString()}</p>
                      </div>
                  </div>
              </div>
@@ -775,26 +1506,40 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
 
             {activeTab === 'tab3' && (
                 <div className="space-y-6">
+                    {/* JOB ORDER REPORT GENERATOR */}
                     <div className="bg-surface p-6 rounded-xl border border-border shadow-sm bg-blue-50/50">
-                        <div className="flex justify-between items-center">
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                              <div className="flex items-center gap-4">
                                  <div className="bg-brand text-white p-3 rounded-lg shadow-lg shadow-brand/20">
                                      <FileText size={24} />
                                  </div>
                                  <div>
-                                     <h3 className="text-lg font-bold text-gray-900">Job Order Report #2236</h3>
-                                     <p className="text-sm text-text-muted">Corrective Maintenance - Vital Signs Monitor - OPD</p>
+                                     <h3 className="text-lg font-bold text-gray-900">Specific Job Order Report</h3>
+                                     <p className="text-sm text-text-muted">Generate detailed form for a specific Work Order (e.g., 2236)</p>
                                  </div>
                              </div>
-                             <button 
-                                onClick={() => setSelectedJobReport(getDetailedReports()[0])}
-                                className="bg-white border border-gray-200 hover:border-brand text-brand font-bold px-6 py-3 rounded-lg shadow-sm transition-all hover:shadow-md flex items-center gap-2"
-                             >
-                                 <Search size={18} /> View Report
-                             </button>
+                             <div className="flex items-center gap-2 w-full md:w-auto">
+                                 <input 
+                                    type="text" 
+                                    placeholder="Job Order No."
+                                    value={jobOrderSearchId}
+                                    onChange={(e) => setJobOrderSearchId(e.target.value)}
+                                    className="border border-gray-300 rounded-lg px-4 py-3 w-full md:w-40 text-sm focus:ring-2 focus:ring-brand outline-none"
+                                 />
+                                 <button 
+                                    onClick={() => {
+                                        const report = getDetailedReports().find(r => r.job_order_no.toString() === jobOrderSearchId) || getDetailedReports()[0]; // Fallback to demo report for UX
+                                        setSelectedJobReport(report);
+                                    }}
+                                    className="bg-white border border-gray-200 hover:border-brand text-brand font-bold px-6 py-3 rounded-lg shadow-sm transition-all hover:shadow-md flex items-center gap-2 whitespace-nowrap"
+                                 >
+                                     <Search size={18} /> Generate Report
+                                 </button>
+                             </div>
                         </div>
                     </div>
 
+                    {/* GENERAL REPORT GENERATOR */}
                     <div className="bg-surface p-6 rounded-xl border border-border shadow-sm">
                         <div className="flex items-center gap-2 mb-4">
                              <div className="p-2 bg-brand/10 text-brand rounded-lg">

@@ -17,8 +17,15 @@ export const translations = {
     role_nurse: "Nurse",
     role_vendor: "Vendor",
     // Login
-    login_title: "CMMS Login",
+    login_title: "Sign in to your account",
+    login_subtitle: "Enter your credentials to access the system",
+    email_label: "Email Address",
+    password_label: "Password",
+    btn_login: "Sign In",
+    login_error: "Invalid email or password",
+    or_continue_as: "Or continue with Demo Persona",
     select_persona: "Select a Persona to Demo:",
+    logging_in: "Logging in...",
     // Sidebar/Nav
     nav_dashboard: "Dashboard",
     nav_assets: "Assets & Equipment",
@@ -26,6 +33,7 @@ export const translations = {
     nav_inventory: "Inventory & Supply",
     nav_calibration: "Calibration & Quality",
     nav_analysis: "Analysis & Knowledge",
+    nav_users: "User Management",
     // Dashboard
     op_overview: "Operational Overview",
     total_assets: "Total Assets",
@@ -35,6 +43,8 @@ export const translations = {
     dept_map: "Live Department Map",
     unauth_move: "Unauthorized Move",
     kpi_mtbf: "Mean Time Between Failures (MTBF)",
+    kpi_mttr: "Mean Time To Repair (MTTR)",
+    failure_trend: "Failure Analysis Trend",
     kpi_availability: "Asset Availability",
     alert_boundary: "Boundary Alert",
     alert_boundary_msg: "Asset crossed unauthorized boundary",
@@ -74,6 +84,7 @@ export const translations = {
     form_sn: "Asset ID / S/N",
     form_location: "Location",
     form_date: "Purchase Date",
+    form_image: "Asset Image",
     btn_save: "Save Asset",
     // Maintenance
     tab_wo: "Work Orders",
@@ -84,6 +95,15 @@ export const translations = {
     assigned: "Assigned",
     priority: "Priority",
     type: "Type",
+    view_board: "Board View",
+    view_list: "List View",
+    create_wo: "Create Work Order",
+    wo_title: "Work Orders",
+    wo_status_open: "Open",
+    wo_status_inprogress: "In Progress",
+    wo_status_closed: "Closed",
+    assign: "Assign",
+    filter_all: "All",
     // Inventory
     tab_stock: "Current Stock",
     tab_logs: "Stock Logs",
@@ -184,7 +204,20 @@ export const translations = {
     reported: "Reported",
     scan_nfc: "Scan Device NFC",
     identifying: "Identifying Device...",
-    tap_instruction: "Tap phone to asset tag"
+    tap_instruction: "Tap phone to asset tag",
+    // Users
+    users_title: "System Users",
+    add_user: "Add User",
+    user_name: "Name",
+    user_email: "Email",
+    user_phone: "Phone Number",
+    user_role: "Role",
+    user_dept: "Department",
+    user_password: "Password",
+    user_sign: "Digital Signature",
+    modal_add_user: "Create New Account",
+    upload_sign: "Upload Signature",
+    btn_create_user: "Create Account"
   },
   ar: {
     // General
@@ -199,8 +232,15 @@ export const translations = {
     role_nurse: "ممرض/ة",
     role_vendor: "بائع",
     // Login
-    login_title: "تسجيل الدخول للنظام",
+    login_title: "تسجيل الدخول",
+    login_subtitle: "أدخل بيانات الاعتماد للوصول إلى النظام",
+    email_label: "البريد الإلكتروني",
+    password_label: "كلمة المرور",
+    btn_login: "دخول",
+    login_error: "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+    or_continue_as: "أو الاستمرار كشخصية تجريبية",
     select_persona: "اختر مستخدم للتجربة:",
+    logging_in: "جاري الدخول...",
     // Sidebar/Nav
     nav_dashboard: "لوحة القيادة",
     nav_assets: "الأصول والمعدات",
@@ -208,6 +248,7 @@ export const translations = {
     nav_inventory: "المخزون والتوريد",
     nav_calibration: "المعايرة والجودة",
     nav_analysis: "التحليل والمعرفة",
+    nav_users: "إدارة المستخدمين",
     // Dashboard
     op_overview: "نظرة عامة",
     total_assets: "إجمالي الأصول",
@@ -217,6 +258,8 @@ export const translations = {
     dept_map: "خريطة الأقسام الحية",
     unauth_move: "حركة غير مصرح بها",
     kpi_mtbf: "متوسط الزمن بين الأعطال (MTBF)",
+    kpi_mttr: "متوسط وقت الإصلاح (MTTR)",
+    failure_trend: "تحليل اتجاه الأعطال",
     kpi_availability: "جاهزية الأصول",
     alert_boundary: "تنبيه حدودي",
     alert_boundary_msg: "تجاوز الأصل الحدود المصرح بها",
@@ -256,6 +299,7 @@ export const translations = {
     form_sn: "الرقم التعريفي / التسلسلي",
     form_location: "الموقع",
     form_date: "تاريخ الشراء",
+    form_image: "صورة الأصل",
     btn_save: "حفظ الأصل",
     // Maintenance
     tab_wo: "أوامر العمل",
@@ -266,6 +310,15 @@ export const translations = {
     assigned: "مكلف بـ",
     priority: "الأولوية",
     type: "النوع",
+    view_board: "لوحة المهام",
+    view_list: "قائمة",
+    create_wo: "إنشاء أمر عمل",
+    wo_title: "أوامر العمل",
+    wo_status_open: "مفتوح",
+    wo_status_inprogress: "جاري التنفيذ",
+    wo_status_closed: "مغلق",
+    assign: "تعيين",
+    filter_all: "الكل",
     // Inventory
     tab_stock: "المخزون الحالي",
     tab_logs: "سجلات المخزون",
@@ -366,7 +419,20 @@ export const translations = {
     reported: "تم الإبلاغ",
     scan_nfc: "مسح NFC للجهاز",
     identifying: "جاري التعرف...",
-    tap_instruction: "قرب الهاتف من ملصق الجهاز"
+    tap_instruction: "قرب الهاتف من ملصق الجهاز",
+    // Users
+    users_title: "مستخدمي النظام",
+    add_user: "إضافة مستخدم",
+    user_name: "الاسم",
+    user_email: "البريد الإلكتروني",
+    user_phone: "رقم الهاتف",
+    user_role: "الدور",
+    user_dept: "القسم",
+    user_password: "كلمة المرور",
+    user_sign: "التوقيع الرقمي",
+    modal_add_user: "إنشاء حساب جديد",
+    upload_sign: "رفع التوقيع",
+    btn_create_user: "إنشاء حساب"
   }
 };
 

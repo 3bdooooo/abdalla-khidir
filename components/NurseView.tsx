@@ -1,6 +1,8 @@
 
+
 import React, { useState, useMemo } from 'react';
-import { createWorkOrder, LOCATIONS } from '../services/mockDb';
+import * as api from '../services/api';
+import { LOCATIONS } from '../services/mockDb';
 import { Priority, WorkOrderType, Asset, User, AssetStatus } from '../types';
 import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -35,13 +37,13 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
     maint: deptAssets.filter(a => a.status === AssetStatus.UNDER_MAINT).length,
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
     if (!description) return;
 
     const assetIdToReport = selectedAssetId || 'NFC-1004';
     
-    createWorkOrder({
-      wo_id: Math.floor(Math.random() * 10000),
+    await api.createWorkOrder({
+      wo_id: Math.floor(Math.random() * 100000), // Random ID for simplicity
       asset_id: assetIdToReport,
       type: WorkOrderType.CORRECTIVE,
       priority: Priority.CRITICAL,

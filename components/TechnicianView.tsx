@@ -1,8 +1,10 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Asset, InventoryPart, WorkOrder, AssetDocument, WorkOrderType } from '../types';
 import { analyzeRootCause } from '../services/geminiService';
-import { updateStock, closeWorkOrder, startWorkOrder, getAssets, getAssetDocuments } from '../services/mockDb';
+import { getAssets, getAssetDocuments } from '../services/mockDb';
+import * as api from '../services/api';
 import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -41,6 +43,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ userWorkOrders, inve
 
   // Helper to get Asset for WO
   const getAssetForWO = (assetId: string) => {
+      // Note: In real app, we might need to fetch single asset async if list is huge
       return getAssets().find(a => a.asset_id === assetId);
   };
 
@@ -90,8 +93,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ userWorkOrders, inve
     const currentAssetId = selectedWO.asset_id;
 
     // Simulate 1.5s scan delay
-    setTimeout(() => {
-        startWorkOrder(currentWoId);
+    setTimeout(async () => {
+        await api.startWorkOrder(currentWoId);
         refreshData();
         
         // Update local state to reflect status change immediately for UI
@@ -122,14 +125,15 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ userWorkOrders, inve
     setIsAnalyzing(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedWO) return;
     
-    // 1. Update Inventory
-    selectedParts.forEach(p => updateStock(p.id, p.qty));
+    // 1. Update Inventory (Parallel)
+    const stockPromises = selectedParts.map(p => api.updateStock(p.id, p.qty));
+    await Promise.all(stockPromises);
     
     // 2. Close WO
-    closeWorkOrder(selectedWO.wo_id);
+    await api.closeWorkOrder(selectedWO.wo_id);
     
     // 3. Reset
     setShowConfirmModal(false);

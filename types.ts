@@ -44,7 +44,12 @@ export interface User {
   name: string;
   role: UserRole;
   email: string;
-  location_id?: number; // Optional, for Nurses/Dept Heads
+  location_id?: number; 
+  // New Fields for User Management
+  phone_number?: string;
+  password?: string; // Stored plainly for mock/demo purposes
+  digital_signature?: string; // Base64 string
+  department?: string;
 }
 
 // Asset Inventory Table

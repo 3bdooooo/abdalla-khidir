@@ -27,15 +27,16 @@ export const LOCATIONS: Location[] = [
   { location_id: 121, name: 'OPD', department: 'OPD', city: 'Amlaj', building: 'Main Building', room: 'OPD' },
 ];
 
-export const MOCK_USERS: User[] = [
-  { user_id: 1, name: 'Dr. Sarah Smith', role: UserRole.SUPERVISOR, email: 'sarah@hospital.com', location_id: 101 },
-  { user_id: 2, name: 'Abdalla Yasir', role: UserRole.TECHNICIAN, email: 'abdalla@fgc.com' },
-  { user_id: 3, name: 'Nurse Jackie', role: UserRole.NURSE, email: 'jackie@hospital.com', location_id: 105 },
-  { user_id: 4, name: 'Eng. Mike Ross', role: UserRole.ENGINEER, email: 'mike@hospital.com' },
-  { user_id: 5, name: 'Admin Head', role: UserRole.ADMIN, email: 'admin@hospital.com' },
+export let MOCK_USERS: User[] = [
+  { user_id: 1, name: 'Dr. Sarah Smith', role: UserRole.SUPERVISOR, email: 'sarah@hospital.com', location_id: 101, phone_number: '0501234567', department: 'Radiology', password: '123' },
+  { user_id: 2, name: 'Abdalla Yasir', role: UserRole.TECHNICIAN, email: 'abdalla@fgc.com', phone_number: '0509876543', department: 'Maintenance', password: '123' },
+  { user_id: 3, name: 'Nurse Jackie', role: UserRole.NURSE, email: 'jackie@hospital.com', location_id: 105, phone_number: '0555555555', department: 'General Ward', password: '123' },
+  { user_id: 4, name: 'Eng. Mike Ross', role: UserRole.ENGINEER, email: 'mike@hospital.com', phone_number: '0566666666', department: 'Biomedical', password: '123' },
+  { user_id: 5, name: 'Admin Head', role: UserRole.ADMIN, email: 'admin@hospital.com', phone_number: '0599999999', department: 'Administration', password: 'admin' },
+  { user_id: 6, name: 'Vendor Steve', role: UserRole.VENDOR, email: 'steve@vendor.com', phone_number: '0588888888', department: 'External', password: '123' },
 ];
 
-// Initial 50+ Assets with Database Fields
+// Initial Assets
 export let assets: Asset[] = [
   { 
     asset_id: 'NFC-1001', nfc_tag_id: 'NFC-1001', name: 'MRI Scanner', model: 'Siemens Magnetom', location_id: 101, 
@@ -61,14 +62,12 @@ export let assets: Asset[] = [
     last_calibration_date: '2023-06-01', next_calibration_date: '2023-12-01', 
     image: 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
   },
-  // Specific Asset for Report
   { 
     asset_id: '17678', nfc_tag_id: '17678', name: 'Vital Signs Monitors', model: 'V100', manufacturer: 'GE', serial_number: 'SH614030057SA', 
     location_id: 121, status: AssetStatus.RUNNING, purchase_date: '2020-01-01', warranty_expiration: '2022-01-01', operating_hours: 1500, risk_score: 10,
     last_calibration_date: '2023-01-01', next_calibration_date: '2024-01-01',
     image: 'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=800&q=80'
   },
-  // New Assets (Populating to 50 with simplified fields for brevity, assuming defaults for new fields)
   { asset_id: 'NFC-1005', name: 'Anesthesia Machine', model: 'Drager Fabius', location_id: 106, status: AssetStatus.RUNNING, purchase_date: '2020-05-12', warranty_expiration: '2023-05-12', operating_hours: 1500, risk_score: 10, last_calibration_date: '2023-05-01', next_calibration_date: '2024-05-01', image: 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?auto=format&fit=crop&w=800&q=80' },
   { asset_id: 'NFC-1006', name: 'Surgical Light', model: 'Maquet Volista', location_id: 106, status: AssetStatus.RUNNING, purchase_date: '2019-11-20', warranty_expiration: '2024-11-20', operating_hours: 2200, risk_score: 5, last_calibration_date: '2023-01-10', next_calibration_date: '2024-01-10', image: 'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=800&q=80' },
   { asset_id: 'NFC-1007', name: 'Electrosurgical Unit', model: 'Valleylab FT10', location_id: 106, status: AssetStatus.RUNNING, purchase_date: '2021-02-15', warranty_expiration: '2024-02-15', operating_hours: 800, risk_score: 15, last_calibration_date: '2023-08-15', next_calibration_date: '2024-08-15', image: 'https://images.unsplash.com/photo-1582719508461-905c673771fd?auto=format&fit=crop&w=800&q=80' },
@@ -184,6 +183,8 @@ export let workOrders: WorkOrder[] = [
   { wo_id: 5005, asset_id: 'NFC-1015', type: WorkOrderType.CALIBRATION, priority: Priority.HIGH, assigned_to_id: 4, description: 'Calibration due', status: 'Open', created_at: '2023-10-27' },
   // Specific WO for Report
   { wo_id: 2236, asset_id: '17678', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 2, description: 'Not Working', status: 'Closed', created_at: '2025-11-09', close_time: '2025-11-12' },
+  // Specific WO for Vendor
+  { wo_id: 5099, asset_id: 'NFC-1005', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, assigned_to_id: 6, description: 'Anesthesia Gas Mixer Repair', status: 'Open', created_at: '2023-11-01' },
 ];
 
 export const MOCK_DETAILED_REPORTS: DetailedJobOrderReport[] = [
@@ -277,6 +278,7 @@ export const getAssets = () => assets;
 export const getInventory = () => inventory;
 export const getWorkOrders = () => workOrders;
 export const getLocations = () => LOCATIONS;
+export const getUsers = () => MOCK_USERS;
 export const getLocationName = (id: number) => LOCATIONS.find(l => l.location_id === id)?.name || 'Unknown';
 export const getAssetDocuments = (assetId?: string) => assetId ? MOCK_DOCUMENTS.filter(d => d.asset_id === assetId) : MOCK_DOCUMENTS;
 export const getMovementLogs = () => MOCK_MOVEMENT_LOGS;
@@ -327,3 +329,11 @@ export const updateStock = (partId: number, quantityUsed: number) => {
 export const restockPart = (partId: number, quantityAdded: number) => {
   inventory = inventory.map(i => i.part_id === partId ? { ...i, current_stock: i.current_stock + quantityAdded } : i);
 };
+
+export const addAsset = (asset: Asset) => {
+  assets = [...assets, asset];
+}
+
+export const addUser = (user: User) => {
+  MOCK_USERS = [...MOCK_USERS, user];
+}

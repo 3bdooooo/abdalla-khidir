@@ -4,8 +4,8 @@ let aiClient: GoogleGenAI | null = null;
 
 const getAiClient = () => {
   if (!aiClient) {
-    // Vite uses import.meta.env for environment variables
-    const apiKey = import.meta.env.VITE_API_KEY || ''; 
+    // Safely access env vars using optional chaining
+    const apiKey = import.meta.env?.VITE_API_KEY || ''; 
     
     if (!apiKey) {
       console.warn("Google GenAI API Key is missing. AI features will not function.");
@@ -26,7 +26,8 @@ export const analyzeRootCause = async (
     const ai = getAiClient();
     
     // Check key existence before call
-    const apiKey = import.meta.env.VITE_API_KEY || '';
+    const apiKey = import.meta.env?.VITE_API_KEY || '';
+    
     if (!apiKey) {
         return "AI analysis unavailable (Missing API Key)";
     }
