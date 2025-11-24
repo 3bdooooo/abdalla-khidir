@@ -4,7 +4,7 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, L
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, SystemAlert, Priority, WorkOrderType, User, UserRole } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getSystemAlerts } from '../services/mockDb';
 import * as api from '../services/api';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -74,6 +74,22 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
   const [maintenanceViewMode, setMaintenanceViewMode] = useState<'kanban' | 'list'>('kanban');
   const [maintenanceFilterPriority, setMaintenanceFilterPriority] = useState<string>('all');
   const [maintenanceFilterType, setMaintenanceFilterType] = useState<string>('all');
+  
+  // Create Work Order Modal State
+  const [isCreateWOModalOpen, setIsCreateWOModalOpen] = useState(false);
+  const [newWOForm, setNewWOForm] = useState({
+      assetId: '',
+      type: WorkOrderType.CORRECTIVE,
+      priority: Priority.MEDIUM,
+      description: '',
+      assignedToId: ''
+  });
+
+  // Calibration View State
+  const [calibrationSearch, setCalibrationSearch] = useState('');
+  const [updateCalibrationModalOpen, setUpdateCalibrationModalOpen] = useState(false);
+  const [assetToCalibrate, setAssetToCalibrate] = useState<Asset | null>(null);
+  const [newCalibrationDate, setNewCalibrationDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Simulation State
   const [isSimulationActive, setIsSimulationActive] = useState(false);
@@ -302,6 +318,49 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
       }
   };
 
+  const handleCreateWOSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      
+      await api.createWorkOrder({
+          wo_id: Math.floor(Math.random() * 100000),
+          asset_id: newWOForm.assetId,
+          type: newWOForm.type,
+          priority: newWOForm.priority,
+          description: newWOForm.description,
+          assigned_to_id: parseInt(newWOForm.assignedToId),
+          status: 'Open',
+          created_at: new Date().toISOString()
+      });
+
+      refreshData();
+      setIsCreateWOModalOpen(false);
+      setNewWOForm({
+          assetId: '',
+          type: WorkOrderType.CORRECTIVE,
+          priority: Priority.MEDIUM,
+          description: '',
+          assignedToId: ''
+      });
+  };
+
+  const handleUpdateCalibration = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (assetToCalibrate) {
+          const nextCal = new Date(newCalibrationDate);
+          nextCal.setFullYear(nextCal.getFullYear() + 1);
+          
+          await api.updateAssetCalibration(
+              assetToCalibrate.asset_id,
+              newCalibrationDate,
+              nextCal.toISOString().split('T')[0]
+          );
+          
+          refreshData();
+          setUpdateCalibrationModalOpen(false);
+          setAssetToCalibrate(null);
+      }
+  };
+
   const handleFindJobReport = () => {
       // Logic to find specific report. Mocking 2236 for now
       if (jobOrderSearchId === '2236' || jobOrderSearchId === '') {
@@ -315,7 +374,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
 
   // --- 1. DASHBOARD MODULE (ADMIN/HEAD UI) ---
   if (currentView === 'dashboard') {
-    // ... [Existing Dashboard Code]
+    // ... [Existing Dashboard Code - Unchanged]
     const departments = Array.from(new Set(getLocations().map(l => l.department)));
 
     return (
@@ -662,6 +721,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
 
   // --- 7. USERS MODULE (ADMIN ONLY) ---
   if (currentView === 'users') {
+      // ... [Existing User Module Code - Unchanged]
       return (
           <div className="space-y-6 animate-in fade-in">
               <div className="flex justify-between items-center">
@@ -802,6 +862,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
   
   // --- 2. ASSETS MODULE ---
   if (currentView === 'assets') {
+      // ... [Existing Assets Module Code - Unchanged]
       if (selectedAsset) {
           const assetWOs = workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id);
           return (
@@ -971,7 +1032,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                              <List size={18} />
                          </button>
                      </div>
-                     <button className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
+                     <button onClick={() => setIsCreateWOModalOpen(true)} className="bg-brand hover:bg-brand-dark text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm">
                          <Plus size={16} /> {t('create_wo')}
                      </button>
                 </div>
@@ -1000,6 +1061,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                   </select>
              </div>
 
+             {/* KANBAN / LIST VIEW RENDERING */}
              {maintenanceViewMode === 'kanban' ? (
                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                      {/* Column: Open */}
@@ -1108,13 +1170,95 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
                      </table>
                  </div>
              )}
+
+             {/* CREATE WO MODAL */}
+             {isCreateWOModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-lg text-gray-900">{t('modal_create_wo')}</h3>
+                            <button onClick={() => setIsCreateWOModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                        </div>
+                        <form onSubmit={handleCreateWOSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('wo_asset')}</label>
+                                <select 
+                                    required 
+                                    value={newWOForm.assetId} 
+                                    onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none bg-white"
+                                >
+                                    <option value="">Select Asset...</option>
+                                    {assets.map(asset => (
+                                        <option key={asset.asset_id} value={asset.asset_id}>{asset.name} ({asset.asset_id})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('type')}</label>
+                                    <select 
+                                        value={newWOForm.type} 
+                                        onChange={e => setNewWOForm({...newWOForm, type: e.target.value as WorkOrderType})}
+                                        className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none bg-white"
+                                    >
+                                        {Object.values(WorkOrderType).map(t => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('priority')}</label>
+                                    <select 
+                                        value={newWOForm.priority} 
+                                        onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}
+                                        className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none bg-white"
+                                    >
+                                        {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('wo_description')}</label>
+                                <textarea 
+                                    required
+                                    value={newWOForm.description}
+                                    onChange={e => setNewWOForm({...newWOForm, description: e.target.value})}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 h-24 focus:ring-2 focus:ring-brand outline-none resize-none"
+                                    placeholder="Describe the issue..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-1">{t('wo_assign_tech')}</label>
+                                <select 
+                                    value={newWOForm.assignedToId} 
+                                    onChange={e => setNewWOForm({...newWOForm, assignedToId: e.target.value})}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none bg-white"
+                                >
+                                    <option value="">Unassigned</option>
+                                    {users.filter(u => u.role === UserRole.TECHNICIAN).map(tech => (
+                                        <option key={tech.user_id} value={tech.user_id}>{tech.name} ({tech.department})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-100">
+                                <button type="button" onClick={() => setIsCreateWOModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-bold rounded-lg hover:bg-gray-200 transition">{t('btn_cancel')}</button>
+                                <button type="submit" className="flex-1 py-2.5 bg-brand text-white font-bold rounded-lg hover:bg-brand-dark transition">{t('btn_dispatch')}</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+             )}
         </div>
       );
   }
 
   // --- 4. INVENTORY MODULE ---
   if (currentView === 'inventory') {
-    return (
+      // ... [Existing Inventory Code - Unchanged]
+      return (
         <div className="space-y-6 animate-in fade-in">
             {/* Header */}
             <div className="flex justify-between items-center">
@@ -1245,11 +1389,139 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, assets,
     );
   }
 
-  // --- 5. CALIBRATION MODULE (Skipped) ---
-  if (currentView === 'calibration') return <div className="p-6">Calibration View</div>;
+  // --- 5. CALIBRATION MODULE ---
+  if (currentView === 'calibration') {
+      const filteredAssets = assets.filter(a => 
+          a.name.toLowerCase().includes(calibrationSearch.toLowerCase()) || 
+          a.asset_id.toLowerCase().includes(calibrationSearch.toLowerCase())
+      );
+      
+      // Mock Stats
+      const compliantCount = assets.filter(a => !a.next_calibration_date || new Date(a.next_calibration_date) > new Date()).length;
+      const overdueCount = assets.length - compliantCount;
+      const complianceRate = Math.floor((compliantCount / assets.length) * 100);
+
+      return (
+          <div className="space-y-6 animate-in fade-in">
+              <div className="flex justify-between items-end">
+                  <div>
+                      <h2 className="text-2xl font-bold text-gray-900">{t('cal_dashboard')}</h2>
+                      <p className="text-text-muted text-sm mt-1">Track compliance and equipment certification</p>
+                  </div>
+                  <div className="bg-white px-4 py-2 rounded-lg border border-border shadow-sm flex gap-6">
+                      <div className="text-center">
+                          <p className="text-xs font-bold text-text-muted uppercase">Compliance Rate</p>
+                          <p className="text-xl font-bold text-success">{complianceRate}%</p>
+                      </div>
+                      <div className="w-px bg-gray-200"></div>
+                      <div className="text-center">
+                          <p className="text-xs font-bold text-text-muted uppercase">Overdue</p>
+                          <p className="text-xl font-bold text-danger">{overdueCount}</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="flex gap-4 items-center bg-white p-4 rounded-xl border border-border shadow-sm">
+                  <Search size={18} className="text-text-muted" />
+                  <input 
+                    type="text"
+                    placeholder="Search asset by name or ID..."
+                    value={calibrationSearch}
+                    onChange={(e) => setCalibrationSearch(e.target.value)}
+                    className="flex-1 outline-none text-sm"
+                  />
+              </div>
+
+              <div className="bg-surface rounded-xl shadow-sm border border-border overflow-hidden">
+                  <table className="w-full text-start border-collapse">
+                      <thead className="bg-gray-50">
+                          <tr>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('asset_info')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('last_cal')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('next_due')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('cal_status')}</th>
+                              <th className="p-4 text-xs font-bold text-text-muted uppercase text-start">{t('actions')}</th>
+                          </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                          {filteredAssets.map(asset => {
+                              const isOverdue = asset.next_calibration_date && new Date(asset.next_calibration_date) < new Date();
+                              return (
+                                  <tr key={asset.asset_id} className="hover:bg-gray-50">
+                                      <td className="p-4">
+                                          <div className="font-bold text-gray-900">{asset.name}</div>
+                                          <div className="text-xs text-text-muted">{asset.asset_id}</div>
+                                      </td>
+                                      <td className="p-4 text-sm text-gray-600">{asset.last_calibration_date || '-'}</td>
+                                      <td className="p-4 text-sm font-bold">{asset.next_calibration_date || '-'}</td>
+                                      <td className="p-4">
+                                          {isOverdue ? (
+                                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-danger/10 text-danger border border-danger/20">
+                                                  <AlertCircle size={12}/> {t('cal_overdue')}
+                                              </span>
+                                          ) : (
+                                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold bg-success/10 text-success border border-success/20">
+                                                  <ClipboardCheck size={12}/> {t('cal_compliant')}
+                                              </span>
+                                          )}
+                                      </td>
+                                      <td className="p-4">
+                                          <button 
+                                            onClick={() => {
+                                                setAssetToCalibrate(asset);
+                                                setUpdateCalibrationModalOpen(true);
+                                            }}
+                                            className="text-brand font-bold text-xs hover:underline flex items-center gap-1"
+                                          >
+                                              <RefreshCw size={12}/> {t('btn_update_cal')}
+                                          </button>
+                                      </td>
+                                  </tr>
+                              )
+                          })}
+                      </tbody>
+                  </table>
+              </div>
+
+              {/* UPDATE CALIBRATION MODAL */}
+              {updateCalibrationModalOpen && assetToCalibrate && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+                            <h3 className="font-bold text-lg text-gray-900">{t('update_cal_title')}</h3>
+                            <button onClick={() => setUpdateCalibrationModalOpen(false)}><X size={20} className="text-gray-400 hover:text-gray-600" /></button>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                                <p className="text-sm font-bold">{assetToCalibrate.name}</p>
+                                <p className="text-xs text-text-muted">{assetToCalibrate.asset_id}</p>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 mb-2">{t('new_cal_date')}</label>
+                                <input 
+                                    type="date" 
+                                    value={newCalibrationDate}
+                                    onChange={(e) => setNewCalibrationDate(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-2 focus:ring-brand outline-none"
+                                />
+                            </div>
+                            <button 
+                                onClick={handleUpdateCalibration}
+                                className="w-full py-3 bg-brand hover:bg-brand-dark text-white rounded-lg font-bold mt-2"
+                            >
+                                {t('btn_record')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+              )}
+          </div>
+      );
+  }
 
   // --- 6. ANALYSIS & KNOWLEDGE MODULE ---
   if (currentView === 'analysis') {
+      // ... [Existing Analysis Code - Unchanged]
       if (selectedJobReport) {
           return (
              <div className="space-y-6 animate-in zoom-in-95 duration-200">

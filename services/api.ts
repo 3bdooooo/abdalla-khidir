@@ -39,7 +39,9 @@ const mapDbAssetToApp = (dbAsset: any): Asset => ({
     purchase_date: dbAsset.purchase_date || new Date().toISOString(),
     operating_hours: 0, 
     risk_score: 0, 
-    image: dbAsset.image
+    image: dbAsset.image,
+    last_calibration_date: dbAsset.last_calibration_date, // Ensure these are mapped
+    next_calibration_date: dbAsset.next_calibration_date
 });
 
 const mapAppAssetToDb = (asset: Asset) => ({
@@ -114,6 +116,11 @@ const generateRandomAssets = (count: number) => {
         if (statusRandom > 0.85) status = AssetStatus.DOWN;
         else if (statusRandom > 0.75) status = AssetStatus.UNDER_MAINT;
 
+        // Calibration dates logic
+        const lastCal = new Date(Date.now() - Math.floor(Math.random() * 365 * 24 * 60 * 60 * 1000));
+        const nextCal = new Date(lastCal);
+        nextCal.setFullYear(nextCal.getFullYear() + 1);
+
         assets.push({
             asset_id: `NFC-${10000 + i}`,
             nfc_tag_id: `NFC-${10000 + i}`,
@@ -126,7 +133,9 @@ const generateRandomAssets = (count: number) => {
             purchase_date: new Date(Date.now() - Math.floor(Math.random() * 100000000000)).toISOString().split('T')[0],
             operating_hours: Math.floor(Math.random() * 5000),
             risk_score: Math.floor(Math.random() * 100),
-            image: `https://source.unsplash.com/random/800x600/?medical,technology&sig=${i}`
+            image: `https://source.unsplash.com/random/800x600/?medical,technology&sig=${i}`,
+            last_calibration_date: lastCal.toISOString().split('T')[0],
+            next_calibration_date: nextCal.toISOString().split('T')[0]
         });
     }
     return assets;
@@ -294,19 +303,20 @@ export const createWorkOrder = async (wo: WorkOrder) => {
 
     const dbWo = {
         asset_id: assetData.asset_id,
-        reporter_id: 3, 
+        reporter_id: wo.assigned_to_id || 3, // Use assigned or default to a nurse
         priority: wo.priority,
         description: wo.description,
         status: wo.status,
         assigned_to_id: wo.assigned_to_id,
-        type: wo.type === WorkOrderType.PREVENTIVE ? 'Preventive' : 'Corrective'
+        type: wo.type === WorkOrderType.PREVENTIVE ? 'Preventive' : 'Corrective',
+        creation_date: wo.created_at
     };
 
     const { error } = await supabase.from('work_orders').insert(dbWo);
     if (error) throw error;
 
     if (wo.priority === 'Critical' || wo.priority === 'High') {
-        await updateAssetStatus(wo.asset_id, 'Down' as AssetStatus);
+        await updateAssetStatus(wo.asset_id, AssetStatus.DOWN);
     }
   } catch (e) {
     console.warn("Supabase create failed, using mock.", e);
@@ -325,6 +335,26 @@ export const updateAssetStatus = async (assetId: string, status: AssetStatus) =>
   } catch (e) {
     MockDb.updateAssetStatus(assetId, status);
   }
+};
+
+export const updateAssetCalibration = async (assetId: string, lastDate: string, nextDate: string) => {
+    if (!isSupabaseConfigured) {
+        // Mock update if needed (mockDb logic doesn't deeply simulate this, but avoids crash)
+        return;
+    }
+    try {
+        const { error } = await supabase
+            .from('assets')
+            .update({ 
+                last_calibration_date: lastDate,
+                next_calibration_date: nextDate
+            })
+            .eq('nfc_tag_id', assetId);
+            
+        if (error) throw error;
+    } catch (e) {
+        console.error("Calibration update failed", e);
+    }
 };
 
 export const updateStock = async (partId: number, qtyUsed: number) => {
