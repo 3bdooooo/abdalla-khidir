@@ -10,9 +10,10 @@ interface LayoutProps {
   currentView: string;
   onNavigate: (view: string) => void;
   children: React.ReactNode;
+  badgeCounts?: { [key: string]: number };
 }
 
-export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onNavigate, children }) => {
+export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onNavigate, children, badgeCounts }) => {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
   const { t, toggleLanguage, language } = useLanguage();
 
@@ -86,23 +87,31 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
           </div>
 
           <nav className="flex-1 p-4 space-y-1">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onNavigate(item.id);
-                  setIsSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-start font-medium ${
-                  currentView === item.id 
-                    ? 'bg-brand/10 text-brand border border-brand/10' 
-                    : 'text-text-muted hover:bg-gray-50 hover:text-gray-900'
-                }`}
-              >
-                <item.icon size={18} className={currentView === item.id ? 'text-brand' : 'text-gray-400 rtl:rotate-180'} />
-                {item.label}
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const badge = badgeCounts?.[item.id] || 0;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    onNavigate(item.id);
+                    setIsSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-start font-medium relative group ${
+                    currentView === item.id 
+                      ? 'bg-brand/10 text-brand border border-brand/10' 
+                      : 'text-text-muted hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <item.icon size={18} className={currentView === item.id ? 'text-brand' : 'text-gray-400 rtl:rotate-180 group-hover:text-gray-600'} />
+                  <span className="flex-1">{item.label}</span>
+                  {badge > 0 && (
+                    <span className="bg-danger text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                        {badge > 99 ? '99+' : badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </nav>
 
           <div className="p-4 border-t border-border bg-gray-50/50 space-y-3">

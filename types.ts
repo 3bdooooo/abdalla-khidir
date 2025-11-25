@@ -135,7 +135,7 @@ export interface ClosureReport {
   final_comments: string;
 }
 
-// New Interface for the Specific Job Order Report
+// Detailed CM Report
 export interface DetailedJobOrderReport {
   job_order_no: number;
   report_id: string;
@@ -162,6 +162,11 @@ export interface DetailedJobOrderReport {
     technician_name: string;
     remedy_work_done: string;
   };
+  spare_parts: {
+    part_name: string;
+    part_no: string;
+    quantity: number;
+  }[];
   qc_analysis: {
     need_spare_parts: string;
     need_calibration: boolean;
@@ -176,6 +181,44 @@ export interface DetailedJobOrderReport {
     dept_head: { name: string; date: string };
     site_supervisor: { name: string; date: string };
     site_admin: { name: string; date: string };
+  };
+}
+
+// Detailed PM Report
+export interface PreventiveMaintenanceReport {
+  pm_id: string;
+  wo_id: number;
+  scheduled_date: string;
+  completion_date: string;
+  technician_name: string;
+  asset: {
+    name: string;
+    model: string;
+    serial_no: string;
+    asset_id: string;
+    location: string;
+  };
+  checklist: {
+    id: number;
+    task: string;
+    status: 'Pass' | 'Fail' | 'N/A';
+    notes?: string;
+  }[];
+  vital_data: {
+    operating_hours: number;
+    last_calibration: string;
+    electrical_safety_pass: boolean;
+  };
+  calibration_results: {
+    required: boolean;
+    status: 'Pass' | 'Fail' | 'N/A';
+    certificate_no?: string;
+  };
+  next_due_date: string;
+  approvals: {
+    technician_sign: string;
+    supervisor_sign: string;
+    date: string;
   };
 }
 

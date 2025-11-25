@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState } from 'react';
 
 export type Language = 'en' | 'ar';
@@ -141,10 +142,12 @@ export const translations = {
     update_cal_title: "Record Calibration",
     new_cal_date: "New Calibration Date",
     btn_record: "Record",
-    // Analysis
+    // Analysis & Reports
+    tab_analysis: "Analysis & Reports",
     tab_reports: "Reports",
     tab_kb: "Knowledge Base",
     tab_gen_report: "Report Generator",
+    tab_analytics: "Strategic Analytics", // New
     gen_report: "Generate Report",
     report_type: "Report Type",
     cm_report: "Corrective Maintenance (CM)",
@@ -153,6 +156,20 @@ export const translations = {
     date_range: "Date Range",
     download_pdf: "Download PDF",
     generated_reports: "Generated Reports",
+    // New Analytics
+    pillar_operational: "Operational Efficiency",
+    pillar_assets: "Asset Management & Predictive",
+    chart_mttr_trend: "MTTR Trend (Monthly)",
+    chart_tech_perf: "Technician Performance Analysis",
+    chart_downtime_loc: "Downtime by Department",
+    chart_asset_status: "Current Asset Status",
+    chart_fault_dist: "Fault Distribution by Equipment",
+    chart_qc_analysis: "Quality Control Analysis",
+    table_risk_report: "Predictive Risk Report",
+    lbl_avg_mttr: "Avg MTTR",
+    lbl_wo_count: "WO Count",
+    lbl_user_error: "User Errors",
+    lbl_tech_fault: "Technical Faults",
     // Technician
     tech_dashboard: "Technician Dashboard",
     btn_start_job: "Start Job (Scan NFC)",
@@ -182,8 +199,8 @@ export const translations = {
     // New Tech UI
     tab_new_req: "New Requests",
     tab_scheduled_pm: "Scheduled PMs",
-    tab_diagnosis: "Diagnosis",
-    tab_parts: "Spare Parts",
+    tab_diagnosis: "Diagnosis Steps",
+    tab_parts: "Parts Used",
     tab_checklist: "Checklist",
     tab_finish: "Finish",
     search_parts: "Search Inventory...",
@@ -214,7 +231,7 @@ export const translations = {
     report_placeholder: "What seems to be the problem? (e.g., Bed remote not working)",
     btn_report: "REPORT FAULT NOW",
     report_sent: "Report Sent!",
-    report_desc: "Pressing this button will immediately dispatch a CRITICAL alert and email the nearest technician.",
+    report_desc: "الضغط على هذا الزر سيرسل تنبيهاً عاجلاً وبريداً إلكترونياً لأقرب فني فوراً.",
     detected: "Detected",
     reported: "Reported",
     scan_nfc: "Scan Device NFC",
@@ -372,9 +389,11 @@ export const translations = {
     new_cal_date: "تاريخ المعايرة الجديد",
     btn_record: "تسجيل",
     // Analysis
+    tab_analysis: "التحليل والتقارير",
     tab_reports: "التقارير",
     tab_kb: "قاعدة المعرفة",
     tab_gen_report: "منشئ التقارير",
+    tab_analytics: "التحليلات الاستراتيجية", // New
     gen_report: "إنشاء تقرير",
     report_type: "نوع التقرير",
     cm_report: "صيانة تصحيحية (CM)",
@@ -383,6 +402,20 @@ export const translations = {
     date_range: "النطاق الزمني",
     download_pdf: "تحميل PDF",
     generated_reports: "التقارير المنشأة",
+    // New Analytics
+    pillar_operational: "الكفاءة التشغيلية",
+    pillar_assets: "إدارة الأصول والتنبؤ",
+    chart_mttr_trend: "اتجاه MTTR (شهري)",
+    chart_tech_perf: "تحليل أداء الفنيين",
+    chart_downtime_loc: "وقت التوقف حسب القسم",
+    chart_asset_status: "حالة الأصول الحالية",
+    chart_fault_dist: "توزيع الأعطال حسب المعدات",
+    chart_qc_analysis: "تحليل مراقبة الجودة",
+    table_risk_report: "تقرير المخاطر التنبؤي",
+    lbl_avg_mttr: "متوسط MTTR",
+    lbl_wo_count: "عدد الأوامر",
+    lbl_user_error: "أخطاء المستخدم",
+    lbl_tech_fault: "أعطال فنية",
     // Technician
     tech_dashboard: "لوحة مهام الفني",
     btn_start_job: "ابدأ العمل (مسح NFC)",

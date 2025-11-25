@@ -20,7 +20,8 @@ const AppContent: React.FC = () => {
   const [inventory, setInventory] = useState<InventoryPart[]>([]);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [users, setUsers] = useState<User[]>([]); // New State
-  
+  const [badges, setBadges] = useState<{ [key: string]: number }>({});
+
   // Load Data from Supabase
   const refreshData = async () => {
     setLoading(true);
@@ -51,6 +52,19 @@ const AppContent: React.FC = () => {
     };
     init();
   }, []);
+
+  // Calculate Badges
+  useEffect(() => {
+    const criticalWOs = workOrders.filter(wo => wo.status !== 'Closed' && wo.priority === 'Critical').length;
+    const overdueCal = assets.filter(a => a.next_calibration_date && new Date(a.next_calibration_date) < new Date()).length;
+    const lowStock = inventory.filter(p => p.current_stock <= p.min_reorder_level).length;
+
+    setBadges({
+        maintenance: criticalWOs,
+        calibration: overdueCal,
+        inventory: lowStock
+    });
+  }, [workOrders, assets, inventory]);
 
   // Handle Add Asset
   const handleAddAsset = async (newAsset: Asset) => {
@@ -93,6 +107,7 @@ const AppContent: React.FC = () => {
       onLogout={handleLogout} 
       currentView={currentView}
       onNavigate={setCurrentView}
+      badgeCounts={badges}
     >
       {(user.role === UserRole.SUPERVISOR || user.role === UserRole.ADMIN) && (
         <SupervisorView 
@@ -110,6 +125,7 @@ const AppContent: React.FC = () => {
 
       {(user.role === UserRole.TECHNICIAN || user.role === UserRole.VENDOR) && (
         <TechnicianView 
+          currentUser={user}
           userWorkOrders={workOrders.filter(wo => wo.assigned_to_id === user.user_id)} // Filter from live data
           inventory={inventory}
           refreshData={refreshData}

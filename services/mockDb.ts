@@ -1,5 +1,5 @@
 
-import { Asset, AssetStatus, InventoryPart, Location, Priority, User, UserRole, WorkOrder, WorkOrderType, AssetDocument, MovementLog, DetailedJobOrderReport, Incident, SystemAlert } from '../types';
+import { Asset, AssetStatus, InventoryPart, Location, Priority, User, UserRole, WorkOrder, WorkOrderType, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, Incident, SystemAlert } from '../types';
 
 // Expanded Hospital Locations / Departments
 export const LOCATIONS: Location[] = [
@@ -214,8 +214,11 @@ export const MOCK_DETAILED_REPORTS: DetailedJobOrderReport[] = [
       technician_name: 'Abdalla Yasir',
       remedy_work_done: 'Necessary work was done, the fault was repaired, and the device is working well.'
     },
+    spare_parts: [
+      { part_name: 'Power Supply Module', part_no: 'PS-V100-22', quantity: 1 }
+    ],
     qc_analysis: {
-      need_spare_parts: 'No Spare Parts Yet',
+      need_spare_parts: 'No Spare Parts Yet', // Or 'Consumed'
       need_calibration: false,
       user_errors: false,
       unrepairable: false,
@@ -228,6 +231,46 @@ export const MOCK_DETAILED_REPORTS: DetailedJobOrderReport[] = [
       dept_head: { name: 'Weed Ali Al sidalani', date: '12-11-2025 15:30' },
       site_supervisor: { name: 'Eng. Ahmed Najah El Sharef', date: '12-11-2025 15:32' },
       site_admin: { name: 'Eng. Mohamed Salah Al Mailbi', date: '18-11-2025 15:42' }
+    }
+  }
+];
+
+export const MOCK_PM_REPORTS: PreventiveMaintenanceReport[] = [
+  {
+    pm_id: 'PM-2025-1024',
+    wo_id: 5002,
+    scheduled_date: '2023-10-26',
+    completion_date: '2023-10-26',
+    technician_name: 'Abdalla Yasir',
+    asset: {
+      name: 'MRI Scanner',
+      model: 'Siemens Magnetom',
+      serial_no: 'SN-1001-A',
+      asset_id: 'NFC-1001',
+      location: 'Radiology / Radio-1'
+    },
+    checklist: [
+      { id: 1, task: 'Inspect physical condition of chassis and cables', status: 'Pass' },
+      { id: 2, task: 'Verify cooling system fluid levels', status: 'Pass' },
+      { id: 3, task: 'Test emergency stop functionality', status: 'Pass' },
+      { id: 4, task: 'Check gradient coil connections', status: 'Pass', notes: 'Tightened loose connector on axis Z' },
+      { id: 5, task: 'Perform image quality phantom test', status: 'Pass' }
+    ],
+    vital_data: {
+      operating_hours: 12150,
+      last_calibration: '2022-10-26',
+      electrical_safety_pass: true
+    },
+    calibration_results: {
+      required: true,
+      status: 'Pass',
+      certificate_no: 'CAL-2023-8892'
+    },
+    next_due_date: '2024-10-26',
+    approvals: {
+      technician_sign: 'Abdalla Yasir',
+      supervisor_sign: 'Eng. Mike Ross',
+      date: '2023-10-26 14:00'
     }
   }
 ];
@@ -266,10 +309,10 @@ export const MOCK_ALERTS: SystemAlert[] = [
     id: 3,
     type: 'COMPLIANCE',
     message: 'Calibration overdue for Ventilator (NFC-1013) in ICU-1',
-    timestamp: new Date().toISOString(),
-    asset_id: 'NFC-1013',
-    severity: 'high',
-    status: 'active'
+    timestamp: new Date().toISOString(), 
+    asset_id: 'NFC-1013', 
+    severity: 'high', 
+    status: 'active' 
   }
 ];
 
@@ -282,7 +325,8 @@ export const getUsers = () => MOCK_USERS;
 export const getLocationName = (id: number) => LOCATIONS.find(l => l.location_id === id)?.name || 'Unknown';
 export const getAssetDocuments = (assetId?: string) => assetId ? MOCK_DOCUMENTS.filter(d => d.asset_id === assetId) : MOCK_DOCUMENTS;
 export const getMovementLogs = () => MOCK_MOVEMENT_LOGS;
-export const getDetailedReports = () => MOCK_DETAILED_REPORTS; // New Helper
+export const getDetailedReports = () => MOCK_DETAILED_REPORTS; 
+export const getPMReports = () => MOCK_PM_REPORTS; // New Helper
 export const getSystemAlerts = () => MOCK_ALERTS;
 
 export const getTechnicianWorkOrders = (techId: number) => workOrders.filter(wo => wo.assigned_to_id === techId);

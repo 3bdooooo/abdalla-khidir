@@ -287,6 +287,11 @@ export const fetchUsers = async (): Promise<User[]> => {
   }
 };
 
+export const fetchPMReport = async (woId: string) => {
+    // Mock fetch for PM reports since we are using detailed mock templates
+    return MockDb.getPMReports().find(r => r.wo_id.toString() === woId) || MockDb.getPMReports()[0];
+}
+
 // --- WRITE FUNCTIONS ---
 
 export const createWorkOrder = async (wo: WorkOrder) => {
