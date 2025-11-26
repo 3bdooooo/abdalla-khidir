@@ -1,11 +1,11 @@
-// ... existing imports ...
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
 import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
-import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService'; // Import Predictive Service
+import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -23,33 +23,44 @@ interface SupervisorProps {
 }
 
 export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, currentUser, assets, workOrders, inventory, users = [], onAddAsset, onAddUser, refreshData, onNavigate }) => {
-    // ... KEEP ALL EXISTING STATE AND LOGIC UNCHANGED ...
+    // State Management
     const [activeTab, setActiveTab] = useState('tab_analytics'); 
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const { t, language } = useLanguage();
+    
+    // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newAssetForm, setNewAssetForm] = useState({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
+    
     const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
     const [newUserForm, setNewUserForm] = useState({ name: '', email: '', phone: '', password: '', role: UserRole.TECHNICIAN, department: '', signature: '' });
+    
+    // Inventory State
     const [restockModalOpen, setRestockModalOpen] = useState(false);
     const [confirmRestockOpen, setConfirmRestockOpen] = useState(false);
     const [selectedPartForRestock, setSelectedPartForRestock] = useState<InventoryPart | null>(null);
     const [restockAmount, setRestockAmount] = useState('');
+    
+    // Reporting State
     const [reportType, setReportType] = useState<'CM' | 'PPM' | 'COMPLIANCE'>('CM');
     const [reportStartDate, setReportStartDate] = useState('2023-01-01');
     const [reportEndDate, setReportEndDate] = useState('2023-12-31');
     const [jobOrderSearchId, setJobOrderSearchId] = useState('');
-    const [kbSearch, setKbSearch] = useState('');
     const [selectedCMReport, setSelectedCMReport] = useState<DetailedJobOrderReport | null>(null);
     const [selectedPMReport, setSelectedPMReport] = useState<PreventiveMaintenanceReport | null>(null);
+    
+    // Alerts State
     const [alerts, setAlerts] = useState<SystemAlert[]>(getSystemAlerts());
     const [showAlertPanel, setShowAlertPanel] = useState(false);
     const [justificationModalOpen, setJustificationModalOpen] = useState(false);
     const [selectedAlert, setSelectedAlert] = useState<SystemAlert | null>(null);
     const [justificationReason, setJustificationReason] = useState('');
+    
     // 3D Map State
     const [selectedMapZone, setSelectedMapZone] = useState<string | null>(null);
+    const [isSimulationActive, setIsSimulationActive] = useState(false);
     
+    // Maintenance State
     const [maintenanceViewMode, setMaintenanceViewMode] = useState<'kanban' | 'list'>('kanban');
     const [maintenanceFilterPriority, setMaintenanceFilterPriority] = useState<string>('all');
     const [maintenanceFilterType, setMaintenanceFilterType] = useState<string>('all');
@@ -57,19 +68,21 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [newWOForm, setNewWOForm] = useState({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
     const [selectedWorkOrderForDetails, setSelectedWorkOrderForDetails] = useState<WorkOrder | null>(null);
     const [isWorkOrderDetailsModalOpen, setIsWorkOrderDetailsModalOpen] = useState(false);
+    
+    // Calibration State
     const [calibrationSearch, setCalibrationSearch] = useState('');
     const [updateCalibrationModalOpen, setUpdateCalibrationModalOpen] = useState(false);
     const [assetToCalibrate, setAssetToCalibrate] = useState<Asset | null>(null);
     const [newCalibrationDate, setNewCalibrationDate] = useState(new Date().toISOString().split('T')[0]);
-    const [isSimulationActive, setIsSimulationActive] = useState(false);
     
-    // New State for Assignment
+    // Assignment State
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [selectedWOForAssignment, setSelectedWOForAssignment] = useState<WorkOrder | null>(null);
     const [selectedTechForAssignment, setSelectedTechForAssignment] = useState('');
-    const [recommendedTechs, setRecommendedTechs] = useState<TechRecommendation[]>([]); // NEW STATE
+    const [recommendedTechs, setRecommendedTechs] = useState<TechRecommendation[]>([]);
 
-    // New State for AI Search
+    // Knowledge Base State
+    const [kbSearch, setKbSearch] = useState('');
     const [kbMode, setKbMode] = useState<'list' | 'ai'>('list');
     const [aiQuery, setAiQuery] = useState('');
     const [aiResult, setAiResult] = useState<{explanation: string, solution: string, relevantDocs: string[]} | null>(null);
@@ -80,74 +93,78 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [selectedWOForApproval, setSelectedWOForApproval] = useState<WorkOrder | null>(null);
     const [approvalSignature, setApprovalSignature] = useState('');
 
-    // Use Centralized Knowledge Base Docs
+    // --- DATA MEMOIZATION ---
     const kbDocuments = useMemo(() => getKnowledgeBaseDocs(), []);
     const filteredKbDocs = kbDocuments.filter(doc => doc.title.toLowerCase().includes(kbSearch.toLowerCase()));
     
-    // --- PREDICTIVE RISK CALCULATION ON LOAD ---
+    // Risk Calculation Simulation
     useEffect(() => {
-        // In a real app, this runs on the backend. Here we simulate the update on load.
-        // We iterate through assets and update their risk score based on the new logic.
-        const movementLogs = getMovementLogs(); // In real app, fetch these
+        const movementLogs = getMovementLogs();
         assets.forEach(asset => {
              const newScore = calculateAssetRiskScore(asset, workOrders, movementLogs);
-             // We don't have a bulk update API in this demo, so we just mutate the local object for display
-             // In a real scenario: api.updateAssetRisk(asset.asset_id, newScore);
              asset.risk_score = newScore; 
         });
-    }, [assets, workOrders]); // Recalculate when data changes
+    }, [assets, workOrders]);
 
-    // Handlers
-    const handleAiSearch = async () => {
-        if(!aiQuery) return;
-        setIsAiSearching(true);
-        setAiResult(null);
+    // View Switching Logic
+    useEffect(() => { 
+        if (currentView === 'analysis') setActiveTab('tab_analytics'); 
+        else setActiveTab('tab1'); 
         
-        // Extract titles for context
-        const availableTitles = kbDocuments.map(d => d.title);
+        setSelectedAsset(null); 
+        setSelectedCMReport(null); 
+        setSelectedPMReport(null);
         
-        const result = await searchKnowledgeBase(aiQuery, availableTitles, language);
-        setAiResult(result);
-        setIsAiSearching(false);
-    };
+        if (currentView !== 'dashboard') setIsSimulationActive(false); 
+    }, [currentView]);
 
-    useEffect(() => { if (currentView === 'analysis') setActiveTab('tab_analytics'); else setActiveTab('tab1'); setSelectedAsset(null); setSelectedCMReport(null); setSelectedPMReport(null); if (currentView !== 'dashboard') setIsSimulationActive(false); }, [currentView]);
-    useEffect(() => { let interval: NodeJS.Timeout; if (isSimulationActive && currentView === 'dashboard') { interval = setInterval(async () => { const randomIdx = Math.floor(Math.random() * assets.length); const targetAsset = assets[randomIdx]; const r = Math.random(); let newStatus = AssetStatus.RUNNING; if (r > 0.90) newStatus = AssetStatus.DOWN; else if (r > 0.80) newStatus = AssetStatus.UNDER_MAINT; if (targetAsset.status !== newStatus) { await api.updateAssetStatus(targetAsset.asset_id, newStatus); refreshData(); } }, 3000); } return () => clearInterval(interval); }, [isSimulationActive, currentView, assets, refreshData]);
+    // Simulation Loop
+    useEffect(() => { 
+        let interval: NodeJS.Timeout; 
+        if (isSimulationActive && currentView === 'dashboard') { 
+            interval = setInterval(async () => { 
+                const randomIdx = Math.floor(Math.random() * assets.length); 
+                const targetAsset = assets[randomIdx]; 
+                const r = Math.random(); 
+                let newStatus = AssetStatus.RUNNING; 
+                if (r > 0.90) newStatus = AssetStatus.DOWN; 
+                else if (r > 0.80) newStatus = AssetStatus.UNDER_MAINT; 
+                
+                if (targetAsset.status !== newStatus) { 
+                    await api.updateAssetStatus(targetAsset.asset_id, newStatus); 
+                    refreshData(); 
+                } 
+            }, 3000); 
+        } 
+        return () => clearInterval(interval); 
+    }, [isSimulationActive, currentView, assets, refreshData]);
     
-    const kpiData = useMemo(() => { /* ... existing logic ... */ return { totalAssets: assets.length, openWorkOrders: workOrders.filter(wo => wo.status !== 'Closed').length, lowStockAlerts: inventory.filter(i => i.current_stock <= i.min_reorder_level).length, availability: [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length }, { name: 'Maint', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length }, ], mttr: '4.2' }; }, [assets, workOrders, inventory]);
-    const mtbfData = [ { month: 'Jan', mtbf: 450 }, { month: 'Feb', mtbf: 480 }, { month: 'Mar', mtbf: 520 }, { month: 'Apr', mtbf: 510 }, { month: 'May', mtbf: 550 }, { month: 'Jun', mtbf: 590 }, ];
-    const failureTrendData = [ { month: 'Jan', Power: 12, Software: 8, Mechanical: 5, UserError: 2 }, { month: 'Feb', Power: 10, Software: 12, Mechanical: 4, UserError: 3 }, { month: 'Mar', Power: 8, Software: 15, Mechanical: 6, UserError: 1 }, { month: 'Apr', Power: 5, Software: 9, Mechanical: 8, UserError: 4 }, { month: 'May', Power: 7, Software: 11, Mechanical: 7, UserError: 2 }, { month: 'Jun', Power: 4, Software: 8, Mechanical: 9, UserError: 5 }, ];
-    
+    // Analytics Calculations
     const analyticsData = useMemo(() => {
-        // ... (existing logic) ...
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
+        
+        // MTTR Trend
         const mttrByMonth: {[key: string]: {total: number, count: number}} = {};
-        closedWOs.forEach(wo => { const month = new Date(wo.close_time!).toLocaleString('default', { month: 'short' }); if (!mttrByMonth[month]) mttrByMonth[month] = { total: 0, count: 0 }; const duration = new Date(wo.close_time!).getTime() - new Date(wo.start_time!).getTime(); mttrByMonth[month].total += duration; mttrByMonth[month].count += 1; });
+        closedWOs.forEach(wo => { 
+            const month = new Date(wo.close_time!).toLocaleString('default', { month: 'short' }); 
+            if (!mttrByMonth[month]) mttrByMonth[month] = { total: 0, count: 0 }; 
+            const duration = new Date(wo.close_time!).getTime() - new Date(wo.start_time!).getTime(); 
+            mttrByMonth[month].total += duration; 
+            mttrByMonth[month].count += 1; 
+        });
         const mttrTrend = Object.keys(mttrByMonth).map(m => ({ month: m, hours: parseFloat((mttrByMonth[m].total / mttrByMonth[m].count / (1000 * 60 * 60)).toFixed(1)) })).slice(0, 6);
         
-        // TECHNICIAN PERFORMANCE & RATING
+        // Tech Performance
         const techStats: {[key: string]: {count: number, totalTime: number, totalRating: number, ratingCount: number, firstFix: number}} = {};
-        
         workOrders.filter(wo => wo.status === 'Closed').forEach(wo => {
             const techId = wo.assigned_to_id;
             if (!techStats[techId]) techStats[techId] = { count: 0, totalTime: 0, totalRating: 0, ratingCount: 0, firstFix: 0 };
-            
             techStats[techId].count += 1;
-            
             if (wo.start_time && wo.close_time) {
                 techStats[techId].totalTime += (new Date(wo.close_time).getTime() - new Date(wo.start_time).getTime());
             }
-            
-            // Rating
-            if (wo.nurse_rating) {
-                techStats[techId].totalRating += wo.nurse_rating;
-                techStats[techId].ratingCount += 1;
-            }
-
-            // First Fix
-            if (wo.is_first_time_fix) {
-                techStats[techId].firstFix += 1;
-            }
+            if (wo.nurse_rating) { techStats[techId].totalRating += wo.nurse_rating; techStats[techId].ratingCount += 1; }
+            if (wo.is_first_time_fix) { techStats[techId].firstFix += 1; }
         });
 
         const techPerformance = Object.keys(techStats).map(id => {
@@ -163,14 +180,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             };
         });
 
-        const faultCounts: {[key: string]: number} = {};
-        workOrders.filter(wo => wo.type === WorkOrderType.CORRECTIVE).forEach(wo => { const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id); const name = asset ? asset.name : 'Unknown'; faultCounts[name] = (faultCounts[name] || 0) + 1; });
-        const faultDistribution = Object.keys(faultCounts).map(key => ({ name: key, count: faultCounts[key] })).sort((a,b) => b.count - a.count).slice(0, 5);
-        const statusData = [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length, color: '#10B981' }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length, color: '#EF4444' }, { name: 'Maint.', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length, color: '#F59E0B' }, { name: 'Scrapped', value: assets.filter(a => a.status === AssetStatus.SCRAPPED).length, color: '#64748B' }, ];
+        // Other Stats
+        const statusData = [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length, color: '#10B981' }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length, color: '#EF4444' }, { name: 'Maint.', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length, color: '#F59E0B' } ];
         const riskData = [...assets].sort((a,b) => b.risk_score - a.risk_score).slice(0, 10);
-        const qcData = [ { name: 'User Errors', value: 35 }, { name: 'Technical Faults', value: 65 } ];
         
-        // TCO ANALYSIS
+        // TCO
         const tcoData = assets
             .filter(a => a.purchase_cost && a.accumulated_maintenance_cost)
             .sort((a,b) => (b.accumulated_maintenance_cost || 0) - (a.accumulated_maintenance_cost || 0))
@@ -182,48 +196,98 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 recommendation: (a.accumulated_maintenance_cost || 0) > ((a.purchase_cost || 0) * 0.4) ? 'Replace' : 'Repair'
             }));
 
-        return { mttrTrend, techPerformance, faultDistribution, statusData, riskData, qcData, tcoData };
+        return { mttrTrend, techPerformance, statusData, riskData, tcoData };
     }, [assets, workOrders, users]);
 
-    // ... COPY ALL HANDLERS (handleImageChange, handleAddSubmit, etc...) ...
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setNewAssetForm(prev => ({ ...prev, image: reader.result as string })); }; reader.readAsDataURL(file); } };
-    const handleAddSubmit = (e: React.FormEvent) => { e.preventDefault(); const asset: Asset = { asset_id: newAssetForm.asset_id || `NFC-${Math.floor(Math.random() * 10000)}`, name: newAssetForm.name, model: newAssetForm.model, location_id: Number(newAssetForm.location_id), status: AssetStatus.RUNNING, purchase_date: newAssetForm.purchase_date, operating_hours: 0, risk_score: 0, last_calibration_date: newAssetForm.purchase_date, next_calibration_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0], image: newAssetForm.image || 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' }; onAddAsset(asset); setIsAddModalOpen(false); setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' }); };
-    // ... OTHER HANDLERS ...
-    const handleAddUserSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!onAddUser) return; const newUser: User = { user_id: Math.floor(Math.random() * 100000), name: newUserForm.name, email: newUserForm.email, role: newUserForm.role, phone_number: newUserForm.phone, password: newUserForm.password, department: newUserForm.department, digital_signature: newUserForm.signature, location_id: 101 }; onAddUser(newUser); setIsAddUserModalOpen(false); refreshData(); setNewUserForm({ name: '', email: '', phone: '', password: '', role: UserRole.TECHNICIAN, department: '', signature: '' }); };
+    // --- HANDLERS ---
+    const handleAiSearch = async () => {
+        if(!aiQuery) return;
+        setIsAiSearching(true);
+        setAiResult(null);
+        const availableTitles = kbDocuments.map(d => d.title);
+        const result = await searchKnowledgeBase(aiQuery, availableTitles, language);
+        setAiResult(result);
+        setIsAiSearching(false);
+    };
+
+    const handleAddSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const asset: Asset = {
+            asset_id: newAssetForm.asset_id || `NFC-${Math.floor(Math.random() * 10000)}`,
+            name: newAssetForm.name,
+            model: newAssetForm.model,
+            location_id: Number(newAssetForm.location_id),
+            status: AssetStatus.RUNNING,
+            purchase_date: newAssetForm.purchase_date,
+            operating_hours: 0,
+            risk_score: 0,
+            last_calibration_date: newAssetForm.purchase_date,
+            next_calibration_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+            image: newAssetForm.image || 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+        };
+        onAddAsset(asset);
+        setIsAddModalOpen(false);
+        setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
+    };
+
+    const handleAddUserSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!onAddUser) return;
+        const newUser: User = {
+            user_id: Math.floor(Math.random() * 100000),
+            name: newUserForm.name,
+            email: newUserForm.email,
+            role: newUserForm.role,
+            phone_number: newUserForm.phone,
+            password: newUserForm.password,
+            department: newUserForm.department,
+            digital_signature: newUserForm.signature,
+            location_id: 101
+        };
+        onAddUser(newUser);
+        setIsAddUserModalOpen(false);
+        refreshData();
+        setNewUserForm({ name: '', email: '', phone: '', password: '', role: UserRole.TECHNICIAN, department: '', signature: '' });
+    };
+
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => { setNewAssetForm(prev => ({ ...prev, image: reader.result as string })); };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const initiateRestock = (part: InventoryPart) => { setSelectedPartForRestock(part); setRestockAmount(''); setRestockModalOpen(true); };
     const handleRestockPreCheck = () => { const qty = parseInt(restockAmount); if (!qty || qty <= 0) return; if (qty > 50) { setConfirmRestockOpen(true); } else { submitRestock(); } };
     const submitRestock = async () => { if (selectedPartForRestock && restockAmount) { await api.restockPart(selectedPartForRestock.part_id, parseInt(restockAmount)); refreshData(); setRestockModalOpen(false); setConfirmRestockOpen(false); setRestockAmount(''); setSelectedPartForRestock(null); } };
-    const handleDownloadPDF = () => { const printWindow = window.open('', '', 'height=800,width=1000'); if (printWindow) { printWindow.document.write('<html><head><title>Compliance Report</title></head><body><h1>Strategic Compliance Report</h1><p>Includes: MTBF Analysis, Boundary Alerts</p></body></html>'); printWindow.print(); } };
-    const handlePrintJobReport = () => { window.print(); };
-    const handleAlertClick = (alert: SystemAlert) => { if (alert.type === 'BOUNDARY_CROSSING') { setSelectedAlert(alert); setJustificationModalOpen(true); } };
-    const submitJustification = () => { if (selectedAlert && justificationReason) { setAlerts(alerts.map(a => a.id === selectedAlert.id ? {...a, status: 'resolved'} : a)); setJustificationModalOpen(false); setSelectedAlert(null); setJustificationReason(''); setShowAlertPanel(false); } };
-    const handleCreateWOSubmit = async (e: React.FormEvent) => { e.preventDefault(); await api.createWorkOrder({ wo_id: Math.floor(Math.random() * 100000), asset_id: newWOForm.assetId, type: newWOForm.type, priority: newWOForm.priority, description: newWOForm.description, assigned_to_id: parseInt(newWOForm.assignedToId), status: 'Open', created_at: new Date().toISOString() }); refreshData(); setIsCreateWOModalOpen(false); setNewWOForm({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' }); };
-    const handleViewWODetails = (wo: WorkOrder) => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); };
-    const handleUpdateCalibration = async (e: React.FormEvent) => { e.preventDefault(); if (assetToCalibrate) { const nextCal = new Date(newCalibrationDate); nextCal.setFullYear(nextCal.getFullYear() + 1); await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]); refreshData(); setUpdateCalibrationModalOpen(false); setAssetToCalibrate(null); } };
-    const handleFindJobReport = async () => { if (reportType === 'PPM') { const report = await api.fetchPMReport(jobOrderSearchId || '5002'); if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.'); } else { if (jobOrderSearchId === '2236' || jobOrderSearchId === '') { setSelectedCMReport(getDetailedReports()[0]); } else { alert('Job Order Report not found. Try 2236.'); } } };
     
-    // Assignment Handlers
-    const openAssignModal = (wo: WorkOrder) => {
-        setSelectedWOForAssignment(wo);
-        setSelectedTechForAssignment('');
-        setRecommendedTechs([]); // Clear previous recommendations
-        setIsAssignModalOpen(true);
+    const handleCreateWOSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await api.createWorkOrder({
+            wo_id: Math.floor(Math.random() * 100000),
+            asset_id: newWOForm.assetId,
+            type: newWOForm.type,
+            priority: newWOForm.priority,
+            description: newWOForm.description,
+            assigned_to_id: parseInt(newWOForm.assignedToId),
+            status: 'Open',
+            created_at: new Date().toISOString()
+        });
+        refreshData();
+        setIsCreateWOModalOpen(false);
+        setNewWOForm({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
     };
 
-    // --- SMART ASSIGN LOGIC ---
     const handleSmartAssign = () => {
         if (!selectedWOForAssignment) return;
         const asset = assets.find(a => a.asset_id === selectedWOForAssignment.asset_id || a.nfc_tag_id === selectedWOForAssignment.asset_id);
         const techs = users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER);
-        
         if (asset) {
             const recommendations = recommendTechnicians(asset, techs, workOrders);
             setRecommendedTechs(recommendations);
-            
-            // Auto-select the top match
-            if (recommendations.length > 0) {
-                setSelectedTechForAssignment(recommendations[0].user.user_id.toString());
-            }
+            if (recommendations.length > 0) setSelectedTechForAssignment(recommendations[0].user.user_id.toString());
         }
     };
 
@@ -235,342 +299,167 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             refreshData();
             setIsAssignModalOpen(false);
             setSelectedWOForAssignment(null);
-            setSelectedTechForAssignment('');
-            setRecommendedTechs([]);
+        }
+    };
+    
+    const handleUpdateCalibration = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (assetToCalibrate) {
+            const nextCal = new Date(newCalibrationDate);
+            nextCal.setFullYear(nextCal.getFullYear() + 1);
+            await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]);
+            refreshData();
+            setUpdateCalibrationModalOpen(false);
+            setAssetToCalibrate(null);
         }
     };
 
-    // ... APPROVAL HANDLERS (Same as before) ...
-    const openApprovalModal = (wo: WorkOrder) => { setSelectedWOForApproval(wo); setApprovalSignature(''); setIsApprovalModalOpen(true); };
-    const handleApprovalSubmit = async () => { if (!selectedWOForApproval || !approvalSignature) return; if (currentUser.role === UserRole.ADMIN && selectedWOForApproval.status === 'Awaiting Approval') { await api.submitManagerApproval(selectedWOForApproval.wo_id, currentUser.user_id, approvalSignature); } else if (currentUser.role === UserRole.SUPERVISOR && selectedWOForApproval.status === 'Manager Approved') { await api.submitSupervisorApproval(selectedWOForApproval.wo_id, currentUser.user_id, approvalSignature); } refreshData(); setIsApprovalModalOpen(false); setApprovalSignature(''); setSelectedWOForApproval(null); };
+    const handleFindJobReport = async () => {
+        if (reportType === 'PPM') {
+            const report = await api.fetchPMReport(jobOrderSearchId || '5002');
+            if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.');
+        } else {
+            if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]);
+            else alert('Job Order Report not found. Try 2236.');
+        }
+    };
 
-  const COLORS = ['#10B981', '#EF4444', '#F59E0B', '#64748B'];
+    // --- RENDER HELPERS ---
+    const departmentZones = [
+        { id: 'ICU', name: 'Intensive Care', x: 20, y: 20, width: 25, height: 25, color: 'bg-indigo-100' },
+        { id: 'Emergency', name: 'ER & Triage', x: 55, y: 20, width: 30, height: 20, color: 'bg-red-100' },
+        { id: 'Radiology', name: 'Radiology / X-Ray', x: 20, y: 55, width: 25, height: 25, color: 'bg-blue-100' },
+        { id: 'Laboratory', name: 'Laboratory', x: 55, y: 50, width: 20, height: 30, color: 'bg-yellow-100' },
+        { id: 'Pharmacy', name: 'Pharmacy', x: 80, y: 50, width: 15, height: 20, color: 'bg-green-100' },
+    ];
+    
+    const getAssetsInZone = (deptId: string) => {
+        return assets.filter(a => {
+            const loc = getLocations().find(l => l.location_id === a.location_id);
+            return loc?.department === deptId || (deptId === 'Emergency' && loc?.department === 'ER');
+        });
+    };
+    
+    // ---------------- VIEW ROUTING ----------------
 
-  // Map Logic
-  const departmentZones = [
-      { id: 'ICU', name: 'Intensive Care', x: 20, y: 20, width: 25, height: 25, color: 'bg-indigo-100' },
-      { id: 'Emergency', name: 'ER & Triage', x: 55, y: 20, width: 30, height: 20, color: 'bg-red-100' },
-      { id: 'Radiology', name: 'Radiology / X-Ray', x: 20, y: 55, width: 25, height: 25, color: 'bg-blue-100' },
-      { id: 'Laboratory', name: 'Laboratory', x: 55, y: 50, width: 20, height: 30, color: 'bg-yellow-100' },
-      { id: 'Pharmacy', name: 'Pharmacy', x: 80, y: 50, width: 15, height: 20, color: 'bg-green-100' },
-  ];
-
-  const getAssetsInZone = (deptId: string) => {
-      return assets.filter(a => {
-          const loc = getLocations().find(l => l.location_id === a.location_id);
-          return loc?.department === deptId || (deptId === 'Emergency' && loc?.department === 'ER');
-      });
-  }
-
-  const selectedZoneAssets = selectedMapZone ? getAssetsInZone(selectedMapZone) : [];
-
-  // ... RENDER LOGIC ...
-  if (currentView === 'dashboard') {
-    return <div className="space-y-6 animate-in fade-in">
-        {/* ... (Existing Dashboard Header and Charts) ... */}
-        
-        {/* HEADER */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
-          <h2 className="text-2xl font-bold text-gray-900">{t('nav_dashboard')}</h2>
-          <div className="flex gap-2">
-            <button className="btn-secondary text-sm">
-               <Download size={16}/> {t('download_pdf')}
-            </button>
-            <button 
-                onClick={() => setIsSimulationActive(!isSimulationActive)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${isSimulationActive ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'bg-gray-100 text-gray-600'}`}
-            >
-                <Activity size={16} className={isSimulationActive ? 'animate-pulse' : ''} />
-                {isSimulationActive ? 'Live Traffic ON' : 'Simulate Traffic'}
-            </button>
-          </div>
-        </div>
-
-        {/* ALERTS & KPI */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-           {/* ... existing KPIs ... */}
-             <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex items-center justify-center gap-4">
-                 <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
-                     <BrainCircuit size={24}/>
-                 </div>
-                 <div>
-                     <p className="text-text-muted text-xs font-bold uppercase tracking-wider">{t('predictive_risk')}</p>
-                     <p className="text-xl font-bold text-gray-900 mt-1">Active</p>
-                 </div>
-             </div>
-             {/* ... */}
-        </div>
-
-        {/* 3D FLOOR PLAN & ASSET DETAIL PANEL */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-             {/* LEFT: 3D MAP */}
-             <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden flex flex-col min-h-[500px]">
-                 <div className="p-4 border-b border-border flex justify-between items-center bg-gray-50/50">
-                     <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                        <Layers className="text-brand"/> {t('floor_plan_3d')}
-                     </h3>
-                     <div className="flex gap-2 text-xs font-bold">
-                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span> Down</span>
-                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> Maint</span>
-                         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Running</span>
-                     </div>
-                 </div>
-                 
-                 <div className="flex-1 relative bg-gray-100 overflow-hidden flex items-center justify-center p-8 perspective-[1000px]">
-                     {/* ISOMETRIC PLANE */}
-                     <div className="relative w-full h-full max-w-2xl aspect-square transform rotate-x-60 rotate-z-[-45deg] shadow-2xl bg-white/40 border-4 border-white/50 rounded-xl transition-all duration-500">
-                          {/* Grid Lines */}
-                          <div className="absolute inset-0" style={{backgroundImage: 'linear-gradient(rgba(0,0,0,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.05) 1px, transparent 1px)', backgroundSize: '40px 40px'}}></div>
-
-                          {/* ZONES */}
-                          {departmentZones.map(zone => {
-                              const zoneAssets = getAssetsInZone(zone.id);
-                              const zoneAssetCount = zoneAssets.length;
-                              const hasDownAssets = zoneAssets.some(a => a.status === AssetStatus.DOWN);
-                              const hasMaintAssets = zoneAssets.some(a => a.status === AssetStatus.UNDER_MAINT);
-                              
-                              let zoneColorClass = 'bg-white/80';
-                              let textColorClass = 'text-gray-800';
-                              let signalColorClass = 'text-brand';
-
-                              if (hasDownAssets) {
-                                  zoneColorClass = 'bg-red-500/90 border-red-400';
-                                  textColorClass = 'text-white';
-                                  signalColorClass = 'text-white';
-                              } else if (hasMaintAssets) {
-                                  zoneColorClass = 'bg-amber-400/90 border-amber-500';
-                                  textColorClass = 'text-white';
-                                  signalColorClass = 'text-white';
-                              } else if (zoneAssetCount > 0) {
-                                  zoneColorClass = 'bg-emerald-50/90 border-emerald-200';
-                                  textColorClass = 'text-emerald-800';
-                                  signalColorClass = 'text-emerald-600';
-                              }
-                              
-                              return (
-                                  <div
-                                      key={zone.id}
-                                      onClick={() => setSelectedMapZone(zone.id)}
-                                      className={`
-                                        absolute transition-all duration-300 cursor-pointer group hover:-translate-y-4 hover:shadow-2xl
-                                        ${selectedMapZone === zone.id ? 'translate-y-[-10px] shadow-xl border-brand z-20' : 'z-10 border-white/50'}
-                                        border-2 rounded-lg flex items-center justify-center flex-col
-                                        ${zoneColorClass}
-                                      `}
-                                      style={{
-                                          left: `${zone.x}%`,
-                                          top: `${zone.y}%`,
-                                          width: `${zone.width}%`,
-                                          height: `${zone.height}%`,
-                                          boxShadow: selectedMapZone === zone.id ? '10px 10px 30px rgba(0,0,0,0.2)' : '5px 5px 15px rgba(0,0,0,0.05)'
-                                      }}
-                                  >
-                                      {/* 3D Sides Effect (CSS only) */}
-                                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent pointer-events-none"></div>
-                                      
-                                      <div className={`transform -rotate-z-[45deg] text-center transition-transform group-hover:scale-110 ${textColorClass}`}>
-                                          <div className="font-bold text-xs lg:text-sm uppercase tracking-wider">{zone.name}</div>
-                                          <div className="text-[10px] font-bold mt-1 opacity-80">{zoneAssetCount} Assets</div>
-                                          
-                                          {/* RFID Signal Simulation */}
-                                          {isSimulationActive && zoneAssetCount > 0 && (
-                                              <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex items-center justify-center">
-                                                  <Signal size={16} className={`animate-ping ${signalColorClass}`}/>
-                                              </div>
-                                          )}
-                                      </div>
-                                  </div>
-                              )
-                          })}
-                     </div>
-                 </div>
-             </div>
-
-             {/* RIGHT: ZONE DETAIL PANEL */}
-             <div className="bg-white rounded-2xl border border-border shadow-soft flex flex-col h-[500px]">
-                  <div className="p-4 border-b border-border bg-gray-50/50">
-                      <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
-                          <Box className="text-brand"/> {selectedMapZone ? `${selectedMapZone} ${t('zone_details')}` : t('select_zone')}
-                      </h3>
+    // 1. DASHBOARD
+    if (currentView === 'dashboard') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                 {/* Header */}
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                  <h2 className="text-2xl font-bold text-gray-900">{t('nav_dashboard')}</h2>
+                  <div className="flex gap-2">
+                    <button 
+                        onClick={() => setIsSimulationActive(!isSimulationActive)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${isSimulationActive ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'bg-gray-100 text-gray-600'}`}
+                    >
+                        <Activity size={16} className={isSimulationActive ? 'animate-pulse' : ''} />
+                        {isSimulationActive ? 'Live Traffic ON' : 'Simulate Traffic'}
+                    </button>
                   </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                      {!selectedMapZone ? (
-                          <div className="h-full flex flex-col items-center justify-center text-gray-400 text-center p-6">
-                              <Layers size={48} className="mb-4 opacity-20"/>
-                              <p>Click on a department zone in the 3D map to view live assets.</p>
-                          </div>
-                      ) : (
-                          <>
-                              {selectedZoneAssets.length === 0 ? (
-                                  <div className="text-center py-10 text-gray-400">No assets detected in this zone.</div>
-                              ) : (
-                                  selectedZoneAssets.map(asset => (
-                                      <div key={asset.asset_id} className="bg-white border border-border p-3 rounded-xl shadow-sm hover:border-brand/50 transition-colors group flex items-start gap-3">
-                                          <div className={`w-2 h-full min-h-[40px] rounded-full ${asset.status === AssetStatus.RUNNING ? 'bg-success' : asset.status === AssetStatus.DOWN ? 'bg-danger' : 'bg-warning'}`}></div>
-                                          <div className="flex-1">
-                                              <div className="flex justify-between items-start">
-                                                  <h4 className="font-bold text-gray-900 text-sm group-hover:text-brand">{asset.name}</h4>
-                                                  <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">{asset.asset_id}</span>
-                                              </div>
-                                              <p className="text-xs text-text-muted mt-0.5">{asset.model}</p>
-                                              <div className="mt-2 flex items-center gap-2 text-[10px] font-bold text-gray-400">
-                                                  <Signal size={10} className="text-brand animate-pulse"/> Live Signal
+                </div>
+                
+                {/* 3D Map Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden min-h-[400px]">
+                        <div className="p-4 border-b border-border bg-gray-50/50 flex justify-between">
+                            <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
+                                <Layers className="text-brand"/> {t('floor_plan_3d')}
+                            </h3>
+                        </div>
+                        <div className="relative h-[400px] bg-gray-100 flex items-center justify-center p-8 overflow-hidden">
+                             <div className="relative w-full max-w-lg aspect-square transform rotate-x-60 rotate-z-[-45deg] shadow-2xl bg-white/40 border-4 border-white/50 rounded-xl">
+                                  {departmentZones.map(zone => {
+                                      const zoneAssets = getAssetsInZone(zone.id);
+                                      const hasIssues = zoneAssets.some(a => a.status !== AssetStatus.RUNNING);
+                                      return (
+                                          <div
+                                              key={zone.id}
+                                              onClick={() => setSelectedMapZone(zone.id)}
+                                              className={`absolute transition-all duration-300 cursor-pointer border-2 rounded-lg flex items-center justify-center flex-col 
+                                                ${selectedMapZone === zone.id ? 'translate-y-[-10px] shadow-xl border-brand z-20 bg-white' : 'z-10 bg-white/80 border-white/50'}
+                                                ${hasIssues ? 'bg-red-50/90 border-red-200' : 'bg-white/80'}
+                                              `}
+                                              style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}
+                                          >
+                                              <div className="transform -rotate-z-[45deg] text-center font-bold text-xs">
+                                                  {zone.name}
+                                                  {isSimulationActive && zoneAssets.length > 0 && <Signal size={12} className="mx-auto mt-1 text-brand animate-ping"/>}
                                               </div>
                                           </div>
-                                      </div>
-                                  ))
-                              )}
-                          </>
-                      )}
-                  </div>
-             </div>
-        </div>
-        
-        {/* ASSET LIFECYCLE & TCO (New Section) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                <h3 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
-                    <DollarSign className="text-brand"/> {t('tco_analysis')}
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={analyticsData.tcoData} layout="vertical">
-                         <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} />
-                         <XAxis type="number" hide/>
-                         <YAxis dataKey="name" type="category" width={100} style={{fontSize: '12px'}}/>
-                         <Tooltip cursor={{fill: 'transparent'}} />
-                         <Legend />
-                         <Bar dataKey="purchase" stackId="a" fill="#3B82F6" name={t('purchase_price')} radius={[0, 4, 4, 0]} barSize={20} />
-                         <Bar dataKey="maintenance" stackId="a" fill="#F59E0B" name={t('maint_cost')} radius={[0, 4, 4, 0]} barSize={20} />
-                    </BarChart>
-                </ResponsiveContainer>
-                <div className="mt-4 space-y-2">
-                    {analyticsData.tcoData.map(d => (
-                        <div key={d.name} className="flex justify-between items-center text-xs p-2 bg-gray-50 rounded">
-                             <span className="font-bold">{d.name}</span>
-                             {d.recommendation === 'Replace' ? (
-                                 <span className="text-danger font-bold flex items-center gap-1"><AlertTriangle size={12}/> {t('replace')}</span>
-                             ) : (
-                                 <span className="text-success font-bold flex items-center gap-1"><Check size={12}/> {t('repair')}</span>
-                             )}
+                                      )
+                                  })}
+                             </div>
                         </div>
-                    ))}
+                    </div>
+                    {/* Zone Details Panel */}
+                    <div className="bg-white rounded-2xl border border-border shadow-soft flex flex-col h-[450px]">
+                        <div className="p-4 border-b border-border bg-gray-50/50">
+                            <h3 className="font-bold text-lg text-gray-900">{selectedMapZone ? `${selectedMapZone} Details` : t('select_zone')}</h3>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {selectedMapZone ? getAssetsInZone(selectedMapZone).map(asset => (
+                                <div key={asset.asset_id} className="bg-white border p-3 rounded-xl flex items-center gap-3">
+                                    <div className={`w-2 h-8 rounded-full ${asset.status === AssetStatus.RUNNING ? 'bg-success' : 'bg-danger'}`}></div>
+                                    <div>
+                                        <div className="font-bold text-sm">{asset.name}</div>
+                                        <div className="text-xs text-text-muted">{asset.model}</div>
+                                    </div>
+                                </div>
+                            )) : <div className="text-center text-gray-400 py-10">Select a zone on the map</div>}
+                        </div>
+                    </div>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                        <h3 className="font-bold text-lg text-gray-900 mb-6">{t('tech_rating')}</h3>
+                        <div className="space-y-3">
+                            {analyticsData.techPerformance.slice(0, 3).map(tech => (
+                                <div key={tech.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                                    <div>
+                                        <div className="font-bold text-sm">{tech.name}</div>
+                                        <div className="text-xs text-text-muted">{tech.woCount} Jobs</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold bg-white px-2 py-1 rounded border">MTTR: {tech.avgMttr}h</span>
+                                        <span className="flex items-center gap-1 text-warning font-bold text-sm"><Star size={14} fill="currentColor"/> {tech.avgRating}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                        <h3 className="font-bold text-lg text-gray-900 mb-6">{t('tco_analysis')}</h3>
+                        <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={analyticsData.tcoData} layout="vertical">
+                                <XAxis type="number" hide/>
+                                <YAxis dataKey="name" type="category" width={100} style={{fontSize: '10px'}}/>
+                                <Tooltip/>
+                                <Bar dataKey="purchase" stackId="a" fill="#3B82F6" radius={[0, 4, 4, 0]} />
+                                <Bar dataKey="maintenance" stackId="a" fill="#F59E0B" radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
+        );
+    }
 
-            {/* TECHNICIAN RATING MATRIX */}
-             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                 <h3 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
-                     <Star className="text-warning"/> {t('tech_rating')}
-                 </h3>
-                 <div className="overflow-x-auto">
-                     <table className="w-full text-sm text-left">
-                         <thead>
-                             <tr className="bg-gray-50 text-gray-500">
-                                 <th className="px-4 py-2 rounded-l-lg">Technician</th>
-                                 <th className="px-4 py-2">MTTR (Hrs)</th>
-                                 <th className="px-4 py-2">First Fix %</th>
-                                 <th className="px-4 py-2 rounded-r-lg">Nurse Rating</th>
-                             </tr>
-                         </thead>
-                         <tbody className="divide-y divide-gray-100">
-                             {analyticsData.techPerformance.map(tech => (
-                                 <tr key={tech.id} className="hover:bg-gray-50">
-                                     <td className="px-4 py-3 font-bold text-gray-900">{tech.name}</td>
-                                     <td className="px-4 py-3">{tech.avgMttr}</td>
-                                     <td className="px-4 py-3">
-                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${parseInt(tech.ftfr) > 80 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                             {tech.ftfr}
-                                         </span>
-                                     </td>
-                                     <td className="px-4 py-3 flex items-center gap-1 text-warning font-bold">
-                                         <Star size={14} fill="currentColor"/> {tech.avgRating}
-                                     </td>
-                                 </tr>
-                             ))}
-                         </tbody>
-                     </table>
-                 </div>
-             </div>
-        </div>
-
-        {/* Update Risk Table to show recalculated score */}
-        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft lg:col-span-2">
-             <h3 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
-                  <div className="w-1 h-6 bg-danger rounded-full"></div>
-                  {t('table_risk_report')}
-             </h3>
-             <div className="overflow-x-auto">
-                 <table className="w-full text-sm">
-                     <thead>
-                         <tr className="bg-gray-50 border-b border-gray-200">
-                             <th className="px-4 py-3 text-start font-bold text-gray-500">Asset</th>
-                             <th className="px-4 py-3 text-start font-bold text-gray-500">Model</th>
-                             <th className="px-4 py-3 text-start font-bold text-gray-500">Predictive Score</th> {/* Updated Label */}
-                             <th className="px-4 py-3 text-start font-bold text-gray-500">Factors</th> {/* Added column */}
-                         </tr>
-                     </thead>
-                     <tbody>
-                         {analyticsData.riskData.map(a => (
-                             <tr key={a.asset_id} className="border-b border-gray-100 hover:bg-gray-50">
-                                 <td className="px-4 py-3 font-medium text-gray-900">{a.name}</td>
-                                 <td className="px-4 py-3 text-gray-500">{a.model}</td>
-                                 <td className="px-4 py-3">
-                                     <div className="flex items-center gap-2">
-                                         <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                             <div className={`h-full rounded-full ${a.risk_score > 70 ? 'bg-danger' : a.risk_score > 40 ? 'bg-warning' : 'bg-success'}`} style={{width: `${a.risk_score}%`}}></div>
-                                         </div>
-                                         <span className={`font-bold ${a.risk_score > 70 ? 'text-danger' : 'text-gray-700'}`}>{a.risk_score}</span>
-                                     </div>
-                                 </td>
-                                 <td className="px-4 py-3 text-xs text-text-muted">
-                                     {a.risk_score > 70 ? "High Usage / Recent Failures" : "Stable"}
-                                 </td>
-                             </tr>
-                         ))}
-                     </tbody>
-                 </table>
-             </div>
-         </div>
-         {/* ... (Rest of Dashboard) ... */}
-    </div>;
-  }
-  
-  // ... (Keep existing views) ...
-  // Update Asset Details to show Manuals Link more prominently
-  if (currentView === 'assets') {
-      // ... (keep existing setup) ...
-      // In the return statement for Asset Details:
-      /* 
-         {activeTab === 'docs' && (
-             ...
-                <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-4 flex items-center gap-3">
-                    <div className="p-2 bg-white rounded-lg text-blue-600 shadow-sm"><BookOpen size={20}/></div>
-                    <div>
-                        <h4 className="font-bold text-blue-900">Interactive Library</h4>
-                        <p className="text-xs text-blue-700">Access manuals linked directly to this asset.</p>
-                    </div>
-                    <button className="ml-auto btn-primary py-2 px-4 text-xs" onClick={() => setActiveTab('docs')}>Browse</button>
-                </div>
-             ...
-         )}
-      */
-  }
-  
-  if (currentView === 'assets') {
-      return (
-          <div className="space-y-6 animate-in fade-in">
-              {!selectedAsset ? (
-                  // Asset List
+    // 2. ASSETS
+    if (currentView === 'assets') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                {!selectedAsset ? (
                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                         {/* ... (Existing Asset List Header) ... */}
                          <div className="p-4 border-b border-border flex justify-between items-center">
                              <h2 className="text-xl font-bold text-gray-900">{t('nav_assets')}</h2>
                              <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm">
                                  <Plus size={16}/> {t('add_equipment')}
                              </button>
                          </div>
-                         {/* ... (Existing Asset List Table) ... */}
                          <div className="overflow-x-auto">
                              <table className="w-full text-sm text-left">
                                  <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
@@ -583,35 +472,22 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                  </thead>
                                  <tbody className="divide-y divide-gray-100">
                                      {assets.map(asset => (
-                                         <tr key={asset.asset_id} className="hover:bg-gray-50/80 transition-colors group">
+                                         <tr key={asset.asset_id} className="hover:bg-gray-50">
                                              <td className="px-6 py-4">
                                                  <div className="flex items-center gap-3">
-                                                     <div className="w-10 h-10 rounded-lg bg-gray-100 border border-gray-200 overflow-hidden">
-                                                         {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package className="p-2 text-gray-400"/>}
+                                                     <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
+                                                         {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package className="p-2"/>}
                                                      </div>
                                                      <div>
                                                          <div className="font-bold text-gray-900">{asset.name}</div>
-                                                         <div className="text-xs text-text-muted">{asset.model} <span className="text-gray-300">|</span> {asset.serial_number}</div>
+                                                         <div className="text-xs text-text-muted">{asset.model}</div>
                                                      </div>
                                                  </div>
                                              </td>
-                                             <td className="px-6 py-4 text-gray-600">{getLocationName(asset.location_id)}</td>
-                                             <td className="px-6 py-4">
-                                                 <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${
-                                                     asset.status === AssetStatus.RUNNING ? 'bg-green-50 text-green-700 border-green-200' :
-                                                     asset.status === AssetStatus.DOWN ? 'bg-red-50 text-red-700 border-red-200' :
-                                                     'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                                 }`}>
-                                                     {asset.status}
-                                                 </span>
-                                             </td>
+                                             <td className="px-6 py-4">{getLocationName(asset.location_id)}</td>
+                                             <td className="px-6 py-4"><span className="px-2 py-1 rounded text-xs font-bold bg-gray-100">{asset.status}</span></td>
                                              <td className="px-6 py-4 text-end">
-                                                 <button 
-                                                    onClick={() => setSelectedAsset(asset)}
-                                                    className="px-3 py-1.5 bg-white border border-border rounded-lg text-xs font-bold hover:bg-brand hover:text-white hover:border-brand transition-all shadow-sm"
-                                                 >
-                                                     Details
-                                                 </button>
+                                                 <button onClick={() => setSelectedAsset(asset)} className="text-brand font-bold text-xs hover:underline">Details</button>
                                              </td>
                                          </tr>
                                      ))}
@@ -619,164 +495,435 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                              </table>
                          </div>
                    </div>
-              ) : (
-                  // Asset Details View
-                  <div className="space-y-6">
-                      <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold text-sm">
-                          <ChevronLeft size={16} className="rtl:rotate-180"/> {t('back')}
-                      </button>
-                      
-                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                          {/* Left Panel: Image & Status */}
-                          <div className="space-y-6">
-                              <div className="bg-white p-6 rounded-2xl border border-border shadow-soft text-center">
-                                  <div className="w-32 h-32 mx-auto bg-gray-50 rounded-2xl mb-4 border border-border overflow-hidden">
-                                      {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover"/> : <Package size={48} className="m-auto text-gray-300"/>}
+                ) : (
+                    <div className="space-y-6">
+                        <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold text-sm">
+                            <ChevronLeft size={16}/> {t('back')}
+                        </button>
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex gap-6">
+                             <div className="w-40 h-40 bg-gray-50 rounded-xl overflow-hidden border">
+                                  {selectedAsset.image && <img src={selectedAsset.image} className="w-full h-full object-cover"/>}
+                             </div>
+                             <div>
+                                  <h2 className="text-2xl font-bold text-gray-900">{selectedAsset.name}</h2>
+                                  <p className="text-text-muted">{selectedAsset.model} | {selectedAsset.serial_number}</p>
+                                  <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+                                      <div><span className="text-gray-500">Location:</span> <b>{getLocationName(selectedAsset.location_id)}</b></div>
+                                      <div><span className="text-gray-500">Warranty:</span> <b>{selectedAsset.warranty_expiration}</b></div>
                                   </div>
-                                  <h2 className="text-xl font-bold text-gray-900">{selectedAsset.name}</h2>
-                                  <p className="text-sm text-text-muted mb-4">{selectedAsset.model}</p>
-                                  <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-bold ${
-                                      selectedAsset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'
-                                  }`}>
-                                      <Activity size={16}/> {selectedAsset.status}
-                                  </div>
-                              </div>
-                              
-                              <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                                  <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><TrendingUp size={18} className="text-brand"/> Performance</h3>
-                                  <div className="space-y-4">
-                                      <div className="flex justify-between text-sm">
-                                          <span className="text-text-muted">Uptime</span>
-                                          <span className="font-bold text-success">98.5%</span>
-                                      </div>
-                                      <div className="flex justify-between text-sm">
-                                          <span className="text-text-muted">MTBF</span>
-                                          <span className="font-bold text-gray-900">1,240 Hrs</span>
-                                      </div>
-                                      <div className="flex justify-between text-sm">
-                                          <span className="text-text-muted">Reliability</span>
-                                          <span className="font-bold text-brand">High</span>
-                                      </div>
-                                  </div>
-                              </div>
+                             </div>
+                        </div>
+                    </div>
+                )}
 
-                              {/* Interactive Knowledge Base Link */}
-                              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-2xl shadow-sm cursor-pointer hover:bg-indigo-100 transition-colors" onClick={() => setActiveTab('docs')}>
-                                   <div className="flex items-center gap-3 mb-2">
-                                       <div className="p-2 bg-white rounded-lg text-indigo-600 shadow-sm"><BookOpen size={20}/></div>
-                                       <h4 className="font-bold text-indigo-900">Knowledge Base</h4>
-                                   </div>
-                                   <p className="text-xs text-indigo-700 leading-relaxed mb-3">Access manuals, schematics, and troubleshooting guides specific to this {selectedAsset.model}.</p>
-                                   <div className="text-xs font-bold text-indigo-800 flex items-center gap-1">View Documents <ArrowRight size={12}/></div>
-                              </div>
-                          </div>
-                          
-                          {/* Right Panel: Tabs & Data */}
-                          <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden flex flex-col min-h-[500px]">
-                               <div className="flex border-b border-border">
-                                   {['overview', 'history', 'calibration', 'docs'].map(tab => (
-                                       <button 
-                                          key={tab}
-                                          onClick={() => setActiveTab(tab)}
-                                          className={`flex-1 py-4 text-sm font-bold border-b-2 transition-colors capitalize ${activeTab === tab ? 'border-brand text-brand bg-brand/5' : 'border-transparent text-text-muted hover:text-gray-900'}`}
-                                       >
-                                           {tab}
-                                       </button>
-                                   ))}
-                               </div>
-                               
-                               <div className="p-6 flex-1 overflow-y-auto">
-                                   {/* ... (Existing Tab Content Logic for overview, history, etc...) ... */}
-                                   {activeTab === 'overview' && (
-                                       <div className="grid grid-cols-2 gap-6">
-                                            <div>
-                                                <h4 className="text-xs font-bold text-text-muted uppercase mb-4">Identity</h4>
-                                                <div className="space-y-3">
-                                                    <div><div className="text-xs text-gray-500">Asset ID</div><div className="font-medium">{selectedAsset.asset_id}</div></div>
-                                                    <div><div className="text-xs text-gray-500">Serial Number</div><div className="font-medium">{selectedAsset.serial_number}</div></div>
-                                                    <div><div className="text-xs text-gray-500">Manufacturer</div><div className="font-medium">{selectedAsset.manufacturer}</div></div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <h4 className="text-xs font-bold text-text-muted uppercase mb-4">Location & Date</h4>
-                                                <div className="space-y-3">
-                                                    <div><div className="text-xs text-gray-500">Department</div><div className="font-medium">{getLocationName(selectedAsset.location_id)}</div></div>
-                                                    <div><div className="text-xs text-gray-500">Purchase Date</div><div className="font-medium">{selectedAsset.purchase_date}</div></div>
-                                                    <div><div className="text-xs text-gray-500">Warranty Ends</div><div className="font-medium text-warning">{selectedAsset.warranty_expiration || 'N/A'}</div></div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="col-span-2 pt-6 border-t border-gray-100">
-                                                <h4 className="text-xs font-bold text-text-muted uppercase mb-4">Financials (TCO)</h4>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                     <div className="p-3 bg-gray-50 rounded-lg">
-                                                         <div className="text-xs text-gray-500">Purchase Cost</div>
-                                                         <div className="font-bold text-gray-900">${selectedAsset.purchase_cost?.toLocaleString()}</div>
-                                                     </div>
-                                                     <div className="p-3 bg-gray-50 rounded-lg">
-                                                         <div className="text-xs text-gray-500">Maint. Cost</div>
-                                                         <div className="font-bold text-warning">${selectedAsset.accumulated_maintenance_cost?.toLocaleString()}</div>
-                                                     </div>
-                                                     <div className="p-3 bg-gray-50 rounded-lg">
-                                                         <div className="text-xs text-gray-500">Total Cost (TCO)</div>
-                                                         <div className="font-bold text-brand">${((selectedAsset.purchase_cost || 0) + (selectedAsset.accumulated_maintenance_cost || 0)).toLocaleString()}</div>
-                                                     </div>
-                                                </div>
-                                            </div>
-                                       </div>
-                                   )}
+                {/* Add Asset Modal */}
+                {isAddModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="text-xl font-bold mb-4">{t('modal_add_title')}</h3>
+                            <form onSubmit={handleAddSubmit} className="space-y-4">
+                                <input className="input-modern" placeholder={t('form_name')} value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} required />
+                                <input className="input-modern" placeholder={t('form_model')} value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} required />
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
-                                   {/* ... (Keep other tabs) ... */}
-                                   {activeTab === 'history' && (
-                                       <table className="w-full text-sm text-left">
-                                           <thead className="text-xs text-gray-500 uppercase bg-gray-50">
-                                               <tr><th>Date</th><th>Type</th><th>Technician</th><th>Status</th></tr>
-                                           </thead>
-                                           <tbody className="divide-y divide-gray-100">
-                                               {workOrders.filter(wo => (wo.asset_id === selectedAsset.asset_id || wo.asset_id === selectedAsset.nfc_tag_id)).map(wo => (
-                                                   <tr key={wo.wo_id}>
-                                                       <td className="py-3 px-2">{wo.created_at.split('T')[0]}</td>
-                                                       <td className="py-3 px-2"><span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold">{wo.type}</span></td>
-                                                       <td className="py-3 px-2">{users.find(u => u.user_id === wo.assigned_to_id)?.name || 'Unknown'}</td>
-                                                       <td className="py-3 px-2">{wo.status}</td>
-                                                   </tr>
-                                               ))}
-                                           </tbody>
-                                       </table>
-                                   )}
-                                   
-                                   {activeTab === 'docs' && (
-                                        <div className="space-y-3">
-                                            {getAssetDocuments(selectedAsset.asset_id).map(doc => (
-                                                <div key={doc.doc_id} className="flex items-center justify-between p-3 border border-border rounded-xl hover:bg-gray-50">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 bg-red-50 text-red-500 rounded-lg"><FileText size={18}/></div>
-                                                        <div>
-                                                            <div className="font-bold text-gray-900 text-sm">{doc.title}</div>
-                                                            <div className="text-xs text-text-muted">{doc.type} • {doc.date}</div>
-                                                        </div>
-                                                    </div>
-                                                    <button className="text-brand hover:underline text-xs font-bold">View</button>
+    // 3. MAINTENANCE (Restored)
+    if (currentView === 'maintenance') {
+        const filteredWOs = workOrders.filter(wo => {
+             if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
+             if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
+             return true;
+        });
+
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_maintenance')}</h2>
+                    <div className="flex gap-2">
+                        <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded-lg ${maintenanceViewMode === 'kanban' ? 'bg-brand text-white' : 'bg-gray-100'}`}><LayoutGrid size={20}/></button>
+                        <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded-lg ${maintenanceViewMode === 'list' ? 'bg-brand text-white' : 'bg-gray-100'}`}><List size={20}/></button>
+                        <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm ml-2"><Plus size={16}/> {t('create_wo')}</button>
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex gap-4 mb-4">
+                     <select className="input-modern w-40" value={maintenanceFilterPriority} onChange={(e) => setMaintenanceFilterPriority(e.target.value)}>
+                         <option value="all">All Priorities</option>
+                         <option value={Priority.HIGH}>High</option>
+                         <option value={Priority.CRITICAL}>Critical</option>
+                     </select>
+                </div>
+
+                {/* Kanban View */}
+                {maintenanceViewMode === 'kanban' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-x-auto pb-4">
+                        {['Open', 'In Progress', 'Closed'].map(status => (
+                            <div key={status} className="bg-gray-50 rounded-2xl p-4 min-w-[300px]">
+                                <h3 className="font-bold text-gray-700 mb-4 flex justify-between">
+                                    {status} 
+                                    <span className="bg-white px-2 py-1 rounded text-xs shadow-sm">{filteredWOs.filter(w => w.status === status).length}</span>
+                                </h3>
+                                <div className="space-y-3">
+                                    {filteredWOs.filter(w => w.status === status).map(wo => {
+                                        const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                                        return (
+                                            <div key={wo.wo_id} className="bg-white p-4 rounded-xl shadow-sm border border-border hover:shadow-md transition-all">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${wo.priority === Priority.CRITICAL ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{wo.priority}</span>
+                                                    <span className="text-xs text-gray-400">#{wo.wo_id}</span>
                                                 </div>
-                                            ))}
-                                            {/* AI Suggestion */}
-                                            <div className="mt-4 p-4 bg-indigo-50 rounded-xl border border-indigo-100 flex items-center gap-3">
-                                                 <Sparkles className="text-indigo-500"/>
-                                                 <div className="text-xs text-indigo-700">
-                                                     <strong>AI Tip:</strong> Based on recent fault history, check the "Power Supply Unit Service Guide" first.
-                                                 </div>
+                                                <h4 className="font-bold text-gray-900 text-sm">{asset?.name || 'Unknown Asset'}</h4>
+                                                <p className="text-xs text-text-muted mt-1 line-clamp-2">{wo.description}</p>
+                                                <div className="mt-3 flex gap-2">
+                                                     {status === 'Open' && <button onClick={() => { setSelectedWOForAssignment(wo); setIsAssignModalOpen(true); }} className="flex-1 py-1.5 bg-brand/10 text-brand text-xs font-bold rounded hover:bg-brand hover:text-white transition">{t('assign')}</button>}
+                                                     <button onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }} className="px-2 py-1.5 bg-gray-100 text-gray-600 rounded hover:bg-gray-200"><Eye size={16}/></button>
+                                                </div>
                                             </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
+                {/* List View */}
+                {maintenanceViewMode === 'list' && (
+                     <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                                 <tr>
+                                     <th className="px-6 py-4">ID</th>
+                                     <th className="px-6 py-4">Asset</th>
+                                     <th className="px-6 py-4">Priority</th>
+                                     <th className="px-6 py-4">Status</th>
+                                     <th className="px-6 py-4">Assigned To</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-gray-100">
+                                 {filteredWOs.map(wo => (
+                                     <tr key={wo.wo_id} className="hover:bg-gray-50">
+                                         <td className="px-6 py-4 font-mono">#{wo.wo_id}</td>
+                                         <td className="px-6 py-4 font-bold">{assets.find(a => a.asset_id === wo.asset_id)?.name}</td>
+                                         <td className="px-6 py-4">{wo.priority}</td>
+                                         <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{wo.status}</span></td>
+                                         <td className="px-6 py-4">{users.find(u => u.user_id === wo.assigned_to_id)?.name || '-'}</td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+                )}
+                
+                {/* Assignment Modal */}
+                {isAssignModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="font-bold text-lg mb-4">{t('assign_technician')}</h3>
+                            <button onClick={handleSmartAssign} className="w-full mb-4 py-3 bg-indigo-50 text-indigo-700 font-bold rounded-xl flex items-center justify-center gap-2 border border-indigo-100 hover:bg-indigo-100 transition"><BrainCircuit size={18}/> {t('btn_smart_assign')}</button>
+                            
+                            {recommendedTechs.length > 0 && (
+                                <div className="mb-4 space-y-2">
+                                    <div className="text-xs font-bold text-text-muted uppercase">AI Recommendations</div>
+                                    {recommendedTechs.slice(0, 2).map(rec => (
+                                        <div key={rec.user.user_id} onClick={() => setSelectedTechForAssignment(rec.user.user_id.toString())} className={`p-2 border rounded-lg cursor-pointer flex justify-between items-center ${selectedTechForAssignment === rec.user.user_id.toString() ? 'border-brand bg-brand/5' : 'hover:bg-gray-50'}`}>
+                                            <div>
+                                                <div className="font-bold text-sm">{rec.user.name}</div>
+                                                <div className="text-xs text-green-600">{rec.reason}</div>
+                                            </div>
+                                            <div className="font-bold text-brand">{rec.score} pts</div>
                                         </div>
-                                   )}
-                               </div>
-                          </div>
-                      </div>
-                  </div>
-              )}
-          </div>
-      )
-  }
+                                    ))}
+                                </div>
+                            )}
+                            
+                            <select className="input-modern mb-4" value={selectedTechForAssignment} onChange={e => setSelectedTechForAssignment(e.target.value)}>
+                                <option value="">Select Technician...</option>
+                                {users.filter(u => u.role === UserRole.TECHNICIAN).map(u => (
+                                    <option key={u.user_id} value={u.user_id}>{u.name}</option>
+                                ))}
+                            </select>
+                            
+                            <div className="flex gap-2">
+                                <button onClick={() => setIsAssignModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                <button onClick={handleAssignSubmit} className="flex-1 btn-primary">Assign</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
 
-  // ... (Rest of views remain the same) ...
-  return <div>{/* ... */}</div>;
+    // 4. INVENTORY (Restored)
+    if (currentView === 'inventory') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                 <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                     <div className="flex justify-between items-center mb-6">
+                         <h2 className="text-2xl font-bold text-gray-900">{t('nav_inventory')}</h2>
+                         <button className="btn-secondary text-sm"><Printer size={16}/> Report</button>
+                     </div>
+                     <table className="w-full text-sm text-left">
+                         <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
+                             <tr>
+                                 <th className="px-6 py-4">{t('part_name')}</th>
+                                 <th className="px-6 py-4">{t('stock_level')}</th>
+                                 <th className="px-6 py-4">{t('unit_cost')}</th>
+                                 <th className="px-6 py-4 text-end">{t('actions')}</th>
+                             </tr>
+                         </thead>
+                         <tbody className="divide-y divide-gray-100">
+                             {inventory.map(part => (
+                                 <tr key={part.part_id} className="hover:bg-gray-50">
+                                     <td className="px-6 py-4 font-bold text-gray-900">{part.part_name}</td>
+                                     <td className="px-6 py-4">
+                                         <span className={`px-2 py-1 rounded font-bold text-xs ${part.current_stock <= part.min_reorder_level ? 'bg-red-100 text-red-700 animate-pulse' : 'bg-green-100 text-green-700'}`}>
+                                             {part.current_stock} units
+                                         </span>
+                                     </td>
+                                     <td className="px-6 py-4">${part.cost}</td>
+                                     <td className="px-6 py-4 text-end">
+                                         <button onClick={() => initiateRestock(part)} className="text-brand font-bold hover:underline">{t('btn_restock')}</button>
+                                     </td>
+                                 </tr>
+                             ))}
+                         </tbody>
+                     </table>
+                 </div>
+
+                 {restockModalOpen && (
+                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                             <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}</h3>
+                             <p className="text-sm text-gray-600 mb-4">Adding stock for: <b>{selectedPartForRestock?.part_name}</b></p>
+                             <input type="number" className="input-modern mb-4" placeholder="Qty" value={restockAmount} onChange={e => setRestockAmount(e.target.value)} />
+                             <div className="flex gap-2">
+                                 <button onClick={() => setRestockModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                 <button onClick={handleRestockPreCheck} className="flex-1 btn-primary">Add</button>
+                             </div>
+                         </div>
+                     </div>
+                 )}
+            </div>
+        )
+    }
+
+    // 5. CALIBRATION (Restored)
+    if (currentView === 'calibration') {
+        const calibrationAssets = assets.filter(a => a.next_calibration_date);
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                 <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                     <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('cal_dashboard')}</h2>
+                     <div className="overflow-x-auto">
+                         <table className="w-full text-sm text-left">
+                             <thead className="bg-gray-50 text-gray-500 uppercase font-bold text-xs">
+                                 <tr>
+                                     <th className="px-6 py-4">Asset</th>
+                                     <th className="px-6 py-4">Last Cal.</th>
+                                     <th className="px-6 py-4">Next Due</th>
+                                     <th className="px-6 py-4">Status</th>
+                                     <th className="px-6 py-4 text-end">Action</th>
+                                 </tr>
+                             </thead>
+                             <tbody className="divide-y divide-gray-100">
+                                 {calibrationAssets.map(asset => {
+                                     const isOverdue = new Date(asset.next_calibration_date!) < new Date();
+                                     return (
+                                         <tr key={asset.asset_id} className="hover:bg-gray-50">
+                                             <td className="px-6 py-4 font-bold">{asset.name}</td>
+                                             <td className="px-6 py-4">{asset.last_calibration_date}</td>
+                                             <td className="px-6 py-4">{asset.next_calibration_date}</td>
+                                             <td className="px-6 py-4">
+                                                 <span className={`px-2 py-1 rounded text-xs font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                                     {isOverdue ? t('cal_overdue') : t('cal_compliant')}
+                                                 </span>
+                                             </td>
+                                             <td className="px-6 py-4 text-end">
+                                                 <button onClick={() => { setAssetToCalibrate(asset); setUpdateCalibrationModalOpen(true); }} className="text-brand font-bold hover:underline">{t('btn_update_cal')}</button>
+                                             </td>
+                                         </tr>
+                                     )
+                                 })}
+                             </tbody>
+                         </table>
+                     </div>
+                 </div>
+                 
+                 {updateCalibrationModalOpen && (
+                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                         <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+                             <h3 className="font-bold text-lg mb-4">{t('update_cal_title')}</h3>
+                             <p className="text-sm mb-4">Recording new calibration for <b>{assetToCalibrate?.name}</b></p>
+                             <input type="date" className="input-modern mb-4" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} />
+                             <div className="flex gap-2">
+                                 <button onClick={() => setUpdateCalibrationModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                 <button onClick={handleUpdateCalibration} className="flex-1 btn-primary">Record</button>
+                             </div>
+                         </div>
+                     </div>
+                 )}
+            </div>
+        )
+    }
+
+    // 6. ANALYSIS & KNOWLEDGE BASE (Restored)
+    if (currentView === 'analysis') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                 <div className="bg-white border-b border-border p-4 sticky top-0 z-30 flex gap-4">
+                     <button onClick={() => setActiveTab('tab_analytics')} className={`pb-2 border-b-2 font-bold ${activeTab === 'tab_analytics' ? 'border-brand text-brand' : 'border-transparent text-gray-500'}`}>{t('tab_analytics')}</button>
+                     <button onClick={() => setActiveTab('tab_kb')} className={`pb-2 border-b-2 font-bold ${activeTab === 'tab_kb' ? 'border-brand text-brand' : 'border-transparent text-gray-500'}`}>{t('tab_kb')}</button>
+                     <button onClick={() => setActiveTab('tab_reports')} className={`pb-2 border-b-2 font-bold ${activeTab === 'tab_reports' ? 'border-brand text-brand' : 'border-transparent text-gray-500'}`}>{t('tab_reports')}</button>
+                 </div>
+
+                 {activeTab === 'tab_analytics' && (
+                     <div className="space-y-6">
+                         <div className="grid grid-cols-2 gap-4">
+                             <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                                 <h3 className="font-bold mb-4">{t('chart_mttr_trend')}</h3>
+                                 <ResponsiveContainer width="100%" height={250}><LineChart data={analyticsData.mttrTrend}><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="hours" stroke="#3B82F6" strokeWidth={3}/></LineChart></ResponsiveContainer>
+                             </div>
+                             {/* Additional Charts can go here */}
+                         </div>
+                     </div>
+                 )}
+
+                 {activeTab === 'tab_kb' && (
+                     <div className="space-y-6">
+                         <div className="flex justify-between items-center">
+                             <h2 className="text-2xl font-bold text-gray-900">{t('kb_library')}</h2>
+                             <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+                                 <button onClick={() => setKbMode('list')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition ${kbMode === 'list' ? 'bg-white shadow text-gray-900' : 'text-gray-500'}`}><List size={16}/></button>
+                                 <button onClick={() => setKbMode('ai')} className={`px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-2 ${kbMode === 'ai' ? 'bg-indigo-600 text-white shadow' : 'text-gray-500'}`}><Sparkles size={16}/> AI Search</button>
+                             </div>
+                         </div>
+
+                         {kbMode === 'ai' ? (
+                             <div className="bg-indigo-50 rounded-2xl p-8 border border-indigo-100 text-center">
+                                 <div className="max-w-2xl mx-auto space-y-6">
+                                     <BrainCircuit size={48} className="mx-auto text-indigo-500"/>
+                                     <h3 className="text-xl font-bold text-indigo-900">{t('ai_search_title')}</h3>
+                                     <div className="relative">
+                                         <input type="text" className="w-full p-4 rounded-xl border border-indigo-200 shadow-sm focus:ring-4 focus:ring-indigo-200 focus:border-indigo-400 outline-none" placeholder={t('ai_search_placeholder')} value={aiQuery} onChange={(e) => setAiQuery(e.target.value)}/>
+                                         <button onClick={handleAiSearch} disabled={isAiSearching} className="absolute right-2 top-2 bottom-2 bg-indigo-600 text-white px-6 rounded-lg font-bold hover:bg-indigo-700 transition disabled:opacity-50">
+                                             {isAiSearching ? '...' : t('btn_analyze')}
+                                         </button>
+                                     </div>
+                                     {aiResult && (
+                                         <div className="text-left bg-white p-6 rounded-xl shadow-lg border border-indigo-100 animate-in slide-in-from-bottom-4">
+                                             <div className="mb-4">
+                                                 <h4 className="font-bold text-indigo-900 text-sm uppercase tracking-wider mb-2">{t('ai_explanation')}</h4>
+                                                 <p className="text-gray-700 leading-relaxed">{aiResult.explanation}</p>
+                                             </div>
+                                             <div className="mb-4">
+                                                 <h4 className="font-bold text-indigo-900 text-sm uppercase tracking-wider mb-2">{t('ai_solution')}</h4>
+                                                 <p className="text-gray-700 leading-relaxed whitespace-pre-line">{aiResult.solution}</p>
+                                             </div>
+                                         </div>
+                                     )}
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 {filteredKbDocs.map(doc => (
+                                     <div key={doc.id} className="bg-white p-4 rounded-xl border border-border flex items-center justify-between hover:shadow-md transition cursor-pointer">
+                                         <div className="flex items-center gap-3">
+                                             <div className="p-3 bg-red-50 text-red-500 rounded-lg"><FileText size={20}/></div>
+                                             <div>
+                                                 <div className="font-bold text-gray-900">{doc.title}</div>
+                                                 <div className="text-xs text-text-muted">{doc.category} • {doc.fileSize}</div>
+                                             </div>
+                                         </div>
+                                         <Download size={18} className="text-gray-400 hover:text-brand"/>
+                                     </div>
+                                 ))}
+                             </div>
+                         )}
+                     </div>
+                 )}
+                 
+                 {activeTab === 'tab_reports' && (
+                     <div className="bg-white p-6 rounded-2xl border border-border shadow-soft text-center py-20">
+                         <FileCode size={48} className="mx-auto text-gray-300 mb-4"/>
+                         <h3 className="text-xl font-bold text-gray-900">Report Generator</h3>
+                         <p className="text-text-muted mb-6">Create detailed CM, PPM, or Compliance reports in PDF format.</p>
+                         <button onClick={handleFindJobReport} className="btn-primary mx-auto">Generate Sample Report</button>
+                     </div>
+                 )}
+            </div>
+        )
+    }
+
+    // 7. USERS (Restored)
+    if (currentView === 'users') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('users_title')}</h2>
+                    <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm">
+                        <UserPlus size={16}/> {t('add_user')}
+                    </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                            <tr>
+                                <th className="px-6 py-4">Name</th>
+                                <th className="px-6 py-4">Role</th>
+                                <th className="px-6 py-4">Email</th>
+                                <th className="px-6 py-4">Department</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {users.map(u => (
+                                <tr key={u.user_id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs">{u.name[0]}</div>
+                                        {u.name}
+                                    </td>
+                                    <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{u.role}</span></td>
+                                    <td className="px-6 py-4 text-gray-500">{u.email}</td>
+                                    <td className="px-6 py-4">{u.department || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {isAddUserModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_add_user')}</h3>
+                            <form onSubmit={handleAddUserSubmit} className="space-y-4">
+                                <input className="input-modern" placeholder={t('user_name')} value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} required />
+                                <input className="input-modern" placeholder={t('user_email')} type="email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} required />
+                                <select className="input-modern" value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}>
+                                    {Object.values(UserRole).map(role => <option key={role} value={role}>{role}</option>)}
+                                </select>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary">Create</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    return <div>View not found</div>;
 };
