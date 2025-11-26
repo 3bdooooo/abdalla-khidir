@@ -2,18 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+
+body {
+  @apply bg-background text-text-main antialiased font-sans;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F1F1F1;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #C1C1C1;
-  border-radius: 4px;
+  background: #CBD5E1;
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #A8A8A8;
+  background: #94A3B8;
+}
+
+/* Glassmorphism Utility */
+.glass {
+  @apply bg-white/80 backdrop-blur-md border border-white/20;
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-soft hover:-translate-y-1;
+}
+
+.input-modern {
+  @apply w-full border border-border rounded-xl px-4 py-3 bg-white focus:ring-2 focus:ring-brand/20 focus:border-brand outline-none transition-all placeholder:text-text-light text-sm font-medium;
+}
+
+.btn-primary {
+  @apply bg-brand hover:bg-brand-dark text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-brand/20 transition-all active:scale-95 flex items-center justify-center gap-2;
+}
+
+.btn-secondary {
+  @apply bg-white hover:bg-gray-50 text-text-main border border-border font-medium py-3 px-6 rounded-xl shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2;
 }

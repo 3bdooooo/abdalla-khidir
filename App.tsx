@@ -55,7 +55,7 @@ const AppContent: React.FC = () => {
 
   // Calculate Badges
   useEffect(() => {
-    const criticalWOs = workOrders.filter(wo => wo.status !== 'Closed' && wo.priority === 'Critical').length;
+    const criticalWOs = workOrders.filter(wo => wo.status !== 'Closed' && (wo.priority === 'Critical' || wo.priority === 'High')).length;
     const overdueCal = assets.filter(a => a.next_calibration_date && new Date(a.next_calibration_date) < new Date()).length;
     const lowStock = inventory.filter(p => p.current_stock <= p.min_reorder_level).length;
 
@@ -112,6 +112,7 @@ const AppContent: React.FC = () => {
       {(user.role === UserRole.SUPERVISOR || user.role === UserRole.ADMIN) && (
         <SupervisorView 
           currentView={currentView}
+          currentUser={user} // Pass current user to handle role-based approvals
           assets={assets}
           workOrders={workOrders}
           inventory={inventory}
@@ -136,6 +137,8 @@ const AppContent: React.FC = () => {
         <NurseView 
           user={user}
           assets={assets}
+          workOrders={workOrders}
+          refreshData={refreshData}
         />
       )}
     </Layout>

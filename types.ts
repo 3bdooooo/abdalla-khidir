@@ -91,11 +91,34 @@ export interface WorkOrder {
   priority: Priority;
   assigned_to_id: number; // FK to User (Technician/Engineer)
   description: string;
-  status: 'Open' | 'In Progress' | 'Closed';
+  status: 'Open' | 'Assigned' | 'In Progress' | 'Awaiting Approval' | 'Manager Approved' | 'Awaiting Final Acceptance' | 'Closed';
   start_time?: string; // Timestamp
   close_time?: string; // Timestamp
   parts_used?: { part_id: number; quantity: number }[]; // Tracked in WO table
   created_at: string;
+  
+  // Approval Tracking
+  approvals?: {
+    manager?: {
+      user_id: number;
+      signature: string;
+      timestamp: string;
+      approved_time: boolean;
+    };
+    supervisor?: {
+      user_id: number;
+      signature: string;
+      timestamp: string;
+      approved_parts: boolean;
+      approved_technical: boolean;
+    };
+    nurse?: {
+      user_id: number;
+      signature: string;
+      timestamp: string;
+      verified: boolean;
+    };
+  };
 }
 
 export interface InventoryPart {

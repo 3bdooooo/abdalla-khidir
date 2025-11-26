@@ -1,24 +1,30 @@
 
-
 import React, { useState, useMemo } from 'react';
 import * as api from '../services/api';
 import { LOCATIONS } from '../services/mockDb';
-import { Priority, WorkOrderType, Asset, User, AssetStatus } from '../types';
-import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon } from 'lucide-react';
+import { Priority, WorkOrderType, Asset, User, AssetStatus, WorkOrder } from '../types';
+import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface NurseViewProps {
   user: User;
   assets: Asset[];
+  workOrders: WorkOrder[];
+  refreshData: () => void;
 }
 
-export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'report'>('dashboard');
+export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, refreshData }) => {
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'report' | 'verify'>('dashboard');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [description, setDescription] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
   const { t } = useLanguage();
+
+  // Verification State
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
+  const [selectedWoForVerify, setSelectedWoForVerify] = useState<WorkOrder | null>(null);
+  const [nurseSignature, setNurseSignature] = useState('');
 
   // Filter assets for the user's department
   const deptAssets = useMemo(() => {
@@ -28,6 +34,19 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
         return assetLoc?.department === userLoc?.department || true; 
     });
   }, [assets, user.location_id]);
+
+  // Filter WOs ready for verification
+  const pendingVerifications = useMemo(() => {
+      return workOrders.filter(wo => {
+          const isPending = wo.status === 'Awaiting Final Acceptance';
+          const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+          const userLoc = LOCATIONS.find(l => l.location_id === user.location_id);
+          const assetLoc = LOCATIONS.find(l => l.location_id === asset?.location_id);
+          
+          // Show if pending AND in same department
+          return isPending && (assetLoc?.department === userLoc?.department || true);
+      });
+  }, [workOrders, assets, user.location_id]);
   
   const identifiedAsset = assets.find(a => a.asset_id === selectedAssetId);
 
@@ -59,6 +78,7 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
         setDescription('');
         setSelectedAssetId('');
         setActiveTab('dashboard');
+        refreshData();
     }, 3000);
   };
 
@@ -74,6 +94,22 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
         setSelectedAssetId(randomAsset.asset_id);
         setIsScanning(false);
     }, 2000);
+  };
+
+  const openVerifyModal = (wo: WorkOrder) => {
+      setSelectedWoForVerify(wo);
+      setNurseSignature('');
+      setVerifyModalOpen(true);
+  };
+
+  const submitVerification = async () => {
+      if (selectedWoForVerify && nurseSignature) {
+          await api.submitNurseVerification(selectedWoForVerify.wo_id, user.user_id, nurseSignature);
+          refreshData();
+          setVerifyModalOpen(false);
+          setSelectedWoForVerify(null);
+          setNurseSignature('');
+      }
   };
 
   if (isSubmitted) {
@@ -110,6 +146,17 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
             className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-gray-100 text-gray-900 shadow-sm' : 'text-text-muted hover:text-gray-800'}`}
           >
             {t('tab_overview')}
+          </button>
+          <button 
+            onClick={() => setActiveTab('verify')}
+            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'verify' ? 'bg-indigo-100 text-indigo-700 shadow-sm' : 'text-text-muted hover:text-gray-800'}`}
+          >
+            {t('tab_verify')}
+            {pendingVerifications.length > 0 && (
+                <span className="bg-indigo-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                    {pendingVerifications.length}
+                </span>
+            )}
           </button>
           <button 
             onClick={() => setActiveTab('report')}
@@ -173,6 +220,50 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
                 ))}
             </div>
         </div>
+      )}
+
+      {/* VERIFY VIEW */}
+      {activeTab === 'verify' && (
+          <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+              <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl flex items-center gap-3">
+                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                      <ClipboardCheck size={20}/>
+                  </div>
+                  <div>
+                      <h3 className="font-bold text-indigo-900 text-sm">{t('pending_verify')}</h3>
+                      <p className="text-xs text-indigo-700">{t('verify_desc')}</p>
+                  </div>
+              </div>
+
+              {pendingVerifications.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                      <CheckCircle2 size={48} className="mx-auto mb-3 opacity-20"/>
+                      <p>No repairs pending verification</p>
+                  </div>
+              ) : (
+                  <div className="space-y-3">
+                      {pendingVerifications.map(wo => {
+                          const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                          return (
+                              <div key={wo.wo_id} className="bg-white border border-border p-4 rounded-xl shadow-sm">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <span className="text-[10px] font-mono font-bold text-text-muted bg-gray-50 px-2 py-0.5 rounded">#{wo.wo_id}</span>
+                                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700">Repaired</span>
+                                  </div>
+                                  <div className="font-bold text-gray-900 text-sm mb-1">{asset?.name}</div>
+                                  <div className="text-xs text-text-muted mb-3">{wo.description}</div>
+                                  <button 
+                                    onClick={() => openVerifyModal(wo)}
+                                    className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors"
+                                  >
+                                      {t('verify_action')}
+                                  </button>
+                              </div>
+                          );
+                      })}
+                  </div>
+              )}
+          </div>
       )}
 
       {/* REPORT VIEW */}
@@ -264,6 +355,67 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets }) => {
                 {t('report_desc')}
             </p>
         </div>
+      )}
+
+      {/* VERIFICATION MODAL */}
+      {verifyModalOpen && selectedWoForVerify && (
+          <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 animate-in zoom-in-95">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-900">{t('verify_title')}</h3>
+                      <button onClick={() => setVerifyModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+                  </div>
+                  
+                  <div className="space-y-6">
+                      <div className="p-4 bg-gray-50 rounded-xl border border-border">
+                          <div className="text-sm font-bold text-gray-900">{selectedWoForVerify.description}</div>
+                          <div className="text-xs text-text-muted mt-1">
+                              Asset: {assets.find(a => a.asset_id === selectedWoForVerify.asset_id || a.nfc_tag_id === selectedWoForVerify.asset_id)?.name}
+                          </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 p-3 border border-border rounded-xl bg-green-50/50">
+                          <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><CheckCircle2 size={14}/></div>
+                          <div className="text-sm font-medium text-gray-700">{t('confirm_working')}</div>
+                      </div>
+
+                      <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">{t('nurse_sig')}</label>
+                          <div className="border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 h-32 flex items-center justify-center hover:bg-gray-100 transition-colors cursor-pointer relative overflow-hidden group">
+                              <input 
+                                type="file" 
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        const reader = new FileReader();
+                                        reader.onloadend = () => setNurseSignature(reader.result as string);
+                                        reader.readAsDataURL(file);
+                                    }
+                                }}
+                              />
+                              {nurseSignature ? (
+                                  <img src={nurseSignature} className="h-full object-contain" />
+                              ) : (
+                                  <div className="text-center text-gray-400 group-hover:text-brand transition-colors">
+                                      <PenTool className="mx-auto mb-2" size={24}/>
+                                      <span className="text-sm font-bold">Sign to Confirm</span>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+
+                      <button 
+                        onClick={submitVerification}
+                        disabled={!nurseSignature}
+                        className="w-full btn-primary disabled:opacity-50"
+                      >
+                          {t('btn_verify_close')}
+                      </button>
+                  </div>
+              </div>
+          </div>
       )}
     </div>
   );

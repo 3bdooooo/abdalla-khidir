@@ -7,24 +7,32 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+      boxShadow: {
+        'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+        'glow': '0 0 15px rgba(59, 130, 246, 0.5)',
       },
       colors: {
         brand: {
-          DEFAULT: '#007BFF', // Medical Blue
-          light: '#4DA3FF',
-          dark: '#0056B3',
+          DEFAULT: '#2563EB', // Modern Blue 600
+          light: '#60A5FA',   // Blue 400
+          dark: '#1E40AF',    // Blue 800
+          accent: '#3B82F6',
         },
-        background: '#F8F9FA', // Off-White
-        surface: '#FFFFFF', // White
-        border: '#DEE2E6', // Light Gray
+        background: '#F1F5F9', // Slate 100
+        surface: '#FFFFFF',
+        border: '#E2E8F0',    // Slate 200
         text: {
-          main: '#212529', // Dark Gray / Black
-          muted: '#6C757D', // Muted Gray
+          main: '#0F172A',    // Slate 900
+          muted: '#64748B',   // Slate 500
+          light: '#94A3B8',   // Slate 400
         },
-        danger: '#DC3545', // Medical Red
-        warning: '#FFC107', // Warning Yellow
-        success: '#28A745', // Medical Green
+        danger: '#EF4444',    // Red 500
+        warning: '#F59E0B',   // Amber 500
+        success: '#10B981',   // Emerald 500
+        info: '#0EA5E9',      // Sky 500
       }
     },
   },

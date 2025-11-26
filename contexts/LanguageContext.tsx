@@ -1,23 +1,19 @@
 
-
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, ReactNode } from 'react';
 
 export type Language = 'en' | 'ar';
 
 export const translations = {
   en: {
-    // General
     appName: "A2M MED",
     logout: "Logout",
     welcome: "Welcome",
-    // Roles
     role_admin: "Admin",
     role_supervisor: "Supervisor",
     role_engineer: "Engineer",
     role_technician: "Technician",
     role_nurse: "Nurse",
     role_vendor: "Vendor",
-    // Login
     login_title: "Sign in to your account",
     login_subtitle: "Enter your credentials to access the system",
     email_label: "Email Address",
@@ -27,7 +23,6 @@ export const translations = {
     or_continue_as: "Or continue with Demo Persona",
     select_persona: "Select a Persona to Demo:",
     logging_in: "Logging in...",
-    // Sidebar/Nav
     nav_dashboard: "Dashboard",
     nav_assets: "Assets & Equipment",
     nav_maintenance: "Maintenance Mgmt",
@@ -35,7 +30,6 @@ export const translations = {
     nav_calibration: "Calibration & Quality",
     nav_analysis: "Analysis & Knowledge",
     nav_users: "User Management",
-    // Dashboard
     op_overview: "Operational Overview",
     total_assets: "Total Assets",
     open_tickets: "Open Tickets",
@@ -53,7 +47,6 @@ export const translations = {
     enter_reason: "Enter reason for movement...",
     btn_justify: "Submit Justification",
     compliance_reports: "Compliance Reports",
-    // Assets
     add_equipment: "Add Equipment",
     tab_list: "Equipment List",
     tab_tracking: "Tracking & Movement Log",
@@ -64,7 +57,6 @@ export const translations = {
     purchase_date: "Purchase Date",
     risk_score: "Risk Score",
     actions: "Actions",
-    // Asset Details
     asset_details: "Equipment Details",
     manufacturer: "Manufacturer",
     serial_number: "Serial Number",
@@ -78,7 +70,6 @@ export const translations = {
     last_updated: "Last Updated",
     specifications: "Specifications",
     vendor_support: "Vendor Support",
-    // Add Asset Modal
     modal_add_title: "Add New Equipment",
     form_name: "Equipment Name",
     form_model: "Model",
@@ -87,7 +78,6 @@ export const translations = {
     form_date: "Purchase Date",
     form_image: "Asset Image",
     btn_save: "Save Asset",
-    // Maintenance
     tab_wo: "Work Orders",
     tab_pm: "Preventive Plans (PM)",
     tab_requests: "Requests",
@@ -103,15 +93,31 @@ export const translations = {
     wo_status_open: "Open",
     wo_status_inprogress: "In Progress",
     wo_status_closed: "Closed",
+    wo_status_awaiting: "Awaiting Approval",
+    wo_status_manager_approved: "Manager Approved",
+    wo_status_final_acceptance: "Awaiting Final Acceptance",
     assign: "Assign",
     filter_all: "All",
-    // WO Creation Modal
+    assign_technician: "Assign Technician",
+    select_tech: "Select Technician / Engineer",
+    wo_assigned_msg: "Notification sent to assigned technician.",
+    btn_assign_confirm: "Confirm Assignment",
+    wo_status_assigned: "Assigned",
+    btn_review_approve: "Review & Approve",
+    approval_workflow: "Approval Workflow",
+    manager_review: "Site Manager Review",
+    supervisor_review: "Supervisor Review",
+    verify_time_asset: "Verify Time & Asset",
+    verify_parts_tech: "Verify Parts & Technical",
+    confirm_stock_deduction: "Confirm Stock Deduction",
+    btn_approve_sign: "Approve & Sign",
+    waiting_manager: "Waiting for Manager",
+    waiting_supervisor: "Waiting for Supervisor",
     modal_create_wo: "Dispatch Work Order",
     wo_description: "Fault Description / Task",
     wo_asset: "Select Asset",
     wo_assign_tech: "Assign Technician",
     btn_dispatch: "Dispatch Order",
-    // Inventory
     tab_stock: "Current Stock",
     tab_logs: "Stock Logs",
     tab_alerts: "Reorder Alerts",
@@ -120,7 +126,6 @@ export const translations = {
     unit_cost: "Unit Cost",
     btn_order: "Order Parts",
     btn_restock: "Restock",
-    // Inventory View
     restock_modal_title: "Restock Inventory",
     restock_qty: "Quantity to Add",
     confirm_large_restock_title: "Large Restock Warning",
@@ -128,7 +133,6 @@ export const translations = {
     current_stock_label: "Current Stock",
     min_level_label: "Min Level",
     restock_btn: "Add to Stock",
-    // Calibration
     cal_dashboard: "Calibration & Quality Control",
     cal_schedule: "Calibration Schedule",
     cal_certs: "Certificates",
@@ -142,12 +146,11 @@ export const translations = {
     update_cal_title: "Record Calibration",
     new_cal_date: "New Calibration Date",
     btn_record: "Record",
-    // Analysis & Reports
     tab_analysis: "Analysis & Reports",
     tab_reports: "Reports",
     tab_kb: "Knowledge Base",
     tab_gen_report: "Report Generator",
-    tab_analytics: "Strategic Analytics", // New
+    tab_analytics: "Strategic Analytics",
     gen_report: "Generate Report",
     report_type: "Report Type",
     cm_report: "Corrective Maintenance (CM)",
@@ -156,7 +159,6 @@ export const translations = {
     date_range: "Date Range",
     download_pdf: "Download PDF",
     generated_reports: "Generated Reports",
-    // New Analytics
     pillar_operational: "Operational Efficiency",
     pillar_assets: "Asset Management & Predictive",
     chart_mttr_trend: "MTTR Trend (Monthly)",
@@ -170,7 +172,15 @@ export const translations = {
     lbl_wo_count: "WO Count",
     lbl_user_error: "User Errors",
     lbl_tech_fault: "Technical Faults",
-    // Technician
+    kb_library: "Document Library",
+    kb_ai_search: "AI Smart Search",
+    ai_search_title: "Analyze Error Code / Fault",
+    ai_search_placeholder: "Enter Error Code (e.g. Err 305) or Fault Description...",
+    btn_analyze: "Analyze with AI",
+    analyzing: "Analyzing...",
+    ai_explanation: "Technical Explanation",
+    ai_solution: "Recommended Solution",
+    ai_ref_docs: "Referenced Documents",
     tech_dashboard: "Technician Dashboard",
     btn_start_job: "Start Job (Scan NFC)",
     step_verify: "Verification",
@@ -181,22 +191,21 @@ export const translations = {
     scan_tag: "Scan Tag",
     match_verified: "Match Verified",
     observed_symptoms: "Observed Symptoms",
-    solution_applied: "Solution Applied",
+    solution_applied: "Repair Actions Taken",
     smart_kb: "Smart Knowledge Base",
-    get_suggestions: "Get Suggestions",
+    get_suggestions: "Diagnose & Suggest Parts",
     op_hours: "Cumulative Operating Hours",
     spare_parts: "Spare Parts Consumed",
     ar_guide: "Augmented Reality Guide",
     activate_ar: "Activate AR Guide",
     summary: "Summary",
     digital_sig: "Technician Digital Signature",
-    close_wo: "Close Work Order",
+    close_wo: "Submit for Approval",
     back: "Back",
     next_step: "Next Step",
     todo: "To Do",
     inprogress: "In Progress",
     completed: "Completed",
-    // New Tech UI
     tab_new_req: "New Requests",
     tab_scheduled_pm: "Scheduled PMs",
     tab_diagnosis: "Diagnosis Steps",
@@ -206,22 +215,24 @@ export const translations = {
     search_parts: "Search Inventory...",
     start_instruction: "Scan NFC to Start Job",
     checklist_progress: "Checklist Progress",
-    confirm_close_title: "Confirm Closure",
-    confirm_close_msg: "Are you sure you want to close this work order? This action cannot be undone.",
-    btn_confirm: "Confirm",
+    confirm_close_title: "Submit for Approval",
+    confirm_close_msg: "Are you sure you want to submit this repair report? The Work Order will be sent to the Supervisor for final approval.",
+    btn_confirm: "Submit Report",
     btn_cancel: "Cancel",
-    // Docs Modal
     manuals_detected: "Reference Documents Detected",
     relevant_docs: "Relevant Manuals & Guides",
     continue_work: "Acknowledge & Continue",
-    // Visual Tab
+    smart_match: "Smart Match",
+    acquiring_location: "Acquiring GPS Location...",
+    location_verified: "Location Verified",
+    geofence_success: "Geofence Check Passed",
     available_guides: "Available Guides",
     ar_overlay: "AI Overlay",
     ar_simulation_msg: "Highlighting internal power supply unit. Verify voltage output at test points marked in blue.",
-    // Nurse
     nurse_dashboard: "Nurse & Dept. Dashboard",
     tab_overview: "Overview",
     tab_report: "Report Issue",
+    tab_verify: "Verify Repairs",
     my_dept: "My Department",
     running: "Running",
     stopped: "Stopped",
@@ -231,13 +242,12 @@ export const translations = {
     report_placeholder: "What seems to be the problem? (e.g., Bed remote not working)",
     btn_report: "REPORT FAULT NOW",
     report_sent: "Report Sent!",
-    report_desc: "الضغط على هذا الزر سيرسل تنبيهاً عاجلاً وبريداً إلكترونياً لأقرب فني فوراً.",
+    report_desc: "The button triggers an urgent alert to the nearest technician.",
     detected: "Detected",
     reported: "Reported",
     scan_nfc: "Scan Device NFC",
     identifying: "Identifying Device...",
     tap_instruction: "Tap phone to asset tag",
-    // Users
     users_title: "System Users",
     add_user: "Add User",
     user_name: "Name",
@@ -249,21 +259,31 @@ export const translations = {
     user_sign: "Digital Signature",
     modal_add_user: "Create New Account",
     upload_sign: "Upload Signature",
-    btn_create_user: "Create Account"
+    btn_create_user: "Create Account",
+    pending_verify: "Pending Verification",
+    verify_desc: "Confirm repairs for department assets",
+    verify_action: "Verify & Sign",
+    verify_title: "Confirm Repair Completion",
+    confirm_working: "I confirm the device is working properly",
+    nurse_sig: "Nurse Signature",
+    btn_verify_close: "Verify & Close Order",
+    btn_smart_assign: "Smart Auto-Assign",
+    floor_plan_3d: "Interactive 3D Floor Plan",
+    view_assets_in_zone: "View Assets in Zone",
+    rfid_signal: "RFID Live Signal",
+    zone_details: "Zone Details",
+    select_zone: "Select a Zone",
   },
   ar: {
-    // General
     appName: "A2M MED",
     logout: "تسجيل خروج",
     welcome: "مرحباً",
-    // Roles
     role_admin: "مسؤول",
     role_supervisor: "مشرف",
     role_engineer: "مهندس",
     role_technician: "فني",
     role_nurse: "ممرض/ة",
     role_vendor: "بائع",
-    // Login
     login_title: "تسجيل الدخول",
     login_subtitle: "أدخل بيانات الاعتماد للوصول إلى النظام",
     email_label: "البريد الإلكتروني",
@@ -273,7 +293,6 @@ export const translations = {
     or_continue_as: "أو الاستمرار كشخصية تجريبية",
     select_persona: "اختر مستخدم للتجربة:",
     logging_in: "جاري الدخول...",
-    // Sidebar/Nav
     nav_dashboard: "لوحة القيادة",
     nav_assets: "الأصول والمعدات",
     nav_maintenance: "إدارة الصيانة",
@@ -281,7 +300,6 @@ export const translations = {
     nav_calibration: "المعايرة والجودة",
     nav_analysis: "التحليل والمعرفة",
     nav_users: "إدارة المستخدمين",
-    // Dashboard
     op_overview: "نظرة عامة",
     total_assets: "إجمالي الأصول",
     open_tickets: "التذاكر المفتوحة",
@@ -299,7 +317,6 @@ export const translations = {
     enter_reason: "أدخل سبب النقل...",
     btn_justify: "إرسال التبرير",
     compliance_reports: "تقارير الامتثال",
-    // Assets
     add_equipment: "إضافة معدات",
     tab_list: "قائمة المعدات",
     tab_tracking: "سجل التتبع والحركة",
@@ -310,7 +327,6 @@ export const translations = {
     purchase_date: "تاريخ الشراء",
     risk_score: "درجة المخاطرة",
     actions: "إجراءات",
-    // Asset Details
     asset_details: "تفاصيل الجهاز",
     manufacturer: "الشركة المصنعة",
     serial_number: "الرقم التسلسلي",
@@ -324,7 +340,6 @@ export const translations = {
     last_updated: "آخر تحديث",
     specifications: "المواصفات",
     vendor_support: "دعم البائع",
-    // Add Asset Modal
     modal_add_title: "إضافة معدات جديدة",
     form_name: "اسم الجهاز",
     form_model: "الموديل",
@@ -333,7 +348,6 @@ export const translations = {
     form_date: "تاريخ الشراء",
     form_image: "صورة الأصل",
     btn_save: "حفظ الأصل",
-    // Maintenance
     tab_wo: "أوامر العمل",
     tab_pm: "الخطط الوقائية",
     tab_requests: "الطلبات",
@@ -349,15 +363,31 @@ export const translations = {
     wo_status_open: "مفتوح",
     wo_status_inprogress: "جاري التنفيذ",
     wo_status_closed: "مغلق",
+    wo_status_awaiting: "بانتظار الموافقة",
+    wo_status_manager_approved: "تمت موافقة المدير",
+    wo_status_final_acceptance: "بانتظار القبول النهائي",
     assign: "تعيين",
     filter_all: "الكل",
-    // WO Creation Modal
+    assign_technician: "تعيين فني",
+    select_tech: "اختر فني / مهندس",
+    wo_assigned_msg: "تم إرسال إشعار للمهندس المكلف.",
+    btn_assign_confirm: "تأكيد التعيين",
+    wo_status_assigned: "تم التكليف",
+    btn_review_approve: "مراجعة واعتماد",
+    approval_workflow: "سير عمل الموافقات",
+    manager_review: "مراجعة مدير الموقع",
+    supervisor_review: "مراجعة المشرف",
+    verify_time_asset: "التحقق من الوقت والأصل",
+    verify_parts_tech: "التحقق الفني وقطع الغيار",
+    confirm_stock_deduction: "تأكيد خصم المخزون",
+    btn_approve_sign: "اعتماد وتوقيع",
+    waiting_manager: "بانتظار المدير",
+    waiting_supervisor: "بانتظار المشرف",
     modal_create_wo: "إرسال أمر عمل جديد",
     wo_description: "وصف العطل / المهمة",
     wo_asset: "اختيار الجهاز",
     wo_assign_tech: "تعيين الفني",
     btn_dispatch: "إرسال الأمر",
-    // Inventory
     tab_stock: "المخزون الحالي",
     tab_logs: "سجلات المخزون",
     tab_alerts: "تنبيهات إعادة الطلب",
@@ -366,7 +396,6 @@ export const translations = {
     unit_cost: "تكلفة الوحدة",
     btn_order: "طلب قطع غيار",
     btn_restock: "إعادة تعبئة",
-    // Inventory View
     restock_modal_title: "إعادة تعبئة المخزون",
     restock_qty: "الكمية للإضافة",
     confirm_large_restock_title: "تحذير: كمية كبيرة",
@@ -374,7 +403,6 @@ export const translations = {
     current_stock_label: "المخزون الحالي",
     min_level_label: "الحد الأدنى",
     restock_btn: "إضافة للمخزون",
-    // Calibration
     cal_dashboard: "المعايرة ومراقبة الجودة",
     cal_schedule: "جدول المعايرة",
     cal_certs: "الشهادات",
@@ -388,12 +416,11 @@ export const translations = {
     update_cal_title: "تسجيل معايرة جديدة",
     new_cal_date: "تاريخ المعايرة الجديد",
     btn_record: "تسجيل",
-    // Analysis
     tab_analysis: "التحليل والتقارير",
     tab_reports: "التقارير",
     tab_kb: "قاعدة المعرفة",
     tab_gen_report: "منشئ التقارير",
-    tab_analytics: "التحليلات الاستراتيجية", // New
+    tab_analytics: "التحليلات الاستراتيجية",
     gen_report: "إنشاء تقرير",
     report_type: "نوع التقرير",
     cm_report: "صيانة تصحيحية (CM)",
@@ -402,7 +429,6 @@ export const translations = {
     date_range: "النطاق الزمني",
     download_pdf: "تحميل PDF",
     generated_reports: "التقارير المنشأة",
-    // New Analytics
     pillar_operational: "الكفاءة التشغيلية",
     pillar_assets: "إدارة الأصول والتنبؤ",
     chart_mttr_trend: "اتجاه MTTR (شهري)",
@@ -416,7 +442,15 @@ export const translations = {
     lbl_wo_count: "عدد الأوامر",
     lbl_user_error: "أخطاء المستخدم",
     lbl_tech_fault: "أعطال فنية",
-    // Technician
+    kb_library: "مكتبة الوثائق",
+    kb_ai_search: "البحث الذكي (AI)",
+    ai_search_title: "تحليل كود الخطأ / العطل",
+    ai_search_placeholder: "أدخل كود الخطأ (مثال: Error 305) أو وصف العطل...",
+    btn_analyze: "تحليل بواسطة AI",
+    analyzing: "جاري التحليل...",
+    ai_explanation: "الشرح الفني",
+    ai_solution: "الحل المقترح",
+    ai_ref_docs: "الوثائق المرجعية",
     tech_dashboard: "لوحة مهام الفني",
     btn_start_job: "ابدأ العمل (مسح NFC)",
     step_verify: "التحقق",
@@ -427,22 +461,21 @@ export const translations = {
     scan_tag: "مسح الرمز",
     match_verified: "تم التحقق من المطابقة",
     observed_symptoms: "الأعراض الملاحظة",
-    solution_applied: "الحل المطبق",
+    solution_applied: "إجراءات الإصلاح المتخذة",
     smart_kb: "قاعدة المعرفة الذكية",
-    get_suggestions: "الحصول على مقترحات",
+    get_suggestions: "تشخيص واقتراح قطع",
     op_hours: "ساعات التشغيل التراكمية",
     spare_parts: "قطع الغيار المستهلكة",
     ar_guide: "دليل الواقع المعزز",
     activate_ar: "تفعيل الواقع المعزز",
     summary: "الملخص",
     digital_sig: "توقيع الفني الرقمي",
-    close_wo: "إغلاق أمر العمل",
+    close_wo: "إرسال للموافقة",
     back: "رجوع",
     next_step: "الخطوة التالية",
     todo: "للعمل",
     inprogress: "جاري العمل",
     completed: "مكتمل",
-    // New Tech UI
     tab_new_req: "بلاغات جديدة",
     tab_scheduled_pm: "صيانة دورية مجدولة",
     tab_diagnosis: "خطوات التشخيص",
@@ -452,22 +485,24 @@ export const translations = {
     search_parts: "بحث في المخزون...",
     start_instruction: "امسح علامة NFC لبدء العمل",
     checklist_progress: "تقدم القائمة",
-    confirm_close_title: "تأكيد الإغلاق",
-    confirm_close_msg: "هل أنت متأكد من إغلاق أمر العمل؟ لا يمكن التراجع عن هذا الإجراء.",
-    btn_confirm: "تأكيد",
+    confirm_close_title: "تأكيد الإرسال",
+    confirm_close_msg: "هل أنت متأكد من إرسال تقرير الإصلاح؟ سيتم تحويل الطلب للمشرف للموافقة النهائية.",
+    btn_confirm: "إرسال التقرير",
     btn_cancel: "إلغاء",
-    // Docs Modal
     manuals_detected: "تم العثور على وثائق",
     relevant_docs: "كتيبات وأدلة ذات صلة",
     continue_work: "فهمت، تابع العمل",
-    // Visual Tab
+    smart_match: "مطابقة ذكية",
+    acquiring_location: "تحديد الموقع الجغرافي...",
+    location_verified: "تم التحقق من الموقع",
+    geofence_success: "نجح فحص النطاق الجغرافي",
     available_guides: "الأدلة المتاحة",
     ar_overlay: "تراكب الذكاء الاصطناعي",
     ar_simulation_msg: "تحديد وحدة الطاقة الداخلية. تحقق من خرج الجهد عند نقاط الاختبار المحددة باللون الأزرق.",
-    // Nurse
     nurse_dashboard: "لوحة القسم",
     tab_overview: "نظرة عامة",
     tab_report: "إبلاغ عن عطل",
+    tab_verify: "تأكيد الإصلاح",
     my_dept: "قسمي",
     running: "يعمل",
     stopped: "متوقف",
@@ -483,7 +518,6 @@ export const translations = {
     scan_nfc: "مسح NFC للجهاز",
     identifying: "جاري التعرف...",
     tap_instruction: "قرب الهاتف من ملصق الجهاز",
-    // Users
     users_title: "مستخدمي النظام",
     add_user: "إضافة مستخدم",
     user_name: "الاسم",
@@ -495,36 +529,48 @@ export const translations = {
     user_sign: "التوقيع الرقمي",
     modal_add_user: "إنشاء حساب جديد",
     upload_sign: "رفع التوقيع",
-    btn_create_user: "إنشاء حساب"
+    btn_create_user: "إنشاء حساب",
+    pending_verify: "بانتظار التأكيد",
+    verify_desc: "تأكيد إصلاحات أصول القسم",
+    verify_action: "تحقق وتوقيع",
+    verify_title: "تأكيد اكتمال الإصلاح",
+    confirm_working: "أقر بأن الجهاز يعمل بشكل صحيح",
+    nurse_sig: "توقيع الممرض/ة",
+    btn_verify_close: "تأكيد وإغلاق الطلب",
+    btn_smart_assign: "التوزيع الذكي (AI)",
+    floor_plan_3d: "الخريطة التفاعلية ثلاثية الأبعاد",
+    view_assets_in_zone: "عرض الأصول في المنطقة",
+    rfid_signal: "إشارة RFID الحية",
+    zone_details: "تفاصيل المنطقة",
+    select_zone: "اختر منطقة",
   }
 };
 
 interface LanguageContextType {
   language: Language;
-  setLanguage: (lang: Language) => void;
+  toggleLanguage: () => void;
   t: (key: keyof typeof translations['en']) => string;
   dir: 'ltr' | 'rtl';
-  toggleLanguage: () => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('en');
 
-  const t = (key: keyof typeof translations['en']) => {
-    return translations[language][key] || key;
+  const toggleLanguage = () => {
+    setLanguage((prev) => (prev === 'en' ? 'ar' : 'en'));
   };
 
-  const toggleLanguage = () => {
-    setLanguage(prev => prev === 'en' ? 'ar' : 'en');
+  const t = (key: keyof typeof translations['en']): string => {
+    return translations[language][key] || key;
   };
 
   const dir = language === 'ar' ? 'rtl' : 'ltr';
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, dir, toggleLanguage }}>
-      <div dir={dir} className={language === 'ar' ? 'font-sans' : 'font-sans'}>
+    <LanguageContext.Provider value={{ language, toggleLanguage, t, dir }}>
+      <div dir={dir} className={language === 'ar' ? 'font-arabic' : 'font-sans'}>
         {children}
       </div>
     </LanguageContext.Provider>
@@ -533,6 +579,8 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
 export const useLanguage = () => {
   const context = useContext(LanguageContext);
-  if (!context) throw new Error('useLanguage must be used within a LanguageProvider');
+  if (!context) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
   return context;
 };
