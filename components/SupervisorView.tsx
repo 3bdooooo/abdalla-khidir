@@ -795,7 +795,38 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                  <h3 className="font-bold mb-4">{t('chart_mttr_trend')}</h3>
                                  <ResponsiveContainer width="100%" height={250}><LineChart data={analyticsData.mttrTrend}><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="hours" stroke="#3B82F6" strokeWidth={3}/></LineChart></ResponsiveContainer>
                              </div>
-                             {/* Additional Charts can go here */}
+                             <div className="bg-white p-6 rounded-2xl border shadow-sm">
+                                  <h3 className="font-bold mb-4">{t('table_risk_report')}</h3>
+                                  <div className="overflow-y-auto max-h-[250px]">
+                                      <table className="w-full text-sm text-left">
+                                          <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase sticky top-0">
+                                              <tr>
+                                                  <th className="px-4 py-2">Asset</th>
+                                                  <th className="px-4 py-2">Score</th>
+                                                  <th className="px-4 py-2">Action</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody>
+                                              {analyticsData.riskData.map(asset => (
+                                                  <tr key={asset.asset_id} className="border-b">
+                                                      <td className="px-4 py-2 font-medium">{asset.name}</td>
+                                                      <td className="px-4 py-2">
+                                                          <div className="flex items-center gap-2">
+                                                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                  <div className={`h-2 rounded-full ${asset.risk_score > 70 ? 'bg-red-500' : asset.risk_score > 40 ? 'bg-yellow-400' : 'bg-green-500'}`} style={{width: `${asset.risk_score}%`}}></div>
+                                                              </div>
+                                                              <span className="text-xs font-bold">{asset.risk_score}</span>
+                                                          </div>
+                                                      </td>
+                                                      <td className="px-4 py-2 text-xs">
+                                                          {asset.risk_score > 70 ? <span className="text-red-600 font-bold">Urgent Maint.</span> : 'Monitor'}
+                                                      </td>
+                                                  </tr>
+                                              ))}
+                                          </tbody>
+                                      </table>
+                                  </div>
+                             </div>
                          </div>
                      </div>
                  )}
