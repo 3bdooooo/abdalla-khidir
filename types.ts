@@ -69,6 +69,10 @@ export interface Asset {
   last_calibration_date?: string;
   next_calibration_date?: string;
   image?: string;
+  
+  // New Financial Fields for TCO
+  purchase_cost?: number;
+  accumulated_maintenance_cost?: number; // Sum of parts + labor over time
 }
 
 // Incident/Trouble Ticket Table
@@ -97,6 +101,10 @@ export interface WorkOrder {
   parts_used?: { part_id: number; quantity: number }[]; // Tracked in WO table
   created_at: string;
   
+  // Performance Metrics
+  nurse_rating?: number; // 1-5 Star Rating
+  is_first_time_fix?: boolean; // Did it get resolved without reopening?
+
   // Approval Tracking
   approvals?: {
     manager?: {

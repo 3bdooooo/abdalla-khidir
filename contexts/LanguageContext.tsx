@@ -273,6 +273,16 @@ export const translations = {
     rfid_signal: "RFID Live Signal",
     zone_details: "Zone Details",
     select_zone: "Select a Zone",
+    tech_rating: "Technician Rating",
+    nurse_satisfaction: "Nurse Satisfaction",
+    rate_service: "Rate Service Quality",
+    tco_analysis: "TCO & Life Cycle Analysis",
+    purchase_price: "Purchase Price",
+    maint_cost: "Maint. Cost",
+    recommendation: "Recommendation",
+    replace: "Replace",
+    repair: "Repair",
+    ftfr: "First-Time Fix Rate",
   },
   ar: {
     appName: "A2M MED",
@@ -543,6 +553,16 @@ export const translations = {
     rfid_signal: "إشارة RFID الحية",
     zone_details: "تفاصيل المنطقة",
     select_zone: "اختر منطقة",
+    tech_rating: "تقييم الفني",
+    nurse_satisfaction: "رضا التمريض",
+    rate_service: "قيم جودة الخدمة",
+    tco_analysis: "تحليل التكلفة الكلية (TCO)",
+    purchase_price: "سعر الشراء",
+    maint_cost: "تكلفة الصيانة",
+    recommendation: "التوصية",
+    replace: "استبدال",
+    repair: "إصلاح",
+    ftfr: "نسبة الإصلاح من أول مرة",
   }
 };
 

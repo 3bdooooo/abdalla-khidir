@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import * as api from '../services/api';
 import { LOCATIONS } from '../services/mockDb';
 import { Priority, WorkOrderType, Asset, User, AssetStatus, WorkOrder } from '../types';
-import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface NurseViewProps {
@@ -25,6 +25,7 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [selectedWoForVerify, setSelectedWoForVerify] = useState<WorkOrder | null>(null);
   const [nurseSignature, setNurseSignature] = useState('');
+  const [rating, setRating] = useState(0); // 1-5 Stars
 
   // Filter assets for the user's department
   const deptAssets = useMemo(() => {
@@ -99,16 +100,18 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
   const openVerifyModal = (wo: WorkOrder) => {
       setSelectedWoForVerify(wo);
       setNurseSignature('');
+      setRating(0);
       setVerifyModalOpen(true);
   };
 
   const submitVerification = async () => {
       if (selectedWoForVerify && nurseSignature) {
-          await api.submitNurseVerification(selectedWoForVerify.wo_id, user.user_id, nurseSignature);
+          await api.submitNurseVerification(selectedWoForVerify.wo_id, user.user_id, nurseSignature, rating);
           refreshData();
           setVerifyModalOpen(false);
           setSelectedWoForVerify(null);
           setNurseSignature('');
+          setRating(0);
       }
   };
 
@@ -377,6 +380,23 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
                       <div className="flex items-center gap-3 p-3 border border-border rounded-xl bg-green-50/50">
                           <div className="w-6 h-6 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><CheckCircle2 size={14}/></div>
                           <div className="text-sm font-medium text-gray-700">{t('confirm_working')}</div>
+                      </div>
+
+                      {/* STAR RATING */}
+                      <div>
+                          <label className="block text-sm font-bold text-gray-700 mb-2">{t('rate_service')}</label>
+                          <div className="flex gap-2 justify-center py-4 bg-gray-50 rounded-xl border border-gray-100">
+                             {[1, 2, 3, 4, 5].map((star) => (
+                                 <button key={star} onClick={() => setRating(star)} className="focus:outline-none transition-transform active:scale-110">
+                                     <Star 
+                                        size={32} 
+                                        fill={star <= rating ? "#F59E0B" : "none"} 
+                                        className={star <= rating ? "text-warning" : "text-gray-300"}
+                                     />
+                                 </button>
+                             ))}
+                          </div>
+                          {rating > 0 && <div className="text-center text-xs font-bold text-warning mt-1">{rating} / 5 Stars</div>}
                       </div>
 
                       <div>

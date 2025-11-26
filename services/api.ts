@@ -1,7 +1,7 @@
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import * as MockDb from './mockDb';
-import { Asset, InventoryPart, WorkOrder, User, AssetStatus } from '../types';
+import { Asset, InventoryPart, WorkOrder, User, AssetStatus, Priority, WorkOrderType } from '../types';
 
 // READ
 
@@ -153,12 +153,13 @@ export const submitSupervisorApproval = async (woId: number, userId: number, sig
     }).eq('wo_id', woId);
 };
 
-export const submitNurseVerification = async (woId: number, userId: number, signature: string) => {
+export const submitNurseVerification = async (woId: number, userId: number, signature: string, rating: number) => {
     if (!isSupabaseConfigured) {
         // Mock Implementation
         MockDb.getWorkOrders().forEach(w => {
            if (w.wo_id === woId) {
                w.status = 'Closed';
+               w.nurse_rating = rating;
                if (!w.approvals) w.approvals = {};
                w.approvals.nurse = {
                    user_id: userId,
@@ -172,6 +173,7 @@ export const submitNurseVerification = async (woId: number, userId: number, sign
    }
    await supabase.from('work_orders').update({
        status: 'Closed',
+       nurse_rating: rating 
    }).eq('wo_id', woId);
 }
 
@@ -255,15 +257,85 @@ export const addUser = async (user: User) => {
     await supabase.from('users').insert(user);
 }
 
+// MASS SEEDING WITH REALISTIC IMAGES
 export const seedDatabaseIfEmpty = async () => {
     if (!isSupabaseConfigured) return;
     
+    // Check if assets exist
     const { count } = await supabase.from('assets').select('*', { count: 'exact', head: true });
-    if (count === 0) {
-        await supabase.from('assets').insert(MockDb.getAssets());
-        await supabase.from('inventory').insert(MockDb.getInventory());
-        await supabase.from('users').insert(MockDb.getUsers());
+    
+    if (count !== null && count < 50) {
+        console.log("Database empty or low. Starting Mass Seeding...");
+        
+        // 1. Seed Locations & Inventory (Standard Mock Data)
         await supabase.from('locations').insert(MockDb.getLocations());
-        console.log("Database Seeded");
+        await supabase.from('inventory').insert(MockDb.getInventory());
+
+        // 2. Generate 1000 Assets with Real Images
+        const generatedAssets: Asset[] = [];
+        const deviceTypes = [
+            { name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens' },
+            { name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge' },
+            { name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD' },
+            { name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips' },
+            { name: 'Anesthesia Machine', model: 'Drager Fabius', manufacturer: 'Drager' },
+            { name: 'Defibrillator', model: 'LifePak 15', manufacturer: 'Stryker' },
+            { name: 'Infant Incubator', model: 'Isolette 8000', manufacturer: 'Drager' },
+            { name: 'Ultrasound System', model: 'Voluson E10', manufacturer: 'GE Healthcare' }
+        ];
+        
+        const locIds = MockDb.LOCATIONS.map(l => l.location_id);
+
+        for (let i = 0; i < 1000; i++) {
+            const type = deviceTypes[i % deviceTypes.length];
+            const locId = locIds[i % locIds.length];
+            
+            generatedAssets.push({
+                asset_id: `AST-${1000 + i}`,
+                nfc_tag_id: `NFC-${1000 + i}`,
+                name: type.name,
+                model: type.model,
+                manufacturer: type.manufacturer,
+                serial_number: `SN-${Math.floor(Math.random() * 1000000)}`,
+                location_id: locId,
+                status: Math.random() > 0.9 ? AssetStatus.DOWN : (Math.random() > 0.8 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
+                purchase_date: '2022-01-01',
+                operating_hours: Math.floor(Math.random() * 5000),
+                risk_score: Math.floor(Math.random() * 100),
+                // USE REAL IMAGE HELPER
+                image: MockDb.getModelImage(type.model),
+                purchase_cost: 5000 + Math.floor(Math.random() * 50000),
+                accumulated_maintenance_cost: Math.floor(Math.random() * 5000)
+            });
+        }
+
+        // Insert Assets in Batches
+        const batchSize = 50;
+        for (let i = 0; i < generatedAssets.length; i += batchSize) {
+            const batch = generatedAssets.slice(i, i + batchSize);
+            console.log(`Seeding Assets Batch ${i/batchSize + 1}...`);
+            await supabase.from('assets').insert(batch);
+        }
+
+        // 3. Seed Users
+        await supabase.from('users').insert(MockDb.getUsers());
+        
+        // 4. Generate & Seed Work Orders
+        const generatedWOs: WorkOrder[] = [];
+        for (let i = 0; i < 100; i++) {
+            generatedWOs.push({
+                wo_id: 5000 + i,
+                asset_id: `AST-${1000 + (i % 50)}`, // Link to first 50 generated assets
+                type: i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE,
+                priority: i % 5 === 0 ? Priority.CRITICAL : Priority.MEDIUM,
+                assigned_to_id: 3, // Mock Tech
+                description: `Auto-generated test task #${i}`,
+                status: 'Open',
+                created_at: new Date().toISOString()
+            });
+        }
+        await supabase.from('work_orders').insert(generatedWOs);
+        
+        console.log("Mass Seeding Complete!");
     }
 }

@@ -1,6 +1,45 @@
+
 import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert } from '../types';
 
-// Mock Data
+// Real Medical Device Images Mapping
+export const DEVICE_IMAGES: Record<string, string> = {
+    'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // MRI
+    'Servo-U': 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ventilator
+    'Alaris System': 'https://plus.unsplash.com/premium_photo-1661281397737-9b5d75b52beb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Pump/IV
+    'IntelliVue MX40': 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Patient Monitor
+    'Drager Fabius': 'https://images.unsplash.com/photo-1516574187841-693083f0498c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Anesthesia
+    'Defibrillator': 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Medical generic/Defib
+    'LifePak': 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Specific Defib
+    'Incubator': 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Incubator/Baby
+    'Isolette': 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Specific Incubator
+    'X-Ray System': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Radiology (Updated)
+    'Ultrasound': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ultrasound probe (Updated)
+    'Voluson': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' // Specific Ultrasound
+};
+
+export const getModelImage = (model: string): string => {
+    // Normalize model string
+    const m = model.toLowerCase();
+
+    // Exact match lookup (case insensitive)
+    const exactMatch = Object.keys(DEVICE_IMAGES).find(key => key.toLowerCase() === m);
+    if (exactMatch) return DEVICE_IMAGES[exactMatch];
+    
+    // Fuzzy match
+    if (m.includes('mri') || m.includes('magnetom')) return DEVICE_IMAGES['Magnetom Vida'];
+    if (m.includes('ventilator') || m.includes('servo')) return DEVICE_IMAGES['Servo-U'];
+    if (m.includes('pump') || m.includes('alaris')) return DEVICE_IMAGES['Alaris System'];
+    if (m.includes('monitor') || m.includes('intellivue')) return DEVICE_IMAGES['IntelliVue MX40'];
+    if (m.includes('anesthesia') || m.includes('drager') || m.includes('fabius')) return DEVICE_IMAGES['Drager Fabius'];
+    if (m.includes('x-ray') || m.includes('radiology')) return DEVICE_IMAGES['X-Ray System'];
+    if (m.includes('lifepak') || m.includes('defib')) return DEVICE_IMAGES['LifePak'];
+    if (m.includes('incubator') || m.includes('isolette')) return DEVICE_IMAGES['Incubator'];
+    if (m.includes('ultrasound') || m.includes('voluson') || m.includes('echo')) return DEVICE_IMAGES['Voluson'];
+    
+    // Default fallback
+    return 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80';
+};
+
 export const LOCATIONS: Location[] = [
   { location_id: 101, name: 'ICU Room 1', department: 'ICU', building: 'Main Wing', room: '101' },
   { location_id: 102, name: 'ICU Room 2', department: 'ICU', building: 'Main Wing', room: '102' },
@@ -18,10 +57,10 @@ export const MOCK_USERS: User[] = [
 ];
 
 let assets: Asset[] = [
-  { asset_id: 'AST-001', nfc_tag_id: 'NFC-001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens', serial_number: 'SN-998877', location_id: 201, status: AssetStatus.RUNNING, purchase_date: '2020-01-15', operating_hours: 12500, risk_score: 15, last_calibration_date: '2023-11-01', next_calibration_date: '2024-11-01', image: 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' },
-  { asset_id: 'AST-002', nfc_tag_id: 'NFC-002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge', serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING, purchase_date: '2021-05-20', operating_hours: 5400, risk_score: 85, last_calibration_date: '2023-12-10', next_calibration_date: '2024-06-10', image: 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' },
-  { asset_id: 'AST-003', nfc_tag_id: 'NFC-003', name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD', serial_number: 'SN-445566', location_id: 102, status: AssetStatus.DOWN, purchase_date: '2019-08-10', operating_hours: 8900, risk_score: 60, last_calibration_date: '2023-01-15', next_calibration_date: '2024-01-15', image: 'https://images.unsplash.com/photo-1583946912508-63a96f9a7657?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' },
-  { asset_id: 'AST-004', nfc_tag_id: 'NFC-004', name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips', serial_number: 'SN-778899', location_id: 101, status: AssetStatus.UNDER_MAINT, purchase_date: '2022-03-01', operating_hours: 3200, risk_score: 45, last_calibration_date: '2023-09-20', next_calibration_date: '2024-09-20', image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' },
+  { asset_id: 'AST-001', nfc_tag_id: 'NFC-001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens', serial_number: 'SN-998877', location_id: 201, status: AssetStatus.RUNNING, purchase_date: '2020-01-15', operating_hours: 12500, risk_score: 15, last_calibration_date: '2023-11-01', next_calibration_date: '2024-11-01', image: DEVICE_IMAGES['Magnetom Vida'], purchase_cost: 1500000, accumulated_maintenance_cost: 45000 },
+  { asset_id: 'AST-002', nfc_tag_id: 'NFC-002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge', serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING, purchase_date: '2021-05-20', operating_hours: 5400, risk_score: 85, last_calibration_date: '2023-12-10', next_calibration_date: '2024-06-10', image: DEVICE_IMAGES['Servo-U'], purchase_cost: 35000, accumulated_maintenance_cost: 12000 },
+  { asset_id: 'AST-003', nfc_tag_id: 'NFC-003', name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD', serial_number: 'SN-445566', location_id: 102, status: AssetStatus.DOWN, purchase_date: '2019-08-10', operating_hours: 8900, risk_score: 60, last_calibration_date: '2023-01-15', next_calibration_date: '2024-01-15', image: DEVICE_IMAGES['Alaris System'], purchase_cost: 2500, accumulated_maintenance_cost: 1800 },
+  { asset_id: 'AST-004', nfc_tag_id: 'NFC-004', name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips', serial_number: 'SN-778899', location_id: 101, status: AssetStatus.UNDER_MAINT, purchase_date: '2022-03-01', operating_hours: 3200, risk_score: 45, last_calibration_date: '2023-09-20', next_calibration_date: '2024-09-20', image: DEVICE_IMAGES['IntelliVue MX40'], purchase_cost: 8000, accumulated_maintenance_cost: 950 },
 ];
 
 let inventory: InventoryPart[] = [
@@ -33,10 +72,10 @@ let inventory: InventoryPart[] = [
 ];
 
 let workOrders: WorkOrder[] = [
-  { wo_id: 1001, asset_id: 'AST-003', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3, description: 'Pump showing occlusion error continuously.', status: 'Open', created_at: '2023-10-25T09:00:00Z' },
+  { wo_id: 1001, asset_id: 'AST-003', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3, description: 'Pump showing occlusion error continuously.', status: 'Open', created_at: '2023-10-25T09:00:00Z', is_first_time_fix: false },
   { wo_id: 1002, asset_id: 'AST-001', type: WorkOrderType.PREVENTIVE, priority: Priority.MEDIUM, assigned_to_id: 3, description: 'Quarterly PM check for MRI.', status: 'In Progress', start_time: '2023-10-26T08:30:00Z', created_at: '2023-10-20T09:00:00Z' },
   { wo_id: 1003, asset_id: 'AST-002', type: WorkOrderType.CALIBRATION, priority: Priority.HIGH, assigned_to_id: 3, description: 'Annual Calibration Due.', status: 'Assigned', created_at: '2023-10-24T14:00:00Z' },
-  { wo_id: 9001, asset_id: 'AST-004', type: WorkOrderType.CORRECTIVE, priority: Priority.LOW, assigned_to_id: 3, description: 'Screen flickering occasionally.', status: 'Closed', start_time: '2023-09-15T10:00:00Z', close_time: '2023-09-15T14:00:00Z', created_at: '2023-09-15T08:00:00Z' },
+  { wo_id: 9001, asset_id: 'AST-004', type: WorkOrderType.CORRECTIVE, priority: Priority.LOW, assigned_to_id: 3, description: 'Screen flickering occasionally.', status: 'Closed', start_time: '2023-09-15T10:00:00Z', close_time: '2023-09-15T14:00:00Z', created_at: '2023-09-15T08:00:00Z', nurse_rating: 5, is_first_time_fix: true },
 ];
 
 // Helper Functions
@@ -175,4 +214,8 @@ export const assignWorkOrder = (woId: number, userId: number) => {
 
 export const addUser = (user: User) => {
   MOCK_USERS.push(user);
+};
+
+export const nurseRateWorkOrder = (woId: number, rating: number) => {
+    workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, nurse_rating: rating } : w);
 };
