@@ -1,8 +1,7 @@
 
-// ... existing imports ...
 import React, { useState, useEffect } from 'react';
 import { Asset, InventoryPart, WorkOrder, AssetDocument, WorkOrderType, Priority, User } from '../types';
-import { analyzeRootCause, suggestDiagnosisAndParts } from '../services/geminiService'; // Import new function
+import { analyzeRootCause, suggestDiagnosisAndParts } from '../services/geminiService';
 import { getAssets, getAssetDocuments, findRelevantDocuments } from '../services/mockDb';
 import * as api from '../services/api';
 import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench } from 'lucide-react';
@@ -16,7 +15,7 @@ interface TechnicianProps {
 }
 
 export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, inventory, refreshData }) => {
-    // ... State Management ...
+    // State Management
     const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
     const [dashboardTab, setDashboardTab] = useState<'requests' | 'inprogress' | 'pms'>('requests');
     const [filterPriority, setFilterPriority] = useState<string>('All');
@@ -24,6 +23,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     const [filterType, setFilterType] = useState<string>('All');
     const [activeDetailTab, setActiveDetailTab] = useState<'diagnosis' | 'parts' | 'visual' | 'finish'>('diagnosis');
     const { t, dir } = useLanguage();
+    
+    // Detail View State
     const [symptoms, setSymptoms] = useState('');
     const [rootCause, setRootCause] = useState('');
     const [solution, setSolution] = useState('');
@@ -35,38 +36,74 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
     const [operatingHours, setOperatingHours] = useState<string>('');
     const [selectedParts, setSelectedParts] = useState<{id: number, qty: number}[]>([]);
-    const [isArActive, setIsArActive] = useState(false);
     const [partsSearch, setPartsSearch] = useState('');
     const [showConfirmModal, setShowConfirmModal] = useState(false);
+    
+    // Create WO State
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newWO, setNewWO] = useState({ assetId: '', description: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM });
+    
+    // Start Job State
     const [showDocsModal, setShowDocsModal] = useState(false);
     const [assetDocs, setAssetDocs] = useState<AssetDocument[]>([]);
-    const getAssetForWO = (assetId: string) => getAssets().find(a => a.asset_id === assetId);
-    const [checklist, setChecklist] = useState<{id: number, text: string, checked: boolean}[]>([ { id: 1, text: 'Check Power Supply Voltage', checked: false }, { id: 2, text: 'Inspect Cables for Wear', checked: false }, { id: 3, text: 'Clean Filters/Vents', checked: false }, { id: 4, text: 'Verify Calibration Stickers', checked: false }, { id: 5, text: 'Run Self-Test Sequence', checked: false }, ]);
-    
-    // ... Start Job Handlers (handleStartJob, etc) ...
     const [isStartingJob, setIsStartingJob] = useState(false);
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'locating' | 'verified'>('idle');
     const [locationData, setLocationData] = useState<{lat: number, lng: number} | null>(null);
-
-    useEffect(() => { if (selectedWO) { setSymptoms(selectedWO.description); setRootCause(''); setSolution(''); setSignature(''); setOperatingHours(''); setSelectedParts([]); setSuggestedPart(null); setIsArActive(false); setPartsSearch(''); setShowConfirmModal(false); setShowDocsModal(false); setAssetDocs([]); setChecklist(checklist.map(c => ({...c, checked: false}))); if (selectedWO.type === WorkOrderType.PREVENTIVE || selectedWO.type === WorkOrderType.CALIBRATION) { setActiveDetailTab('diagnosis'); } else { setActiveDetailTab('diagnosis'); } } }, [selectedWO]);
     
-    // ... handleStartJob ... (Keep Existing)
-    const handleStartJob = async (e: React.MouseEvent) => { 
-        // ... Code hidden for brevity (keep existing implementation) ...
+    // PM Checklist
+    const [checklist, setChecklist] = useState<{id: number, text: string, checked: boolean}[]>([ 
+        { id: 1, text: 'Check Power Supply Voltage', checked: false }, 
+        { id: 2, text: 'Inspect Cables for Wear', checked: false }, 
+        { id: 3, text: 'Clean Filters/Vents', checked: false }, 
+        { id: 4, text: 'Verify Calibration Stickers', checked: false }, 
+        { id: 5, text: 'Run Self-Test Sequence', checked: false }, 
+    ]);
+
+    // Helpers
+    const getAssetForWO = (assetId: string) => getAssets().find(a => a.asset_id === assetId || a.nfc_tag_id === assetId);
+
+    // Reset state when WO is selected
+    useEffect(() => { 
+        if (selectedWO) { 
+            setSymptoms(selectedWO.description); 
+            setRootCause(''); 
+            setSolution(''); 
+            setSignature(''); 
+            setOperatingHours(''); 
+            setSelectedParts([]); 
+            setSuggestedPart(null); 
+            setPartsSearch(''); 
+            setShowConfirmModal(false); 
+            setShowDocsModal(false); 
+            setAssetDocs([]); 
+            setChecklist(checklist.map(c => ({...c, checked: false}))); 
+            
+            if (selectedWO.type === WorkOrderType.PREVENTIVE || selectedWO.type === WorkOrderType.CALIBRATION) { 
+                setActiveDetailTab('diagnosis'); 
+            } else { 
+                setActiveDetailTab('diagnosis'); 
+            } 
+        } 
+    }, [selectedWO]);
+
+    // --- HANDLERS ---
+
+    const handleStartJob = async (e: React.MouseEvent, wo: WorkOrder) => { 
         e.stopPropagation(); 
-        if (!selectedWO) return; 
+        setSelectedWO(wo); // Select immediately to show context if needed, but we stay on list usually until started? No, let's open details.
         
-        const currentWoId = selectedWO.wo_id; 
-        const currentAssetId = selectedWO.asset_id; 
+        // Actually, let's just start the logic and assume user is on the card
+        const currentWoId = wo.wo_id; 
+        const currentAssetId = wo.asset_id; 
         
         setIsStartingJob(true);
         setScanState('scanning');
 
+        // 1. Simulate NFC Scan Delay
         await new Promise(resolve => setTimeout(resolve, 1500));
         setScanState('locating');
 
+        // 2. Get Geolocation
         navigator.geolocation.getCurrentPosition(
             async (position) => {
                 const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -76,9 +113,10 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 await new Promise(resolve => setTimeout(resolve, 1000)); 
                 await api.startWorkOrder(currentWoId, coords); 
                 refreshData(); 
-                setSelectedWO(prev => prev ? {...prev, status: 'In Progress'} : null); 
+                setSelectedWO(prev => ({...wo, status: 'In Progress'})); // Update local state to enter view
                 
-                const asset = getAssets().find(a => a.asset_id === currentAssetId);
+                // 3. Find Docs
+                const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 if (asset) {
                     const smartMatches = findRelevantDocuments(asset.model, asset.manufacturer || '');
@@ -91,9 +129,10 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 setScanState('idle');
             },
             async (error) => {
+                // Fallback if geo fails
                 await api.startWorkOrder(currentWoId);
                 refreshData();
-                setSelectedWO(prev => prev ? {...prev, status: 'In Progress'} : null);
+                setSelectedWO({...wo, status: 'In Progress'});
                 setIsStartingJob(false);
                 setScanState('idle');
             },
@@ -101,46 +140,318 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         );
     };
 
-    // UPDATED AI HANDLER
     const handleAIAnalysis = async () => { 
         if (!selectedWO || !symptoms) return; 
         setIsAnalyzing(true); 
         
-        const asset = getAssets().find(a => a.asset_id === selectedWO.asset_id);
+        const asset = getAssets().find(a => a.asset_id === selectedWO.asset_id || a.nfc_tag_id === selectedWO.asset_id);
         const model = asset?.model || 'Generic';
         const name = asset?.name || 'Unknown Device';
 
-        // Call the new extended service
         const result = await suggestDiagnosisAndParts(name, model, symptoms, inventory);
         
         setRootCause(result.rootCause);
         if (result.recommendedPart && result.recommendedPart !== "None") {
             setSuggestedPart({ name: result.recommendedPart, prob: result.probability });
-            // Attempt to auto-search parts in the next tab
             setPartsSearch(result.recommendedPart);
         }
 
         setIsAnalyzing(false); 
     };
+
+    const handleSubmit = async () => { 
+        if (!selectedWO) return; 
+        const stockPromises = selectedParts.map(p => api.updateStock(p.id, p.qty)); 
+        await Promise.all(stockPromises); 
+        await api.submitCompletionReport(selectedWO.wo_id, { 
+            failure_cause: rootCause || 'Diagnosed on site', 
+            repair_actions: solution, 
+            technician_signature: signature, 
+            parts_used: selectedParts.map(p => ({ part_id: p.id, quantity: p.qty })) 
+        }); 
+        setShowConfirmModal(false); 
+        refreshData(); 
+        setSelectedWO(null); 
+    };
+
+    const handleCreateSubmit = async (e: React.FormEvent) => { 
+        e.preventDefault(); 
+        await api.createWorkOrder({ 
+            wo_id: Math.floor(Math.random() * 1000000), 
+            asset_id: newWO.assetId, 
+            type: newWO.type, 
+            priority: newWO.priority, 
+            description: newWO.description, 
+            assigned_to_id: currentUser.user_id, 
+            status: 'Open', 
+            created_at: new Date().toISOString() 
+        }); 
+        refreshData(); 
+        setIsCreateModalOpen(false); 
+        setNewWO({ assetId: '', description: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM }); 
+    };
+
+    // --- FILTERING LOGIC ---
+    const filteredOrders = userWorkOrders.filter(wo => { 
+        let matchesTab = false; 
+        // 1. Tab Logic
+        if (dashboardTab === 'requests') {
+            // New requests are Open or Assigned Corrective tasks
+            matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && wo.type === WorkOrderType.CORRECTIVE;
+        } else if (dashboardTab === 'inprogress') {
+            // Tasks currently being worked on
+            matchesTab = wo.status === 'In Progress';
+        } else if (dashboardTab === 'pms') {
+            // PMs and Calibration
+            matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && (wo.type === WorkOrderType.PREVENTIVE || wo.type === WorkOrderType.CALIBRATION);
+        } 
+        
+        if (!matchesTab) return false; 
+        if (filterPriority !== 'All' && wo.priority !== filterPriority) return false; 
+        if (filterStatus !== 'All' && wo.status !== filterStatus) return false; 
+        if (filterType !== 'All' && wo.type !== filterType) return false; 
+        return true; 
+    });
     
-    // ... handleSubmit, handleCreateSubmit ... (Keep Existing)
-    const handleSubmit = async () => { if (!selectedWO) return; const stockPromises = selectedParts.map(p => api.updateStock(p.id, p.qty)); await Promise.all(stockPromises); await api.submitCompletionReport(selectedWO.wo_id, { failure_cause: rootCause || 'Diagnosed on site', repair_actions: solution, technician_signature: signature, parts_used: selectedParts.map(p => ({ part_id: p.id, quantity: p.qty })) }); setShowConfirmModal(false); refreshData(); setSelectedWO(null); };
-    const handleCreateSubmit = async (e: React.FormEvent) => { e.preventDefault(); await api.createWorkOrder({ wo_id: Math.floor(Math.random() * 1000000), asset_id: newWO.assetId, type: newWO.type, priority: newWO.priority, description: newWO.description, assigned_to_id: currentUser.user_id, status: 'Open', created_at: new Date().toISOString() }); refreshData(); setIsCreateModalOpen(false); setNewWO({ assetId: '', description: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM }); };
-    
-    // ... Filtering Logic ...
-    const filteredOrders = userWorkOrders.filter(wo => { let matchesTab = false; if (dashboardTab === 'requests') matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && wo.type === WorkOrderType.CORRECTIVE; else if (dashboardTab === 'inprogress') matchesTab = wo.status === 'In Progress'; else if (dashboardTab === 'pms') matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && (wo.type === WorkOrderType.PREVENTIVE || wo.type === WorkOrderType.CALIBRATION); if (!matchesTab) return false; if (filterPriority !== 'All' && wo.priority !== filterPriority) return false; if (filterStatus !== 'All' && wo.status !== filterStatus) return false; if (filterType !== 'All' && wo.type !== filterType) return false; return true; });
     const filteredInventory = inventory.filter(p => p.part_name.toLowerCase().includes(partsSearch.toLowerCase()));
 
-  // --- DASHBOARD VIEW ---
-  if (!selectedWO) {
-    // ... (Keep existing dashboard return) ...
-    return <div>{/* Placeholder for brevity, assume existing code here */}</div>;
-  }
+    // --- DASHBOARD RENDER ---
+    if (!selectedWO) {
+        return (
+            <div className="space-y-6 pb-20 font-sans animate-in fade-in">
+                {/* Header */}
+                <div className="flex items-center justify-between px-1">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900">{t('tech_dashboard')}</h2>
+                        <div className="text-sm text-text-muted mt-1">{t('welcome')}, {currentUser.name}</div>
+                    </div>
+                    <button 
+                        onClick={() => setIsCreateModalOpen(true)}
+                        className="btn-primary py-2 px-4 text-sm shadow-brand/20"
+                    >
+                        <Plus size={18} /> {t('create_wo')}
+                    </button>
+                </div>
 
-  // --- DETAIL VIEW ---
-  const asset = selectedWO ? getAssetForWO(selectedWO.asset_id) : null;
-  
-  if (selectedWO) {
+                {/* Main Tabs */}
+                <div className="bg-white p-1 rounded-xl border border-border flex shadow-sm">
+                    <button onClick={() => setDashboardTab('requests')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${dashboardTab === 'requests' ? 'bg-brand text-white shadow-md' : 'text-text-muted hover:bg-gray-50'}`}>
+                        {t('tab_new_req')}
+                        {userWorkOrders.filter(w => (w.status === 'Open' || w.status === 'Assigned') && w.type === WorkOrderType.CORRECTIVE).length > 0 && <span className="ml-2 bg-white/20 px-1.5 rounded-full text-xs">●</span>}
+                    </button>
+                    <button onClick={() => setDashboardTab('inprogress')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${dashboardTab === 'inprogress' ? 'bg-brand text-white shadow-md' : 'text-text-muted hover:bg-gray-50'}`}>
+                        {t('inprogress')}
+                         {userWorkOrders.filter(w => w.status === 'In Progress').length > 0 && <span className="ml-2 bg-white/20 px-1.5 rounded-full text-xs">●</span>}
+                    </button>
+                    <button onClick={() => setDashboardTab('pms')} className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${dashboardTab === 'pms' ? 'bg-brand text-white shadow-md' : 'text-text-muted hover:bg-gray-50'}`}>
+                        {t('tab_scheduled_pm')}
+                    </button>
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex gap-3 overflow-x-auto pb-2">
+                    <select className="input-modern w-auto py-2 text-xs" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                        <option value="All">{t('filter_all')} {t('priority')}</option>
+                        <option value={Priority.HIGH}>{Priority.HIGH}</option>
+                        <option value={Priority.CRITICAL}>{Priority.CRITICAL}</option>
+                    </select>
+                    <select className="input-modern w-auto py-2 text-xs" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                        <option value="All">{t('filter_all')} {t('type')}</option>
+                        <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
+                        <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
+                        <option value={WorkOrderType.CALIBRATION}>{WorkOrderType.CALIBRATION}</option>
+                    </select>
+                </div>
+
+                {/* TASK GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredOrders.length === 0 ? (
+                        <div className="col-span-full py-12 text-center text-gray-400 bg-white rounded-2xl border border-dashed border-gray-200">
+                            <ClipboardList size={48} className="mx-auto mb-3 opacity-20"/>
+                            <p>No tasks found in this category.</p>
+                        </div>
+                    ) : (
+                        filteredOrders.map(wo => {
+                            const asset = getAssetForWO(wo.asset_id);
+                            const isAssigned = wo.status === 'Assigned';
+                            const isPm = wo.type !== WorkOrderType.CORRECTIVE;
+                            
+                            return (
+                                <div key={wo.wo_id} className="bg-white rounded-2xl p-5 border border-border shadow-soft hover:shadow-md transition-all group relative overflow-hidden">
+                                    {/* Priority Stripe */}
+                                    <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${wo.priority === Priority.CRITICAL ? 'bg-danger' : wo.priority === Priority.HIGH ? 'bg-warning' : 'bg-success'}`}></div>
+                                    
+                                    <div className="pl-3">
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${wo.priority === Priority.CRITICAL ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                    {wo.priority}
+                                                </span>
+                                                {isAssigned && <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-600 uppercase tracking-wider">Assigned</span>}
+                                            </div>
+                                            <span className="font-mono text-xs text-text-muted">#{wo.wo_id}</span>
+                                        </div>
+
+                                        <div className="flex gap-3 mb-4">
+                                            <div className="w-12 h-12 bg-gray-50 rounded-lg shrink-0 flex items-center justify-center border border-gray-100">
+                                                {asset?.image ? <img src={asset.image} className="w-full h-full object-cover rounded-lg"/> : <Box size={20} className="text-gray-400"/>}
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-gray-900 leading-tight">{asset?.name || 'Unknown Asset'}</h3>
+                                                <p className="text-xs text-text-muted mt-1">{asset?.model}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+                                            <p className="text-sm text-gray-700 line-clamp-2">{wo.description}</p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between mt-auto">
+                                            <div className="text-xs text-text-muted flex items-center gap-1">
+                                                <Calendar size={12}/> {new Date(wo.created_at).toLocaleDateString()}
+                                            </div>
+                                            
+                                            {wo.status === 'In Progress' ? (
+                                                <button 
+                                                    onClick={() => setSelectedWO(wo)}
+                                                    className="px-4 py-2 bg-brand text-white text-xs font-bold rounded-lg shadow-lg shadow-brand/20 hover:bg-brand-dark transition-colors"
+                                                >
+                                                    Continue Job
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={(e) => handleStartJob(e, wo)}
+                                                    disabled={isStartingJob}
+                                                    className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg shadow-md hover:bg-gray-800 transition-colors flex items-center gap-2 disabled:opacity-70"
+                                                >
+                                                    {isStartingJob ? 'Scanning...' : <><Scan size={14}/> {t('btn_start_job')}</>}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                </div>
+
+                {/* Create WO Modal */}
+                {isCreateModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_create_wo')}</h3>
+                            <form onSubmit={handleCreateSubmit} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('wo_asset')}</label>
+                                    <select 
+                                        className="input-modern"
+                                        value={newWO.assetId}
+                                        onChange={e => setNewWO({...newWO, assetId: e.target.value})}
+                                        required
+                                    >
+                                        <option value="">Select Asset...</option>
+                                        {getAssets().map(a => (
+                                            <option key={a.asset_id} value={a.asset_id}>{a.name} ({a.asset_id})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('type')}</label>
+                                    <select 
+                                        className="input-modern"
+                                        value={newWO.type}
+                                        onChange={e => setNewWO({...newWO, type: e.target.value as WorkOrderType})}
+                                    >
+                                        <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
+                                        <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
+                                        <option value={WorkOrderType.CALIBRATION}>{WorkOrderType.CALIBRATION}</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('priority')}</label>
+                                    <select 
+                                        className="input-modern"
+                                        value={newWO.priority}
+                                        onChange={e => setNewWO({...newWO, priority: e.target.value as Priority})}
+                                    >
+                                        {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('wo_description')}</label>
+                                    <textarea 
+                                        className="input-modern min-h-[80px]"
+                                        value={newWO.description}
+                                        onChange={e => setNewWO({...newWO, description: e.target.value})}
+                                        required
+                                    />
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_dispatch')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Scan Overlay */}
+                {isStartingJob && (
+                    <div className="fixed inset-0 bg-gray-900/80 z-[60] flex flex-col items-center justify-center text-white backdrop-blur-sm">
+                        <div className="relative">
+                            <div className="w-24 h-24 rounded-full border-4 border-white/20 animate-ping absolute inset-0"></div>
+                            <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30">
+                                {scanState === 'scanning' && <Scan size={40} className="animate-pulse"/>}
+                                {scanState === 'locating' && <MapPin size={40} className="animate-bounce"/>}
+                                {scanState === 'verified' && <Check size={40} className="text-green-400"/>}
+                            </div>
+                        </div>
+                        <h3 className="mt-8 text-xl font-bold">
+                            {scanState === 'scanning' && t('identifying')}
+                            {scanState === 'locating' && t('acquiring_location')}
+                            {scanState === 'verified' && t('match_verified')}
+                        </h3>
+                        <p className="text-white/60 text-sm mt-2 font-mono">
+                            {scanState === 'locating' && "Triangulating GPS coordinates..."}
+                            {scanState === 'verified' && locationData && `${locationData.lat.toFixed(6)}, ${locationData.lng.toFixed(6)}`}
+                        </p>
+                    </div>
+                )}
+                
+                {/* Docs Found Modal */}
+                {showDocsModal && (
+                    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
+                            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                <BookOpen size={24}/>
+                            </div>
+                            <h3 className="text-xl font-bold text-center mb-2">{t('manuals_detected')}</h3>
+                            <p className="text-center text-gray-500 text-sm mb-6">{t('relevant_docs')}</p>
+                            
+                            <div className="space-y-3 mb-6">
+                                {assetDocs.map(doc => (
+                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                        <FileText size={18} className="text-brand"/>
+                                        <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
+                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">{doc.type}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button onClick={() => setShowDocsModal(false)} className="w-full btn-primary">
+                                {t('continue_work')}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // --- DETAIL VIEW ---
+    const asset = selectedWO ? getAssetForWO(selectedWO.asset_id) : null;
+    
+    // ... Detail JSX ...
     return (
         <div className="min-h-screen pb-20 font-sans">
              {/* Header */}
@@ -149,8 +460,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                      <ChevronLeft size={20} className="rtl:rotate-180"/> <span className="text-sm font-bold">{t('back')}</span>
                  </button>
                  <div className="text-center">
-                     <div className="text-xs font-bold text-text-muted uppercase tracking-wider">#{selectedWO.wo_id}</div>
-                     <div className="font-bold text-gray-900 text-sm">{selectedWO.type}</div>
+                     <div className="text-xs font-bold text-text-muted uppercase tracking-wider">#{selectedWO?.wo_id}</div>
+                     <div className="font-bold text-gray-900 text-sm">{selectedWO?.type}</div>
                  </div>
                  <div className="w-10"></div>
              </div>
@@ -165,12 +476,12 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          <h3 className="font-bold text-gray-900">{asset?.name}</h3>
                          <p className="text-xs text-text-muted">{asset?.model}</p>
                          <div className="flex gap-2 mt-2">
-                             <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600">{selectedWO.asset_id}</span>
+                             <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-600">{selectedWO?.asset_id}</span>
                          </div>
                      </div>
                  </div>
 
-                 {/* Modern Tabs */}
+                 {/* Tabs */}
                  <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto">
                      {[
                          {id: 'diagnosis', label: t('tab_diagnosis'), icon: Activity},
@@ -195,9 +506,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                      {/* 1. DIAGNOSIS */}
                      {activeDetailTab === 'diagnosis' && (
                          <div className="space-y-6 animate-in fade-in">
-                             {selectedWO.type === WorkOrderType.PREVENTIVE || selectedWO.type === WorkOrderType.CALIBRATION ? (
+                             {selectedWO?.type === WorkOrderType.PREVENTIVE || selectedWO?.type === WorkOrderType.CALIBRATION ? (
                                  <div className="space-y-4">
-                                     {/* ... PM Checklist logic ... */}
                                      {checklist.map(item => (
                                          <label key={item.id} className="flex items-center gap-4 p-4 border border-border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors group">
                                              <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${item.checked ? 'bg-success border-success text-white' : 'border-gray-300 group-hover:border-brand'}`}>
@@ -259,10 +569,9 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          </div>
                      )}
                      
-                     {/* ... (Rest of Tabs: Parts, Visual, Finish - Keep existing) ... */}
+                     {/* 2. PARTS */}
                      {activeDetailTab === 'parts' && (
                          <div className="space-y-6 animate-in fade-in">
-                             {/* ... existing parts tab content ... */}
                              <div className="relative">
                                  <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
                                  <input 
@@ -320,10 +629,9 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          </div>
                      )}
                      
-                     {/* ... Visual Tab ... */}
+                     {/* 3. VISUAL */}
                      {activeDetailTab === 'visual' && (
                          <div className="space-y-6 animate-in fade-in h-full flex flex-col">
-                            {/* ... existing visual content ... */}
                              <div className="flex-1 bg-black rounded-xl relative overflow-hidden group min-h-[300px]">
                                  <img 
                                     src={asset?.image || "https://images.unsplash.com/photo-1579684385180-1ea90f842331"} 
@@ -365,7 +673,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          </div>
                      )}
                      
-                     {/* ... Finish Tab ... */}
+                     {/* 4. FINISH */}
                      {activeDetailTab === 'finish' && (
                          <div className="space-y-6 animate-in fade-in">
                               <div>
@@ -455,6 +763,5 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                  </div>
              )}
         </div>
-      );
-  }
+    );
 };
