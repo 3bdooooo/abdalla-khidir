@@ -31,7 +31,7 @@ export const getModelImage = (model: string): string => {
     if (m.includes('pump') || m.includes('alaris')) return DEVICE_IMAGES['Alaris System'];
     if (m.includes('monitor') || m.includes('intellivue')) return DEVICE_IMAGES['IntelliVue MX40'];
     if (m.includes('anesthesia') || m.includes('drager') || m.includes('fabius')) return DEVICE_IMAGES['Drager Fabius'];
-    if (m.includes('x-ray') || m.includes('radiology')) return DEVICE_IMAGES['X-Ray System'];
+    if (m.includes('x-ray') || m.includes('radiology') || m.includes('mobilett')) return DEVICE_IMAGES['X-Ray System'];
     if (m.includes('lifepak') || m.includes('defib')) return DEVICE_IMAGES['LifePak'];
     if (m.includes('incubator') || m.includes('isolette')) return DEVICE_IMAGES['Incubator'];
     if (m.includes('ultrasound') || m.includes('voluson') || m.includes('echo')) return DEVICE_IMAGES['Voluson'];
@@ -46,6 +46,18 @@ export const LOCATIONS: Location[] = [
   { location_id: 201, name: 'Radiology X-Ray 1', department: 'Radiology', building: 'East Wing', room: 'R1' },
   { location_id: 301, name: 'ER Triage', department: 'Emergency', building: 'Main Wing', room: 'E1' },
   { location_id: 401, name: 'Lab Hematology', department: 'Laboratory', building: 'North Wing', room: 'L1' },
+  { location_id: 501, name: 'Pharmacy Main', department: 'Pharmacy', building: 'Main Wing', room: 'P1' },
+  { location_id: 601, name: 'OR 1', department: 'Surgery', building: 'West Wing', room: 'OR1' },
+  { location_id: 602, name: 'OR 2', department: 'Surgery', building: 'West Wing', room: 'OR2' },
+  { location_id: 701, name: 'Cardio Lab', department: 'Cardiology', building: 'East Wing', room: 'C1' },
+  { location_id: 801, name: 'Neuro Ward', department: 'Neurology', building: 'North Wing', room: 'N1' },
+  { location_id: 901, name: 'NICU A', department: 'NICU', building: 'Maternity Wing', room: 'NI1' },
+  { location_id: 1001, name: 'Labor Room', department: 'Maternity', building: 'Maternity Wing', room: 'M1' },
+  { location_id: 1101, name: 'Dialysis Center', department: 'Dialysis', building: 'South Wing', room: 'D1' },
+  { location_id: 1201, name: 'Chemo Ward', department: 'Oncology', building: 'South Wing', room: 'O1' },
+  { location_id: 1301, name: 'Pediatric Ward', department: 'Pediatrics', building: 'Main Wing', room: 'PD1' },
+  { location_id: 1401, name: 'Ortho Rehab', department: 'Orthopedics', building: 'East Wing', room: 'OT1' },
+  { location_id: 1501, name: 'General Ward A', department: 'General Ward', building: 'Main Wing', room: 'G1' },
 ];
 
 export const MOCK_USERS: User[] = [

@@ -325,18 +325,30 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     };
 
     // --- RENDER HELPERS ---
+    // Expanded Departments List for 3D Map
     const departmentZones = [
-        { id: 'ICU', name: 'Intensive Care', x: 20, y: 20, width: 25, height: 25, color: 'bg-indigo-100' },
-        { id: 'Emergency', name: 'ER & Triage', x: 55, y: 20, width: 30, height: 20, color: 'bg-red-100' },
-        { id: 'Radiology', name: 'Radiology / X-Ray', x: 20, y: 55, width: 25, height: 25, color: 'bg-blue-100' },
-        { id: 'Laboratory', name: 'Laboratory', x: 55, y: 50, width: 20, height: 30, color: 'bg-yellow-100' },
-        { id: 'Pharmacy', name: 'Pharmacy', x: 80, y: 50, width: 15, height: 20, color: 'bg-green-100' },
+        { id: 'ICU', name: 'Intensive Care', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' },
+        { id: 'Emergency', name: 'ER & Triage', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' },
+        { id: 'Radiology', name: 'Radiology', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' },
+        { id: 'Laboratory', name: 'Laboratory', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' },
+        { id: 'Pharmacy', name: 'Pharmacy', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' },
+        { id: 'Surgery', name: 'OR & Surgery', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' },
+        { id: 'Cardiology', name: 'Cardiology', x: 80, y: 35, width: 15, height: 20, color: 'bg-rose-100' },
+        { id: 'Neurology', name: 'Neurology', x: 10, y: 70, width: 20, height: 20, color: 'bg-purple-100' },
+        { id: 'NICU', name: 'NICU', x: 35, y: 65, width: 15, height: 15, color: 'bg-pink-100' },
+        { id: 'Maternity', name: 'Maternity', x: 55, y: 65, width: 20, height: 20, color: 'bg-fuchsia-100' },
+        { id: 'Dialysis', name: 'Dialysis', x: 80, y: 60, width: 15, height: 15, color: 'bg-cyan-100' },
+        { id: 'Oncology', name: 'Oncology', x: 80, y: 80, width: 15, height: 15, color: 'bg-amber-100' },
+        { id: 'Pediatrics', name: 'Pediatrics', x: 35, y: 85, width: 20, height: 10, color: 'bg-lime-100' },
+        { id: 'Orthopedics', name: 'Orthopedics', x: 60, y: 90, width: 15, height: 10, color: 'bg-orange-100' },
+        { id: 'General Ward', name: 'General Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' },
     ];
     
     const getAssetsInZone = (deptId: string) => {
         return assets.filter(a => {
             const loc = getLocations().find(l => l.location_id === a.location_id);
-            return loc?.department === deptId || (deptId === 'Emergency' && loc?.department === 'ER');
+            // Match against department name directly or loosely
+            return loc?.department === deptId || (loc?.department && loc.department.includes(deptId));
         });
     };
     
@@ -362,29 +374,50 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 
                 {/* 3D Map Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden min-h-[400px]">
+                    <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden min-h-[500px]">
                         <div className="p-4 border-b border-border bg-gray-50/50 flex justify-between">
                             <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2">
                                 <Layers className="text-brand"/> {t('floor_plan_3d')}
                             </h3>
                         </div>
-                        <div className="relative h-[400px] bg-gray-100 flex items-center justify-center p-8 overflow-hidden">
-                             <div className="relative w-full max-w-lg aspect-square transform rotate-x-60 rotate-z-[-45deg] shadow-2xl bg-white/40 border-4 border-white/50 rounded-xl">
+                        <div className="relative h-[500px] bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
+                             {/* Isometric Container */}
+                             <div className="relative w-full h-full max-w-2xl aspect-square transform rotate-x-60 rotate-z-[-45deg] shadow-2xl bg-white/40 border-4 border-white/50 rounded-xl scale-75 lg:scale-90 transition-transform">
                                   {departmentZones.map(zone => {
                                       const zoneAssets = getAssetsInZone(zone.id);
-                                      const hasIssues = zoneAssets.some(a => a.status !== AssetStatus.RUNNING);
+                                      // Determine color based on highest severity status
+                                      const downCount = zoneAssets.filter(a => a.status === AssetStatus.DOWN).length;
+                                      const maintCount = zoneAssets.filter(a => a.status === AssetStatus.UNDER_MAINT).length;
+                                      
+                                      let statusColor = 'bg-white/80 border-white/50'; // Default
+                                      let zIndex = 10;
+                                      
+                                      if (downCount > 0) {
+                                          statusColor = 'bg-red-500/20 border-red-500/50 shadow-[0_0_15px_rgba(239,68,68,0.4)]';
+                                          zIndex = 30;
+                                      } else if (maintCount > 0) {
+                                          statusColor = 'bg-amber-500/20 border-amber-500/50';
+                                          zIndex = 20;
+                                      } else if (zoneAssets.length > 0) {
+                                          statusColor = 'bg-emerald-500/10 border-emerald-500/30';
+                                      }
+
                                       return (
                                           <div
                                               key={zone.id}
                                               onClick={() => setSelectedMapZone(zone.id)}
-                                              className={`absolute transition-all duration-300 cursor-pointer border-2 rounded-lg flex items-center justify-center flex-col 
-                                                ${selectedMapZone === zone.id ? 'translate-y-[-10px] shadow-xl border-brand z-20 bg-white' : 'z-10 bg-white/80 border-white/50'}
-                                                ${hasIssues ? 'bg-red-50/90 border-red-200' : 'bg-white/80'}
+                                              className={`absolute transition-all duration-300 cursor-pointer border-2 rounded-lg flex items-center justify-center flex-col hover:-translate-y-2 hover:shadow-xl hover:bg-white
+                                                ${selectedMapZone === zone.id ? '-translate-y-4 shadow-2xl border-brand z-40 bg-white' : `z-${zIndex} ${statusColor}`}
                                               `}
                                               style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}
                                           >
-                                              <div className="transform -rotate-z-[45deg] text-center font-bold text-xs">
-                                                  {zone.name}
+                                              <div className="transform -rotate-z-[45deg] text-center">
+                                                  <div className="font-bold text-[10px] lg:text-xs truncate px-1">{zone.name}</div>
+                                                  {zoneAssets.length > 0 && (
+                                                      <div className="text-[8px] font-bold bg-white/80 px-1 rounded-full mt-1 inline-block shadow-sm">
+                                                          {zoneAssets.length}
+                                                      </div>
+                                                  )}
                                                   {isSimulationActive && zoneAssets.length > 0 && <Signal size={12} className="mx-auto mt-1 text-brand animate-ping"/>}
                                               </div>
                                           </div>
@@ -394,20 +427,32 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     </div>
                     {/* Zone Details Panel */}
-                    <div className="bg-white rounded-2xl border border-border shadow-soft flex flex-col h-[450px]">
+                    <div className="bg-white rounded-2xl border border-border shadow-soft flex flex-col h-[500px]">
                         <div className="p-4 border-b border-border bg-gray-50/50">
                             <h3 className="font-bold text-lg text-gray-900">{selectedMapZone ? `${selectedMapZone} Details` : t('select_zone')}</h3>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {selectedMapZone ? getAssetsInZone(selectedMapZone).map(asset => (
-                                <div key={asset.asset_id} className="bg-white border p-3 rounded-xl flex items-center gap-3">
-                                    <div className={`w-2 h-8 rounded-full ${asset.status === AssetStatus.RUNNING ? 'bg-success' : 'bg-danger'}`}></div>
-                                    <div>
-                                        <div className="font-bold text-sm">{asset.name}</div>
-                                        <div className="text-xs text-text-muted">{asset.model}</div>
-                                    </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth">
+                            {selectedMapZone ? (
+                                getAssetsInZone(selectedMapZone).length > 0 ? (
+                                    getAssetsInZone(selectedMapZone).map(asset => (
+                                        <div key={asset.asset_id} className="bg-white border p-3 rounded-xl flex items-center gap-3 hover:shadow-sm transition">
+                                            <div className={`w-2 h-8 rounded-full ${asset.status === AssetStatus.RUNNING ? 'bg-success' : asset.status === AssetStatus.DOWN ? 'bg-danger' : 'bg-warning'}`}></div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="font-bold text-sm truncate">{asset.name}</div>
+                                                <div className="text-xs text-text-muted">{asset.model}</div>
+                                            </div>
+                                            <span className="text-[10px] font-mono bg-gray-100 px-1 rounded">{asset.asset_id}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center text-gray-400 py-10">No assets found in this zone.</div>
+                                )
+                            ) : (
+                                <div className="text-center text-gray-400 py-10 flex flex-col items-center gap-2">
+                                    <MapPin size={32} className="opacity-20"/>
+                                    Select a zone on the 3D map to view assets
                                 </div>
-                            )) : <div className="text-center text-gray-400 py-10">Select a zone on the map</div>}
+                            )}
                         </div>
                     </div>
                 </div>
