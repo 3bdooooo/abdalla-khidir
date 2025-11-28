@@ -278,8 +278,11 @@ export const seedDatabaseIfEmpty = async () => {
             { name: 'Ultrasound', model: 'Voluson E10' },
             { name: 'X-Ray Machine', model: 'Mobilett Elara' },
             { name: 'Dialysis Machine', model: '4008S Classix' },
-            { name: 'Incubator', model: 'Isolette 8000' },
-            { name: 'ECG Machine', model: 'MAC 2000' }
+            { name: 'Infant Incubator', model: 'Isolette 8000' },
+            { name: 'ECG Machine', model: 'MAC 2000' },
+            { name: 'C-Arm', model: 'OEC Elite' },
+            { name: 'Dental Chair', model: 'A-dec 500' },
+            { name: 'Hematology Analyzer', model: 'XN-1000' }
         ];
 
         const assetsBatchSize = 50;

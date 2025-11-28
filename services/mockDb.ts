@@ -12,83 +12,205 @@ export const DEVICE_IMAGES: Record<string, string> = {
     'LifePak': 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Specific Defib
     'Incubator': 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Incubator/Baby
     'Isolette': 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Specific Incubator
-    'X-Ray System': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Radiology (Updated)
-    'Ultrasound': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ultrasound probe (Updated)
-    'Voluson': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80' // Specific Ultrasound
+    'X-Ray System': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Radiology
+    'Ultrasound': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ultrasound probe
+    'Voluson': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Specific Ultrasound
+    'C-Arm': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    'Endoscope': 'https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    'Autoclave': 'https://images.unsplash.com/photo-1581093588401-fbb07366f955?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    'Centrifuge': 'https://images.unsplash.com/photo-1581093588401-fbb07366f955?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    'Dental Chair': 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+    'Hematology Analyzer': 'https://images.unsplash.com/photo-1579165466741-7f35a4755657?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
 };
 
 export const getModelImage = (model: string): string => {
-    // Normalize model string
     const m = model.toLowerCase();
-
-    // Exact match lookup (case insensitive)
+    
+    // Check exact matches first
     const exactMatch = Object.keys(DEVICE_IMAGES).find(key => key.toLowerCase() === m);
     if (exactMatch) return DEVICE_IMAGES[exactMatch];
     
-    // Fuzzy match
+    // Fuzzy matching based on keywords
     if (m.includes('mri') || m.includes('magnetom')) return DEVICE_IMAGES['Magnetom Vida'];
+    if (m.includes('ct ') || m.includes('somatom')) return DEVICE_IMAGES['CT Scanner'];
     if (m.includes('ventilator') || m.includes('servo')) return DEVICE_IMAGES['Servo-U'];
     if (m.includes('pump') || m.includes('alaris')) return DEVICE_IMAGES['Alaris System'];
-    if (m.includes('monitor') || m.includes('intellivue')) return DEVICE_IMAGES['IntelliVue MX40'];
+    if (m.includes('monitor') || m.includes('intellivue') || m.includes('fetal')) return DEVICE_IMAGES['IntelliVue MX40'];
     if (m.includes('anesthesia') || m.includes('drager') || m.includes('fabius')) return DEVICE_IMAGES['Drager Fabius'];
     if (m.includes('x-ray') || m.includes('radiology') || m.includes('mobilett')) return DEVICE_IMAGES['X-Ray System'];
+    if (m.includes('c-arm')) return DEVICE_IMAGES['C-Arm'];
     if (m.includes('lifepak') || m.includes('defib')) return DEVICE_IMAGES['LifePak'];
     if (m.includes('incubator') || m.includes('isolette')) return DEVICE_IMAGES['Incubator'];
     if (m.includes('ultrasound') || m.includes('voluson') || m.includes('echo')) return DEVICE_IMAGES['Voluson'];
+    if (m.includes('endoscop') || m.includes('tower')) return DEVICE_IMAGES['Endoscope'];
+    if (m.includes('autoclave') || m.includes('steriliz')) return DEVICE_IMAGES['Autoclave'];
+    if (m.includes('centrifuge')) return DEVICE_IMAGES['Centrifuge'];
+    if (m.includes('dental')) return DEVICE_IMAGES['Dental Chair'];
+    if (m.includes('analyzer') || m.includes('hematology')) return DEVICE_IMAGES['Hematology Analyzer'];
     
-    // Default fallback
     return 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80';
 };
 
 export const LOCATIONS: Location[] = [
-  { location_id: 101, name: 'ICU Room 1', department: 'ICU', building: 'Main Wing', room: '101' },
-  { location_id: 102, name: 'ICU Room 2', department: 'ICU', building: 'Main Wing', room: '102' },
-  { location_id: 201, name: 'Radiology X-Ray 1', department: 'Radiology', building: 'East Wing', room: 'R1' },
-  { location_id: 301, name: 'ER Triage', department: 'Emergency', building: 'Main Wing', room: 'E1' },
-  { location_id: 401, name: 'Lab Hematology', department: 'Laboratory', building: 'North Wing', room: 'L1' },
-  { location_id: 501, name: 'Pharmacy Main', department: 'Pharmacy', building: 'Main Wing', room: 'P1' },
-  { location_id: 601, name: 'OR 1', department: 'Surgery', building: 'West Wing', room: 'OR1' },
-  { location_id: 602, name: 'OR 2', department: 'Surgery', building: 'West Wing', room: 'OR2' },
-  { location_id: 701, name: 'Cardio Lab', department: 'Cardiology', building: 'East Wing', room: 'C1' },
-  { location_id: 801, name: 'Neuro Ward', department: 'Neurology', building: 'North Wing', room: 'N1' },
+  { location_id: 101, name: 'ICU Bed 1', department: 'ICU', building: 'Main Wing', room: '101' },
+  { location_id: 102, name: 'ICU Bed 2', department: 'ICU', building: 'Main Wing', room: '102' },
+  { location_id: 201, name: 'X-Ray Room', department: 'Radiology', building: 'East Wing', room: 'R1' },
+  { location_id: 202, name: 'MRI Suite', department: 'Radiology', building: 'East Wing', room: 'R2' },
+  { location_id: 301, name: 'Triage 1', department: 'Emergency', building: 'Main Wing', room: 'E1' },
+  { location_id: 302, name: 'Trauma Bay', department: 'Emergency', building: 'Main Wing', room: 'E2' },
+  { location_id: 401, name: 'Hematology Lab', department: 'Laboratory', building: 'North Wing', room: 'L1' },
+  { location_id: 402, name: 'Microbiology', department: 'Laboratory', building: 'North Wing', room: 'L2' },
+  { location_id: 501, name: 'Dispensing', department: 'Pharmacy', building: 'Main Wing', room: 'P1' },
+  { location_id: 601, name: 'OR 1 (General)', department: 'Surgery', building: 'West Wing', room: 'OR1' },
+  { location_id: 602, name: 'OR 2 (Neuro)', department: 'Surgery', building: 'West Wing', room: 'OR2' },
+  { location_id: 701, name: 'Cath Lab', department: 'Cardiology', building: 'East Wing', room: 'C1' },
+  { location_id: 801, name: 'Stroke Unit', department: 'Neurology', building: 'North Wing', room: 'N1' },
   { location_id: 901, name: 'NICU A', department: 'NICU', building: 'Maternity Wing', room: 'NI1' },
-  { location_id: 1001, name: 'Labor Room', department: 'Maternity', building: 'Maternity Wing', room: 'M1' },
-  { location_id: 1101, name: 'Dialysis Center', department: 'Dialysis', building: 'South Wing', room: 'D1' },
-  { location_id: 1201, name: 'Chemo Ward', department: 'Oncology', building: 'South Wing', room: 'O1' },
+  { location_id: 1001, name: 'Delivery Room', department: 'Maternity', building: 'Maternity Wing', room: 'M1' },
+  { location_id: 1101, name: 'Dialysis Stn 1', department: 'Dialysis', building: 'South Wing', room: 'D1' },
+  { location_id: 1201, name: 'Chemo Bay', department: 'Oncology', building: 'South Wing', room: 'O1' },
   { location_id: 1301, name: 'Pediatric Ward', department: 'Pediatrics', building: 'Main Wing', room: 'PD1' },
-  { location_id: 1401, name: 'Ortho Rehab', department: 'Orthopedics', building: 'East Wing', room: 'OT1' },
+  { location_id: 1401, name: 'Rehab Gym', department: 'Orthopedics', building: 'East Wing', room: 'OT1' },
   { location_id: 1501, name: 'General Ward A', department: 'General Ward', building: 'Main Wing', room: 'G1' },
+  { location_id: 1601, name: 'Sterile Processing', department: 'CSSD', building: 'Basement', room: 'S1' },
+  { location_id: 1701, name: 'Dental Clinic', department: 'Dental', building: 'Outpatient', room: 'DC1' },
+  { location_id: 1801, name: 'ENT Exam Room', department: 'ENT', building: 'Outpatient', room: 'ENT1' },
 ];
 
 export const MOCK_USERS: User[] = [
-  { user_id: 1, name: 'Dr. Sarah Connor', role: UserRole.ADMIN, email: 'admin@hospital.com', password: 'password', location_id: 101, department: 'Management' },
-  { user_id: 2, name: 'John Supervisor', role: UserRole.SUPERVISOR, email: 'supervisor@hospital.com', password: 'password', location_id: 101, department: 'Biomedical' },
-  { user_id: 3, name: 'Mike Tech', role: UserRole.TECHNICIAN, email: 'tech@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0101' },
-  { user_id: 4, name: 'Nurse Joy', role: UserRole.NURSE, email: 'nurse@hospital.com', password: 'password', location_id: 101, department: 'ICU' },
-  { user_id: 5, name: 'Vendor Rep', role: UserRole.VENDOR, email: 'vendor@hospital.com', password: 'password', location_id: 101, department: 'External' },
+  { user_id: 1, name: 'Dr. Sarah Connor', role: UserRole.ADMIN, email: 'admin@hospital.com', password: 'password', location_id: 101, department: 'Management', phone_number: '555-0001' },
+  { user_id: 2, name: 'John Supervisor', role: UserRole.SUPERVISOR, email: 'supervisor@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0002' },
+  { user_id: 3, name: 'Mike Tech', role: UserRole.TECHNICIAN, email: 'tech@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0003' },
+  { user_id: 4, name: 'Nurse Joy', role: UserRole.NURSE, email: 'nurse@hospital.com', password: 'password', location_id: 101, department: 'ICU', phone_number: '555-0004' },
+  { user_id: 5, name: 'Vendor Rep', role: UserRole.VENDOR, email: 'vendor@hospital.com', password: 'password', location_id: 101, department: 'External', phone_number: '555-0005' },
 ];
 
-let assets: Asset[] = [
-  { asset_id: 'AST-001', nfc_tag_id: 'NFC-001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens', serial_number: 'SN-998877', location_id: 201, status: AssetStatus.RUNNING, purchase_date: '2020-01-15', operating_hours: 12500, risk_score: 15, last_calibration_date: '2023-11-01', next_calibration_date: '2024-11-01', image: DEVICE_IMAGES['Magnetom Vida'], purchase_cost: 1500000, accumulated_maintenance_cost: 45000 },
-  { asset_id: 'AST-002', nfc_tag_id: 'NFC-002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge', serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING, purchase_date: '2021-05-20', operating_hours: 5400, risk_score: 85, last_calibration_date: '2023-12-10', next_calibration_date: '2024-06-10', image: DEVICE_IMAGES['Servo-U'], purchase_cost: 35000, accumulated_maintenance_cost: 12000 },
-  { asset_id: 'AST-003', nfc_tag_id: 'NFC-003', name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD', serial_number: 'SN-445566', location_id: 102, status: AssetStatus.DOWN, purchase_date: '2019-08-10', operating_hours: 8900, risk_score: 60, last_calibration_date: '2023-01-15', next_calibration_date: '2024-01-15', image: DEVICE_IMAGES['Alaris System'], purchase_cost: 2500, accumulated_maintenance_cost: 1800 },
-  { asset_id: 'AST-004', nfc_tag_id: 'NFC-004', name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips', serial_number: 'SN-778899', location_id: 101, status: AssetStatus.UNDER_MAINT, purchase_date: '2022-03-01', operating_hours: 3200, risk_score: 45, last_calibration_date: '2023-09-20', next_calibration_date: '2024-09-20', image: DEVICE_IMAGES['IntelliVue MX40'], purchase_cost: 8000, accumulated_maintenance_cost: 950 },
+// GENERATE 45 MORE USERS (Total 50)
+const extraRoles = [UserRole.NURSE, UserRole.TECHNICIAN, UserRole.SUPERVISOR, UserRole.NURSE, UserRole.NURSE];
+const firstNames = ["Ahmed", "Mohamed", "Fatima", "Ali", "Sara", "Omar", "Layla", "Khalid", "Noura", "Hassan", "Aisha", "Yousef", "Mariam", "Ibrahim"];
+const lastNames = ["Al-Sayed", "Khan", "Smith", "Johnson", "Al-Harbi", "Nasser", "Othman", "Kamal", "Fawzi", "Salim"];
+
+for (let i = 6; i <= 50; i++) {
+    const role = extraRoles[i % extraRoles.length];
+    const fname = firstNames[i % firstNames.length];
+    const lname = lastNames[i % lastNames.length];
+    const dept = LOCATIONS[i % LOCATIONS.length].department;
+    
+    MOCK_USERS.push({
+        user_id: i,
+        name: `${fname} ${lname} ${i}`,
+        role: role,
+        email: `${role.toLowerCase()}${i}@hospital.com`,
+        password: 'password',
+        location_id: 101,
+        department: dept,
+        phone_number: `555-0${100+i}`
+    });
+}
+
+// GENERATE 500 ASSETS
+const medicalDeviceTypes = [
+    { name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens' },
+    { name: 'CT Scanner', model: 'Somatom Force', manufacturer: 'Siemens' },
+    { name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge' },
+    { name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD' },
+    { name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips' },
+    { name: 'Anesthesia Machine', model: 'Drager Fabius', manufacturer: 'Drager' },
+    { name: 'Defibrillator', model: 'LifePak 15', manufacturer: 'Stryker' },
+    { name: 'Ultrasound', model: 'Voluson E10', manufacturer: 'GE Health' },
+    { name: 'X-Ray Machine', model: 'Mobilett Elara', manufacturer: 'Siemens' },
+    { name: 'Dialysis Machine', model: '4008S Classix', manufacturer: 'Fresenius' },
+    { name: 'Incubator', model: 'Isolette 8000', manufacturer: 'Drager' },
+    { name: 'ECG Machine', model: 'MAC 2000', manufacturer: 'GE Health' },
+    { name: 'C-Arm', model: 'OEC Elite', manufacturer: 'GE Health' },
+    { name: 'Endoscopy Tower', model: 'Evis X1', manufacturer: 'Olympus' },
+    { name: 'Autoclave', model: 'Steris AMSCO', manufacturer: 'Steris' },
+    { name: 'Hematology Analyzer', model: 'XN-1000', manufacturer: 'Sysmex' },
+    { name: 'Dental Chair', model: 'A-dec 500', manufacturer: 'A-dec' },
+    { name: 'Fetal Monitor', model: 'Avalon FM30', manufacturer: 'Philips' }
 ];
 
+let assets: Asset[] = [];
+// Generate 500
+for (let i = 1; i <= 500; i++) {
+    const type = medicalDeviceTypes[i % medicalDeviceTypes.length];
+    const loc = LOCATIONS[i % LOCATIONS.length];
+    const purchaseYear = 2015 + (i % 9); // 2015-2023
+    
+    assets.push({
+        asset_id: `AST-${1000 + i}`,
+        nfc_tag_id: `NFC-${1000 + i}`,
+        name: type.name,
+        model: type.model,
+        manufacturer: type.manufacturer,
+        serial_number: `SN-${10000 + i}`,
+        location_id: loc.location_id,
+        status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
+        purchase_date: `${purchaseYear}-01-15`,
+        warranty_expiration: `${purchaseYear + 5}-01-15`,
+        operating_hours: Math.floor(Math.random() * 20000),
+        risk_score: Math.floor(Math.random() * 100),
+        last_calibration_date: '2023-05-01',
+        next_calibration_date: '2024-05-01',
+        image: getModelImage(type.model),
+        purchase_cost: 5000 + (Math.random() * 50000),
+        accumulated_maintenance_cost: 500 + (Math.random() * 5000)
+    });
+}
+
+// GENERATE INVENTORY
 let inventory: InventoryPart[] = [
-  { part_id: 1, part_name: 'MRI Coil', current_stock: 3, min_reorder_level: 2, cost: 5000 },
-  { part_id: 2, part_name: 'Ventilator Filter', current_stock: 45, min_reorder_level: 20, cost: 25 },
-  { part_id: 3, part_name: 'Infusion Set', current_stock: 12, min_reorder_level: 50, cost: 5 },
-  { part_id: 4, part_name: 'ECG Leads', current_stock: 100, min_reorder_level: 30, cost: 15 },
-  { part_id: 5, part_name: 'Power Supply Unit', current_stock: 2, min_reorder_level: 5, cost: 350 },
+    { part_id: 1, part_name: 'MRI Coil', current_stock: 3, min_reorder_level: 2, cost: 5000 },
+    { part_id: 2, part_name: 'Ventilator Filter', current_stock: 45, min_reorder_level: 20, cost: 25 },
+    { part_id: 3, part_name: 'Infusion Set', current_stock: 12, min_reorder_level: 50, cost: 5 },
+    { part_id: 4, part_name: 'ECG Leads', current_stock: 100, min_reorder_level: 30, cost: 15 },
+    { part_id: 5, part_name: 'Power Supply Unit', current_stock: 2, min_reorder_level: 5, cost: 350 },
+    { part_id: 6, part_name: 'Flow Sensor', current_stock: 10, min_reorder_level: 5, cost: 120 },
+    { part_id: 7, part_name: 'O2 Sensor', current_stock: 15, min_reorder_level: 8, cost: 80 },
+    { part_id: 8, part_name: 'SPO2 Probe', current_stock: 30, min_reorder_level: 10, cost: 45 },
+    { part_id: 9, part_name: 'NIBP Cuff', current_stock: 50, min_reorder_level: 20, cost: 20 },
+    { part_id: 10, part_name: 'X-Ray Tube', current_stock: 1, min_reorder_level: 1, cost: 15000 },
+    { part_id: 11, part_name: 'Ultrasound Probe', current_stock: 2, min_reorder_level: 1, cost: 8000 },
+    { part_id: 12, part_name: 'Defib Pads', current_stock: 200, min_reorder_level: 50, cost: 30 },
+    { part_id: 13, part_name: 'Backup Battery', current_stock: 8, min_reorder_level: 5, cost: 150 },
+    { part_id: 14, part_name: 'Thermal Paper', current_stock: 100, min_reorder_level: 20, cost: 5 },
+    { part_id: 15, part_name: 'Autoclave Seal', current_stock: 5, min_reorder_level: 2, cost: 200 },
 ];
+// Fill up to 100 generic parts
+for (let i = 16; i <= 100; i++) {
+    inventory.push({
+        part_id: i,
+        part_name: `Generic Spare Part #${i}`,
+        current_stock: Math.floor(Math.random() * 50),
+        min_reorder_level: 10,
+        cost: Math.floor(Math.random() * 500)
+    });
+}
 
-let workOrders: WorkOrder[] = [
-  { wo_id: 1001, asset_id: 'AST-003', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3, description: 'Pump showing occlusion error continuously.', status: 'Open', created_at: '2023-10-25T09:00:00Z', is_first_time_fix: false },
-  { wo_id: 1002, asset_id: 'AST-001', type: WorkOrderType.PREVENTIVE, priority: Priority.MEDIUM, assigned_to_id: 3, description: 'Quarterly PM check for MRI.', status: 'In Progress', start_time: '2023-10-26T08:30:00Z', created_at: '2023-10-20T09:00:00Z' },
-  { wo_id: 1003, asset_id: 'AST-002', type: WorkOrderType.CALIBRATION, priority: Priority.HIGH, assigned_to_id: 3, description: 'Annual Calibration Due.', status: 'Assigned', created_at: '2023-10-24T14:00:00Z' },
-  { wo_id: 9001, asset_id: 'AST-004', type: WorkOrderType.CORRECTIVE, priority: Priority.LOW, assigned_to_id: 3, description: 'Screen flickering occasionally.', status: 'Closed', start_time: '2023-09-15T10:00:00Z', close_time: '2023-09-15T14:00:00Z', created_at: '2023-09-15T08:00:00Z', nurse_rating: 5, is_first_time_fix: true },
-];
+// GENERATE WORK ORDERS
+let workOrders: WorkOrder[] = [];
+// Generate 200 history WOs
+for (let i = 1; i <= 200; i++) {
+    const asset = assets[i % assets.length];
+    const tech = MOCK_USERS.find(u => u.role === UserRole.TECHNICIAN) || MOCK_USERS[2];
+    const isClosed = i > 20; // Most are closed
+    const type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
+    
+    workOrders.push({
+        wo_id: 1000 + i,
+        asset_id: asset.asset_id,
+        type: type,
+        priority: i % 10 === 0 ? Priority.CRITICAL : (i % 5 === 0 ? Priority.HIGH : Priority.MEDIUM),
+        assigned_to_id: tech.user_id,
+        description: type === WorkOrderType.PREVENTIVE ? `Scheduled PM for ${asset.name}` : `Reported fault in ${asset.name}`,
+        status: isClosed ? 'Closed' : (i % 2 === 0 ? 'In Progress' : 'Open'),
+        start_time: '2023-10-01T09:00:00Z',
+        close_time: isClosed ? '2023-10-01T14:00:00Z' : undefined,
+        created_at: '2023-09-25T08:00:00Z',
+        is_first_time_fix: Math.random() > 0.3,
+        nurse_rating: isClosed ? Math.floor(Math.random() * 2) + 3 : undefined // 3 to 5 stars
+    });
+}
 
 // Helper Functions
 export const getAssets = () => assets;
@@ -122,7 +244,7 @@ export const findRelevantDocuments = (model: string, manufacturer: string): Asse
 };
 
 export const getMovementLogs = (): MovementLog[] => [
-    { log_id: 1, asset_id: 'AST-002', from_location_id: 101, to_location_id: 201, timestamp: '2023-10-25T10:00:00', user_id: 3 }
+    { log_id: 1, asset_id: 'AST-1002', from_location_id: 101, to_location_id: 201, timestamp: '2023-10-25T10:00:00', user_id: 3 }
 ];
 
 export const getDetailedReports = (): DetailedJobOrderReport[] => [
@@ -137,7 +259,7 @@ export const getDetailedReports = (): DetailedJobOrderReport[] => [
             model: "Servo-U",
             manufacturer: "Getinge",
             serial_no: "SN-112233",
-            asset_id: "AST-002"
+            asset_id: "AST-1002"
         },
         location: {
             site: "Main Hospital",
@@ -176,7 +298,7 @@ export const getDetailedReports = (): DetailedJobOrderReport[] => [
 export const getPMReports = (): PreventiveMaintenanceReport[] => [];
 
 export const getSystemAlerts = (): SystemAlert[] => [
-    { id: 1, type: 'BOUNDARY_CROSSING', message: 'Asset AST-002 (Ventilator) moved out of ICU without authorization.', timestamp: '2023-10-26T14:30:00Z', asset_id: 'AST-002', severity: 'high', status: 'active' },
+    { id: 1, type: 'BOUNDARY_CROSSING', message: 'Asset AST-1002 (Ventilator) moved out of ICU without authorization.', timestamp: '2023-10-26T14:30:00Z', asset_id: 'AST-1002', severity: 'high', status: 'active' },
     { id: 2, type: 'STOCK', message: 'Low stock for "Power Supply Unit" (2 remaining).', timestamp: '2023-10-25T09:00:00Z', severity: 'medium', status: 'active' }
 ];
 
