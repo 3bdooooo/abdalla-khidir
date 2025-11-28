@@ -297,6 +297,10 @@ export const translations = {
     simulate_scan: "Simulate Handheld Reader",
     simulate_gate_pass: "Simulate Gate Passage",
     audit_summary: "Audit Summary",
+    zebra_connected: "Zebra RFD8500 Connected",
+    zebra_listening: "Listening for Tags...",
+    connect_zebra: "Connect Zebra Scanner",
+    zebra_instructions: "Ensure device is paired and in HID Mode",
   },
   ar: {
     appName: "A2M MED",
@@ -591,6 +595,10 @@ export const translations = {
     simulate_scan: "محاكاة القارئ اليدوي",
     simulate_gate_pass: "محاكاة عبور بوابة",
     audit_summary: "ملخص الجرد",
+    zebra_connected: "تم توصيل Zebra RFD8500",
+    zebra_listening: "الاستماع للوسوم...",
+    connect_zebra: "توصيل قارئ Zebra",
+    zebra_instructions: "تأكد من اقتران الجهاز ووضعه في نمط HID",
   }
 };
 
