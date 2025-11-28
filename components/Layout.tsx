@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell } from 'lucide-react';
+import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface LayoutProps {
@@ -62,6 +62,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     { id: 'inventory', label: t('nav_inventory'), icon: Package },
     { id: 'calibration', label: t('nav_calibration'), icon: Activity },
     { id: 'analysis', label: t('nav_analysis'), icon: FileText },
+    { id: 'rfid', label: t('nav_rfid'), icon: Radio }, // Added RFID Menu
   ];
 
   if (user.role === UserRole.ADMIN) {

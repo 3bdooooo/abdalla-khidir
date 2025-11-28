@@ -1,12 +1,12 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart } from 'recharts';
-import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole } from '../types';
+import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
 import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -92,6 +92,12 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
     const [selectedWOForApproval, setSelectedWOForApproval] = useState<WorkOrder | null>(null);
     const [approvalSignature, setApprovalSignature] = useState('');
+
+    // RFID & Audit State
+    const [rfidTab, setRfidTab] = useState<'audit' | 'gate'>('audit');
+    const [activeAudit, setActiveAudit] = useState<AuditSession | null>(null);
+    const [selectedAuditDept, setSelectedAuditDept] = useState('');
+    const [gateLogs, setGateLogs] = useState<RfidGateLog[]>([]);
 
     // --- DATA MEMOIZATION ---
     const kbDocuments = useMemo(() => getKnowledgeBaseDocs(), []);
@@ -321,6 +327,60 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         } else {
             if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]);
             else alert('Job Order Report not found. Try 2236.');
+        }
+    };
+
+    // RFID HANDLERS
+    const startAudit = () => {
+        if(!selectedAuditDept) return alert("Select a department");
+        const expected = getAssetsInZone(selectedAuditDept);
+        const newAudit: AuditSession = {
+            id: Date.now(),
+            date: new Date().toISOString(),
+            department: selectedAuditDept,
+            total_expected: expected.length,
+            total_scanned: 0,
+            missing_assets: expected.map(a => a.asset_id),
+            found_assets: [],
+            status: 'In Progress'
+        };
+        setActiveAudit(newAudit);
+    };
+
+    const simulateRfidScan = () => {
+        if(!activeAudit) return;
+        // Randomly pick a missing asset to "scan"
+        if(activeAudit.missing_assets.length > 0) {
+            const toScanId = activeAudit.missing_assets[0];
+            setActiveAudit(prev => {
+                if(!prev) return null;
+                return {
+                    ...prev,
+                    total_scanned: prev.total_scanned + 1,
+                    missing_assets: prev.missing_assets.filter(id => id !== toScanId),
+                    found_assets: [...prev.found_assets, toScanId]
+                }
+            });
+        }
+    };
+
+    const simulateGatePassage = () => {
+        const randomAsset = assets[Math.floor(Math.random() * assets.length)];
+        const direction = Math.random() > 0.5 ? 'ENTER' : 'EXIT';
+        const newLog: RfidGateLog = {
+            id: Date.now(),
+            asset_id: randomAsset.asset_id,
+            rfid_tag: randomAsset.rfid_tag_id || `RFID-${randomAsset.asset_id}`,
+            gate_location_id: randomAsset.location_id,
+            direction: direction,
+            timestamp: new Date().toISOString()
+        };
+        setGateLogs(prev => [newLog, ...prev]);
+        
+        // Trigger alert if exiting authorized zone
+        if(direction === 'EXIT') {
+             // Mock check: if moving out of assigned dept
+             alert(`ALERT: ${randomAsset.name} detected LEAVING its zone!`);
         }
     };
 
@@ -994,6 +1054,159 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <button type="submit" className="flex-1 btn-primary">Create</button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
+    // 8. RFID & AUDIT (New View)
+    if (currentView === 'rfid') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                {/* Header with Switch */}
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Radio className="text-brand"/> {t('nav_rfid')}</h2>
+                    <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+                         <button onClick={() => setRfidTab('audit')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${rfidTab === 'audit' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}>{t('rfid_audit')}</button>
+                         <button onClick={() => setRfidTab('gate')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${rfidTab === 'gate' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}>{t('rfid_gate_monitor')}</button>
+                    </div>
+                </div>
+
+                {rfidTab === 'audit' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Control Panel */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
+                            <h3 className="font-bold text-lg mb-4">{t('start_audit')}</h3>
+                            {!activeAudit ? (
+                                <div className="space-y-4">
+                                    <select className="input-modern" value={selectedAuditDept} onChange={e => setSelectedAuditDept(e.target.value)}>
+                                        <option value="">Select Department...</option>
+                                        {departmentZones.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                                    </select>
+                                    <button onClick={startAudit} className="w-full btn-primary">{t('start_audit')}</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-6 text-center">
+                                    <div className="w-16 h-16 bg-blue-50 text-brand rounded-full flex items-center justify-center mx-auto animate-pulse">
+                                        <Scan size={32}/>
+                                    </div>
+                                    <h4 className="font-bold text-xl">{t('audit_in_progress')}</h4>
+                                    <p className="text-sm text-text-muted">{activeAudit.department}</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-3 bg-gray-50 rounded-xl">
+                                            <div className="text-2xl font-bold">{activeAudit.total_expected}</div>
+                                            <div className="text-xs text-text-muted">{t('expected_assets')}</div>
+                                        </div>
+                                        <div className="p-3 bg-green-50 rounded-xl text-green-700">
+                                            <div className="text-2xl font-bold">{activeAudit.total_scanned}</div>
+                                            <div className="text-xs font-bold">{t('scanned_assets')}</div>
+                                        </div>
+                                    </div>
+
+                                    <button onClick={simulateRfidScan} className="w-full py-3 border-2 border-dashed border-gray-300 hover:border-brand rounded-xl font-bold text-gray-500 hover:text-brand transition">
+                                        {t('simulate_scan')}
+                                    </button>
+
+                                    <button onClick={() => setActiveAudit(null)} className="text-red-500 text-sm font-bold hover:underline">Stop Audit</button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Audit List */}
+                        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                             <div className="p-4 border-b bg-gray-50 flex justify-between">
+                                 <h3 className="font-bold">{t('audit_summary')}</h3>
+                                 {activeAudit && <span className="text-xs bg-brand text-white px-2 py-1 rounded font-bold">{((activeAudit.total_scanned / activeAudit.total_expected) * 100).toFixed(0)}% Complete</span>}
+                             </div>
+                             {activeAudit ? (
+                                 <div className="max-h-[500px] overflow-y-auto p-4 space-y-2">
+                                     {/* Missing Assets First */}
+                                     {activeAudit.missing_assets.map(id => {
+                                         const asset = assets.find(a => a.asset_id === id);
+                                         return (
+                                             <div key={id} className="flex justify-between items-center p-3 border border-red-100 bg-red-50/50 rounded-xl">
+                                                 <div className="flex items-center gap-3">
+                                                     <div className="w-2 h-2 rounded-full bg-red-400"></div>
+                                                     <div>
+                                                         <div className="font-bold text-gray-900">{asset?.name}</div>
+                                                         <div className="text-xs text-red-500 font-bold">{t('missing_assets')}</div>
+                                                     </div>
+                                                 </div>
+                                                 <span className="font-mono text-xs text-gray-400">{id}</span>
+                                             </div>
+                                         )
+                                     })}
+                                     {/* Found Assets */}
+                                     {activeAudit.found_assets.map(id => {
+                                         const asset = assets.find(a => a.asset_id === id);
+                                         return (
+                                             <div key={id} className="flex justify-between items-center p-3 border border-green-100 bg-green-50/50 rounded-xl opacity-60">
+                                                 <div className="flex items-center gap-3">
+                                                     <Check size={16} className="text-green-600"/>
+                                                     <div>
+                                                         <div className="font-bold text-gray-900">{asset?.name}</div>
+                                                         <div className="text-xs text-green-600 font-bold">Verified</div>
+                                                     </div>
+                                                 </div>
+                                                 <span className="font-mono text-xs text-gray-400">{id}</span>
+                                             </div>
+                                         )
+                                     })}
+                                 </div>
+                             ) : (
+                                 <div className="p-12 text-center text-gray-400">Start an audit session to verify inventory.</div>
+                             )}
+                        </div>
+                    </div>
+                )}
+
+                {rfidTab === 'gate' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[500px] flex flex-col items-center justify-center text-center space-y-6">
+                            <div className="relative">
+                                <div className="absolute inset-0 bg-brand/20 blur-3xl rounded-full animate-pulse"></div>
+                                <img src="https://cdn-icons-png.flaticon.com/512/6257/6257896.png" className="w-48 h-48 relative z-10 opacity-80" alt="RFID Gate" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-900">Live Gate Monitor</h3>
+                            <p className="text-text-muted max-w-xs">Simulating RFID Readers installed at department entrances.</p>
+                            <button onClick={simulateGatePassage} className="btn-primary w-full max-w-sm">
+                                {t('simulate_gate_pass')}
+                            </button>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden h-[500px] flex flex-col">
+                             <div className="p-4 border-b bg-gray-50 font-bold text-lg">{t('gate_event')} Log</div>
+                             <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                 {gateLogs.length === 0 ? (
+                                     <div className="text-center text-gray-400 mt-20">No recent movements detected.</div>
+                                 ) : (
+                                     gateLogs.map(log => {
+                                         const asset = assets.find(a => a.asset_id === log.asset_id);
+                                         return (
+                                             <div key={log.id} className="flex items-center justify-between p-3 border rounded-xl animate-in slide-in-from-right">
+                                                 <div className="flex items-center gap-3">
+                                                     <div className={`p-2 rounded-lg ${log.direction === 'ENTER' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
+                                                         {log.direction === 'ENTER' ? <LogIn size={20}/> : <LogOut size={20}/>}
+                                                     </div>
+                                                     <div>
+                                                         <div className="font-bold text-gray-900">{asset?.name}</div>
+                                                         <div className="text-xs text-text-muted">{getLocationName(log.gate_location_id)}</div>
+                                                     </div>
+                                                 </div>
+                                                 <div className="text-right">
+                                                     <div className={`text-xs font-bold ${log.direction === 'ENTER' ? 'text-green-600' : 'text-orange-600'}`}>
+                                                         {log.direction}
+                                                     </div>
+                                                     <div className="text-[10px] font-mono text-gray-400">{new Date(log.timestamp).toLocaleTimeString()}</div>
+                                                 </div>
+                                             </div>
+                                         )
+                                     })
+                                 )}
+                             </div>
                         </div>
                     </div>
                 )}

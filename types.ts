@@ -56,6 +56,7 @@ export interface User {
 export interface Asset {
   asset_id: string; // Internal ID
   nfc_tag_id?: string; // Physical Tag ID (often same as asset_id)
+  rfid_tag_id?: string; // NEW: RFID EPC Code
   name: string;
   model: string;
   manufacturer?: string;
@@ -153,6 +154,28 @@ export interface MovementLog {
   to_location_id: number;
   timestamp: string;
   user_id: number;
+}
+
+// NEW: RFID Gate Log (Auto-Entry/Exit)
+export interface RfidGateLog {
+  id: number;
+  rfid_tag: string;
+  asset_id: string;
+  gate_location_id: number; // Which department door
+  direction: 'ENTER' | 'EXIT';
+  timestamp: string;
+}
+
+// NEW: Audit Session
+export interface AuditSession {
+  id: number;
+  date: string;
+  department: string;
+  total_expected: number;
+  total_scanned: number;
+  missing_assets: string[]; // IDs
+  found_assets: string[]; // IDs
+  status: 'In Progress' | 'Completed';
 }
 
 export interface ClosureReport {
