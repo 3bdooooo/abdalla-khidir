@@ -190,8 +190,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const statusData = [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length, color: '#10B981' }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length, color: '#EF4444' }, { name: 'Maint.', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length, color: '#F59E0B' } ];
         const riskData = [...assets].sort((a,b) => b.risk_score - a.risk_score).slice(0, 10);
         
-        // TCO
-        const tcoData = assets
+        // TCO Calculation
+        const tcoData = [...assets]
             .filter(a => a.purchase_cost && a.accumulated_maintenance_cost)
             .sort((a,b) => (b.accumulated_maintenance_cost || 0) - (a.accumulated_maintenance_cost || 0))
             .slice(0, 5)
@@ -199,7 +199,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 name: a.name,
                 purchase: a.purchase_cost || 0,
                 maintenance: a.accumulated_maintenance_cost || 0,
-                recommendation: (a.accumulated_maintenance_cost || 0) > ((a.purchase_cost || 0) * 0.4) ? 'Replace' : 'Repair'
+                recommendation: (a.accumulated_maintenance_cost || 0) > ((a.purchase_cost || 0) * 0.4) ? 'Replace' : 'Keep'
             }));
 
         return { mttrTrend, techPerformance, statusData, riskData, tcoData };
@@ -536,17 +536,65 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             ))}
                         </div>
                     </div>
+                    {/* TCO Analysis Card */}
                     <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                        <h3 className="font-bold text-lg text-gray-900 mb-6">{t('tco_analysis')}</h3>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <BarChart data={analyticsData.tcoData} layout="vertical">
-                                <XAxis type="number" hide/>
-                                <YAxis dataKey="name" type="category" width={100} style={{fontSize: '10px'}}/>
-                                <Tooltip/>
-                                <Bar dataKey="purchase" stackId="a" fill="#3B82F6" radius={[0, 4, 4, 0]} />
-                                <Bar dataKey="maintenance" stackId="a" fill="#F59E0B" radius={[0, 4, 4, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-lg text-gray-900">{t('tco_analysis')}</h3>
+                            <div className="flex gap-4 text-xs">
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded"></div> {t('purchase_price')}</div>
+                                <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500 rounded"></div> {t('maint_cost')}</div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="md:col-span-2 h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={analyticsData.tcoData} layout="vertical" margin={{ left: 0, right: 20, bottom: 0, top: 0 }}>
+                                        <XAxis type="number" hide/>
+                                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} interval={0}/>
+                                        <Tooltip 
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const data = payload[0].payload;
+                                                    return (
+                                                        <div className="bg-white p-3 border shadow-lg rounded-lg text-xs z-50">
+                                                            <p className="font-bold mb-1">{data.name}</p>
+                                                            <p className="text-blue-600">Purchase: ${data.purchase.toLocaleString()}</p>
+                                                            <p className="text-amber-600">Maintenance: ${data.maintenance.toLocaleString()}</p>
+                                                            <div className={`mt-2 font-bold px-2 py-1 rounded text-center ${data.recommendation === 'Replace' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                                Rec: {data.recommendation}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Bar dataKey="purchase" fill="#3B82F6" barSize={10} radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="maintenance" fill="#F59E0B" barSize={10} radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <div className="space-y-3 overflow-y-auto max-h-[250px] pr-2">
+                                {analyticsData.tcoData.map((item, idx) => (
+                                    <div key={idx} className={`p-3 border rounded-xl flex flex-col gap-1 ${item.recommendation === 'Replace' ? 'bg-red-50 border-red-100' : 'bg-gray-50'}`}>
+                                        <div className="flex justify-between items-start">
+                                            <div className="font-bold text-xs truncate w-24" title={item.name}>{item.name}</div>
+                                            {item.recommendation === 'Replace' ? 
+                                                <span className="text-[10px] font-bold bg-white text-red-600 px-1.5 py-0.5 rounded border border-red-200 flex items-center gap-1"><AlertTriangle size={10}/> Replace</span>
+                                                : <span className="text-[10px] font-bold bg-white text-green-600 px-1.5 py-0.5 rounded border border-green-200">Keep</span>
+                                            }
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 flex justify-between">
+                                            <span>Maint. Ratio</span>
+                                            <span className="font-mono">{((item.maintenance / item.purchase) * 100).toFixed(0)}%</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 h-1 rounded-full mt-1 overflow-hidden">
+                                            <div className={`h-1 rounded-full ${item.recommendation === 'Replace' ? 'bg-red-500' : 'bg-amber-500'}`} style={{ width: `${Math.min(((item.maintenance / item.purchase) * 100), 100)}%` }}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
