@@ -152,6 +152,7 @@ export const translations = {
     tab_kb: "Knowledge Base",
     tab_gen_report: "Report Generator",
     tab_analytics: "Strategic Analytics",
+    tab_financial: "Cost & Performance",
     gen_report: "Generate Report",
     report_type: "Report Type",
     cm_report: "Corrective Maintenance (CM)",
@@ -168,7 +169,10 @@ export const translations = {
     chart_asset_status: "Current Asset Status",
     chart_fault_dist: "Fault Distribution by Equipment",
     chart_qc_analysis: "Quality Control Analysis",
+    chart_cost_vs_value: "Maintenance Cost vs Purchase Value",
+    chart_freq_vs_cost: "Maintenance Frequency vs Cost",
     table_risk_report: "Predictive Risk Report",
+    table_financial_report: "Asset Financial Health",
     lbl_avg_mttr: "Avg MTTR",
     lbl_wo_count: "WO Count",
     lbl_user_error: "User Errors",
@@ -314,7 +318,10 @@ export const translations = {
     gate_lab: "Lab Access",
     unauthorized_movement: "Unauthorized Movement",
     authorized_movement: "Authorized",
-    live_gate_feed: "Live Gate Feed"
+    live_gate_feed: "Live Gate Feed",
+    cost_ratio: "Cost Ratio",
+    maint_freq: "Frequency",
+    asset_health: "Asset Financial Health"
   },
   ar: {
     appName: "A2M MED",
@@ -464,6 +471,7 @@ export const translations = {
     tab_kb: "قاعدة المعرفة",
     tab_gen_report: "منشئ التقارير",
     tab_analytics: "التحليلات الاستراتيجية",
+    tab_financial: "التكلفة والأداء",
     gen_report: "إنشاء تقرير",
     report_type: "نوع التقرير",
     cm_report: "صيانة تصحيحية (CM)",
@@ -480,7 +488,10 @@ export const translations = {
     chart_asset_status: "حالة الأصول الحالية",
     chart_fault_dist: "توزيع الأعطال حسب المعدات",
     chart_qc_analysis: "تحليل مراقبة الجودة",
+    chart_cost_vs_value: "تكلفة الصيانة مقابل قيمة الشراء",
+    chart_freq_vs_cost: "تكرار الصيانة مقابل التكلفة",
     table_risk_report: "تقرير المخاطر التنبؤي",
+    table_financial_report: "الصحة المالية للأصل",
     lbl_avg_mttr: "متوسط MTTR",
     lbl_wo_count: "عدد الأوامر",
     lbl_user_error: "أخطاء المستخدم",
@@ -626,7 +637,10 @@ export const translations = {
     gate_lab: "مدخل المختبر",
     unauthorized_movement: "حركة غير مصرح بها",
     authorized_movement: "مصرح به",
-    live_gate_feed: "بث البوابة المباشر"
+    live_gate_feed: "بث البوابة المباشر",
+    cost_ratio: "نسبة التكلفة",
+    maint_freq: "تكرار الصيانة",
+    asset_health: "الصحة المالية للأصل"
   }
 };
 

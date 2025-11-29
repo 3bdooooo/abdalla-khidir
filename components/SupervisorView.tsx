@@ -1,13 +1,13 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart } from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
 import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService'; // Import the new service
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -278,7 +278,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 recommendation: (a.accumulated_maintenance_cost || 0) > ((a.purchase_cost || 0) * 0.4) ? 'Replace' : 'Keep'
             }));
 
-        return { mttrTrend, techPerformance, statusData, riskData, tcoData };
+        // Financial & Frequency Analysis Data
+        const financialAnalysis = assets.map(a => {
+            const woCount = workOrders.filter(w => w.asset_id === a.asset_id || w.asset_id === a.nfc_tag_id).length;
+            const maintCost = a.accumulated_maintenance_cost || 0;
+            const purchase = a.purchase_cost || 1; // avoid div by zero
+            return {
+                id: a.asset_id,
+                name: a.name,
+                model: a.model,
+                purchase: purchase,
+                maintCost: maintCost,
+                woCount: woCount,
+                ratio: parseFloat((maintCost / purchase).toFixed(2))
+            };
+        }).sort((a,b) => b.ratio - a.ratio);
+
+        return { mttrTrend, techPerformance, statusData, riskData, tcoData, financialAnalysis };
     }, [assets, workOrders, users]);
 
     // --- HANDLERS ---
@@ -506,8 +522,455 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // ---------------- VIEW ROUTING ----------------
     // ... (Dashboard, Assets, Maintenance, Inventory, Calibration, Analysis, Users - Keep same)
 
+    if (currentView === 'analysis') {
+         // ANALYSIS & REPORTS
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                {/* Module Header */}
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_analysis')}</h2>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setActiveTab('tab_analytics')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'tab_analytics' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            {t('tab_analytics')}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('tab_financial')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'tab_financial' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            <DollarSign size={16}/> {t('tab_financial')}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('tab_gen_report')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'tab_gen_report' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            {t('tab_gen_report')}
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('tab_kb')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeTab === 'tab_kb' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            {t('tab_kb')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* 1. STRATEGIC ANALYTICS */}
+                {activeTab === 'tab_analytics' && (
+                    <div className="space-y-6">
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-1">{t('kpi_mttr')}</h4>
+                                <div className="text-2xl font-bold text-gray-900 flex items-end gap-2">
+                                    4.2h <span className="text-xs text-green-500 font-medium mb-1 flex items-center"><TrendingUp size={12} className="mr-1"/> -12%</span>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-1">{t('kpi_availability')}</h4>
+                                <div className="text-2xl font-bold text-gray-900 flex items-end gap-2">
+                                    98.5% <span className="text-xs text-green-500 font-medium mb-1">+0.5%</span>
+                                </div>
+                            </div>
+                             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-1">PPM Compliance</h4>
+                                <div className="text-2xl font-bold text-gray-900 flex items-end gap-2">
+                                    92% <span className="text-xs text-amber-500 font-medium mb-1">Target 95%</span>
+                                </div>
+                            </div>
+                             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h4 className="text-xs font-bold text-text-muted uppercase mb-1">Active Alerts</h4>
+                                <div className="text-2xl font-bold text-gray-900 flex items-end gap-2">
+                                    {alerts.length} <span className="text-xs text-red-500 font-medium mb-1">Critical</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* MTTR Chart */}
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4">{t('chart_mttr_trend')}</h3>
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={analyticsData.mttrTrend}>
+                                            <defs>
+                                                <linearGradient id="colorMttr" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.1}/>
+                                                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0"/>
+                                            <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 12}} />
+                                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}}/>
+                                            <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)'}}/>
+                                            <Area type="monotone" dataKey="hours" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorMttr)" />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                            
+                            {/* Asset Status Pie */}
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4">{t('chart_asset_status')}</h3>
+                                <div className="h-64 flex items-center justify-center">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={analyticsData.statusData}
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {analyticsData.statusData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend verticalAlign="bottom" height={36}/>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Predictive Risk Report Table */}
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                             <div className="p-4 border-b border-border bg-gray-50 flex justify-between items-center">
+                                 <h3 className="font-bold text-lg text-gray-900">{t('table_risk_report')}</h3>
+                                 <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-bold">AI Generated</span>
+                             </div>
+                             <table className="w-full text-sm text-left">
+                                 <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                                     <tr>
+                                         <th className="px-6 py-4">{t('form_sn')}</th>
+                                         <th className="px-6 py-4">{t('form_name')}</th>
+                                         <th className="px-6 py-4">{t('risk_score')}</th>
+                                         <th className="px-6 py-4">{t('actions')}</th>
+                                     </tr>
+                                 </thead>
+                                 <tbody className="divide-y divide-gray-100">
+                                     {analyticsData.riskData.map(asset => (
+                                         <tr key={asset.asset_id} className="hover:bg-gray-50">
+                                             <td className="px-6 py-4 font-mono text-xs">{asset.asset_id}</td>
+                                             <td className="px-6 py-4 font-bold text-gray-900">{asset.name}</td>
+                                             <td className="px-6 py-4">
+                                                 <div className="flex items-center gap-2">
+                                                     <div className="w-full bg-gray-200 rounded-full h-2 max-w-[100px]">
+                                                         <div 
+                                                            className={`h-2 rounded-full ${asset.risk_score > 70 ? 'bg-danger' : asset.risk_score > 40 ? 'bg-warning' : 'bg-success'}`}
+                                                            style={{width: `${asset.risk_score}%`}}
+                                                         ></div>
+                                                     </div>
+                                                     <span className="font-bold text-xs">{asset.risk_score}</span>
+                                                 </div>
+                                             </td>
+                                             <td className="px-6 py-4">
+                                                 <button className="text-xs bg-brand text-white px-3 py-1.5 rounded-lg hover:bg-brand-dark transition-colors">
+                                                     Generate PM
+                                                 </button>
+                                             </td>
+                                         </tr>
+                                     ))}
+                                 </tbody>
+                             </table>
+                        </div>
+                    </div>
+                )}
+                
+                {/* 2. FINANCIAL & COST ANALYSIS */}
+                {activeTab === 'tab_financial' && (
+                    <div className="space-y-6">
+                        <div className="bg-gradient-to-r from-indigo-900 to-blue-900 p-6 rounded-2xl text-white shadow-lg">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-white/10 rounded-xl"><DollarSign size={24}/></div>
+                                <div>
+                                    <h3 className="text-xl font-bold">{t('tco_analysis')}</h3>
+                                    <p className="text-blue-200 text-sm">Analyze asset efficiency, cost ratios, and replacement strategies.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            {/* Scatter Chart: Cost vs Value */}
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4">{t('chart_cost_vs_value')}</h3>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis type="number" dataKey="purchase" name="Purchase Cost" unit="$" tick={{fontSize: 12}} />
+                                            <YAxis type="number" dataKey="maintCost" name="Maint Cost" unit="$" tick={{fontSize: 12}} />
+                                            <ZAxis type="number" dataKey="woCount" range={[50, 400]} name="WO Count" />
+                                            <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{borderRadius: '12px'}} />
+                                            <Legend />
+                                            <Scatter name="Assets" data={analyticsData.financialAnalysis} fill="#8884d8">
+                                                {analyticsData.financialAnalysis.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.ratio > 0.5 ? '#EF4444' : entry.ratio > 0.3 ? '#F59E0B' : '#10B981'} />
+                                                ))}
+                                            </Scatter>
+                                        </ScatterChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div className="text-xs text-center text-text-muted mt-2">
+                                    X: Purchase Price | Y: Maintenance Cost | Size: Frequency
+                                </div>
+                            </div>
+
+                            {/* Bar Chart: Maintenance Frequency Top 10 */}
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4">{t('chart_freq_vs_cost')}</h3>
+                                <div className="h-80">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart 
+                                            data={analyticsData.financialAnalysis.sort((a,b) => b.woCount - a.woCount).slice(0, 10)}
+                                            layout="vertical"
+                                            margin={{top: 5, right: 30, left: 40, bottom: 5}}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" hide />
+                                            <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}} />
+                                            <Tooltip />
+                                            <Bar dataKey="woCount" fill="#2563EB" radius={[0, 4, 4, 0]} name="WO Count" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Detailed Financial Table */}
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                             <div className="p-4 border-b border-border bg-gray-50">
+                                 <h3 className="font-bold text-lg text-gray-900">{t('table_financial_report')}</h3>
+                             </div>
+                             <div className="overflow-x-auto">
+                                 <table className="w-full text-sm text-left">
+                                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                                         <tr>
+                                             <th className="px-6 py-4">{t('form_name')}</th>
+                                             <th className="px-6 py-4">{t('purchase_price')}</th>
+                                             <th className="px-6 py-4">{t('maint_cost')}</th>
+                                             <th className="px-6 py-4">{t('maint_freq')}</th>
+                                             <th className="px-6 py-4">{t('cost_ratio')}</th>
+                                             <th className="px-6 py-4">{t('recommendation')}</th>
+                                         </tr>
+                                     </thead>
+                                     <tbody className="divide-y divide-gray-100">
+                                         {analyticsData.financialAnalysis.map(item => (
+                                             <tr key={item.id} className="hover:bg-gray-50">
+                                                 <td className="px-6 py-4">
+                                                     <div className="font-bold text-gray-900">{item.name}</div>
+                                                     <div className="text-xs text-text-muted">{item.model}</div>
+                                                 </td>
+                                                 <td className="px-6 py-4 text-gray-600">${item.purchase.toLocaleString()}</td>
+                                                 <td className="px-6 py-4 text-gray-600">${item.maintCost.toLocaleString()}</td>
+                                                 <td className="px-6 py-4">
+                                                     <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-bold text-xs">{item.woCount} Orders</span>
+                                                 </td>
+                                                 <td className="px-6 py-4">
+                                                     <div className="flex items-center gap-2">
+                                                         <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                                             <div className={`h-1.5 rounded-full ${item.ratio > 0.5 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${Math.min(item.ratio * 100, 100)}%`}}></div>
+                                                         </div>
+                                                         <span className="text-xs font-mono">{(item.ratio * 100).toFixed(0)}%</span>
+                                                     </div>
+                                                 </td>
+                                                 <td className="px-6 py-4">
+                                                     {item.ratio > 0.4 ? (
+                                                         <span className="px-2 py-1 bg-red-100 text-red-700 rounded border border-red-200 text-xs font-bold flex items-center gap-1 w-fit">
+                                                             <AlertTriangle size={10}/> {t('replace')}
+                                                         </span>
+                                                     ) : (
+                                                         <span className="px-2 py-1 bg-green-100 text-green-700 rounded border border-green-200 text-xs font-bold flex items-center gap-1 w-fit">
+                                                             <Check size={10}/> {t('repair')}
+                                                         </span>
+                                                     )}
+                                                 </td>
+                                             </tr>
+                                         ))}
+                                     </tbody>
+                                 </table>
+                             </div>
+                        </div>
+                    </div>
+                )}
+                
+                {/* 3. REPORT GENERATOR (CM/PPM) */}
+                {activeTab === 'tab_gen_report' && (
+                    <div className="space-y-6">
+                        {/* Search Specific Job Report */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                             <h3 className="font-bold text-lg mb-4 text-gray-900 flex items-center gap-2">
+                                 <Search className="text-brand"/> Find Job Order Report
+                             </h3>
+                             <div className="flex gap-4">
+                                 <input 
+                                     type="text" 
+                                     placeholder="Enter Job Order ID (e.g. 2236)" 
+                                     className="input-modern"
+                                     value={jobOrderSearchId}
+                                     onChange={(e) => setJobOrderSearchId(e.target.value)}
+                                 />
+                                 <select 
+                                     className="input-modern w-40" 
+                                     value={reportType} 
+                                     onChange={(e) => setReportType(e.target.value as any)}
+                                 >
+                                     <option value="CM">Corrective</option>
+                                     <option value="PPM">Preventive</option>
+                                 </select>
+                                 <button onClick={handleFindJobReport} className="btn-primary whitespace-nowrap">
+                                     View Report
+                                 </button>
+                             </div>
+                        </div>
+
+                        {/* Batch Reports */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                            <h3 className="font-bold text-lg mb-4 text-gray-900">{t('gen_report')}</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">{t('report_type')}</label>
+                                    <div className="flex flex-col gap-2">
+                                        <label className="flex items-center gap-2 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+                                            <input type="radio" name="rptType" checked={reportType === 'CM'} onChange={() => setReportType('CM')} className="text-brand"/>
+                                            <span className="font-medium">{t('cm_report')}</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 p-3 border rounded-xl cursor-pointer hover:bg-gray-50">
+                                            <input type="radio" name="rptType" checked={reportType === 'PPM'} onChange={() => setReportType('PPM')} className="text-brand"/>
+                                            <span className="font-medium">{t('ppm_report')}</span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">{t('date_range')}</label>
+                                        <div className="flex gap-2">
+                                            <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className="input-modern"/>
+                                            <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className="input-modern"/>
+                                        </div>
+                                    </div>
+                                    <button className="w-full btn-primary mt-4">
+                                        <Download size={18}/> {t('download_pdf')}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                {/* 4. KNOWLEDGE BASE */}
+                {activeTab === 'tab_kb' && (
+                    <div className="space-y-6">
+                        <div className="flex gap-4 border-b border-border pb-1">
+                             <button 
+                                onClick={() => setKbMode('list')}
+                                className={`pb-3 px-2 font-bold text-sm transition-all ${kbMode === 'list' ? 'text-brand border-b-2 border-brand' : 'text-text-muted'}`}
+                             >
+                                 <Library className="inline mr-2" size={16}/> {t('kb_library')}
+                             </button>
+                             <button 
+                                onClick={() => setKbMode('ai')}
+                                className={`pb-3 px-2 font-bold text-sm transition-all ${kbMode === 'ai' ? 'text-brand border-b-2 border-brand' : 'text-text-muted'}`}
+                             >
+                                 <BrainCircuit className="inline mr-2" size={16}/> {t('kb_ai_search')}
+                             </button>
+                        </div>
+                        
+                        {kbMode === 'list' ? (
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <div className="relative mb-6">
+                                    <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
+                                    <input 
+                                        type="text" 
+                                        className="input-modern pl-10" 
+                                        placeholder="Search manuals, guides..."
+                                        value={kbSearch}
+                                        onChange={(e) => setKbSearch(e.target.value)}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {filteredKbDocs.map(doc => (
+                                        <div key={doc.id} className="p-4 border border-border rounded-xl hover:shadow-md transition-all group cursor-pointer bg-gray-50 hover:bg-white">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-white rounded-lg border border-gray-200 group-hover:border-brand/30">
+                                                        <Book className="text-brand" size={20}/>
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-gray-900 group-hover:text-brand transition-colors line-clamp-1">{doc.title}</h4>
+                                                        <p className="text-xs text-text-muted">{doc.category} • {doc.type}</p>
+                                                    </div>
+                                                </div>
+                                                <Download size={16} className="text-gray-400 group-hover:text-brand"/>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft min-h-[400px]">
+                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                                    <Sparkles className="text-violet-500"/> {t('ai_search_title')}
+                                </h3>
+                                <div className="flex gap-2 mb-6">
+                                    <input 
+                                        type="text" 
+                                        className="input-modern"
+                                        placeholder={t('ai_search_placeholder')}
+                                        value={aiQuery}
+                                        onChange={(e) => setAiQuery(e.target.value)}
+                                    />
+                                    <button 
+                                        onClick={handleAiSearch}
+                                        disabled={!aiQuery || isAiSearching}
+                                        className="btn-primary bg-violet-600 hover:bg-violet-700 shadow-violet-200 disabled:opacity-70"
+                                    >
+                                        {isAiSearching ? t('analyzing') : t('btn_analyze')}
+                                    </button>
+                                </div>
+                                
+                                {aiResult && (
+                                    <div className="animate-in fade-in slide-in-from-bottom-4 space-y-4">
+                                        <div className="p-4 bg-violet-50 rounded-xl border border-violet-100">
+                                            <h4 className="font-bold text-violet-900 text-sm mb-2 flex items-center gap-2"><Lightbulb size={16}/> {t('ai_explanation')}</h4>
+                                            <p className="text-sm text-gray-800 leading-relaxed">{aiResult.explanation}</p>
+                                        </div>
+                                        
+                                        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                                            <h4 className="font-bold text-emerald-900 text-sm mb-2 flex items-center gap-2"><CheckCircle2 size={16}/> {t('ai_solution')}</h4>
+                                            <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{aiResult.solution}</p>
+                                        </div>
+
+                                        {aiResult.relevantDocs.length > 0 && (
+                                            <div className="mt-4">
+                                                <h4 className="font-bold text-gray-900 text-sm mb-3">{t('ai_ref_docs')}</h4>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {aiResult.relevantDocs.map((docTitle, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                                                            <BookOpen size={14} className="text-text-muted"/>
+                                                            {docTitle}
+                                                            <ArrowRight size={14} className="ml-auto text-gray-400"/>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    }
+    
+    // ... (Other views fallback)
     if (currentView === 'dashboard') {
-        // ... (Keep Dashboard render)
+        // ... (Dashboard JSX)
         return (
             <div className="space-y-6 animate-in fade-in">
                  {/* Header */}
@@ -608,227 +1071,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     </div>
                 </div>
-                {/* KPI Cards... (Keep existing) */}
             </div>
         );
     }
-    
-    // ... (Assets, Maintenance, Inventory, Calibration, Analysis, Users - Keep same)
-    
-    // 8. RFID & AUDIT (Updated)
-    if (currentView === 'rfid') {
-        return (
-            <div className="space-y-6 animate-in fade-in">
-                {/* Header with Switch */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Radio className="text-brand"/> {t('nav_rfid')}</h2>
-                        <div className={`px-3 py-1 rounded-full flex items-center gap-2 text-xs font-bold ${zebraStatus === 'listening' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                            <Bluetooth size={14} />
-                            {zebraStatus === 'listening' ? t('zebra_connected') : t('connect_zebra')}
-                        </div>
-                    </div>
-                    <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-                         <button onClick={() => setRfidTab('audit')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${rfidTab === 'audit' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}>{t('rfid_audit')}</button>
-                         <button onClick={() => setRfidTab('gate')} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${rfidTab === 'gate' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}>{t('rfid_gate_monitor')}</button>
-                    </div>
-                </div>
-                
-                {rfidTab === 'audit' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Control Panel */}
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
-                            <h3 className="font-bold text-lg mb-4">{t('start_audit')}</h3>
-                            {!activeAudit ? (
-                                <div className="space-y-4">
-                                    <select className="input-modern" value={selectedAuditDept} onChange={e => setSelectedAuditDept(e.target.value)}>
-                                        <option value="">Select Department...</option>
-                                        {departmentZones.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                                    </select>
-                                    <button onClick={startAudit} className="w-full btn-primary">{t('start_audit')}</button>
-                                </div>
-                            ) : (
-                                <div className="space-y-6 text-center">
-                                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto transition-all ${zebraStatus === 'processing' ? 'bg-green-500 text-white scale-110' : 'bg-blue-50 text-brand animate-pulse'}`}>
-                                        <Scan size={32}/>
-                                    </div>
-                                    <h4 className="font-bold text-xl">{t('audit_in_progress')}</h4>
-                                    <p className="text-sm text-text-muted">{activeAudit.department}</p>
-                                    
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-3 bg-gray-50 rounded-xl">
-                                            <div className="text-2xl font-bold">{activeAudit.total_expected}</div>
-                                            <div className="text-xs text-text-muted">{t('expected_assets')}</div>
-                                        </div>
-                                        <div className="p-3 bg-green-50 rounded-xl text-green-700">
-                                            <div className="text-2xl font-bold">{activeAudit.total_scanned}</div>
-                                            <div className="text-xs font-bold">{t('scanned_assets')}</div>
-                                        </div>
-                                    </div>
 
-                                    <button onClick={simulateRfidScan} className="w-full py-3 border-2 border-dashed border-gray-300 hover:border-brand rounded-xl font-bold text-gray-500 hover:text-brand transition">
-                                        {t('simulate_scan')}
-                                    </button>
-
-                                    <button onClick={() => setActiveAudit(null)} className="text-red-500 text-sm font-bold hover:underline">Stop Audit</button>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Audit List */}
-                        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                             <div className="p-4 border-b bg-gray-50 flex justify-between">
-                                 <h3 className="font-bold">{t('audit_summary')}</h3>
-                                 {activeAudit && <span className="text-xs bg-brand text-white px-2 py-1 rounded font-bold">{((activeAudit.total_scanned / activeAudit.total_expected) * 100).toFixed(0)}% Complete</span>}
-                             </div>
-                             {activeAudit ? (
-                                 <div className="max-h-[500px] overflow-y-auto p-4 space-y-2">
-                                     {/* Missing Assets First */}
-                                     {activeAudit.missing_assets.map(id => {
-                                         const asset = assets.find(a => a.asset_id === id);
-                                         return (
-                                             <div key={id} className="flex justify-between items-center p-3 border border-red-100 bg-red-50/50 rounded-xl">
-                                                 <div className="flex items-center gap-3">
-                                                     <div className="w-2 h-2 rounded-full bg-red-400"></div>
-                                                     <div>
-                                                         <div className="font-bold text-gray-900">{asset?.name}</div>
-                                                         <div className="text-xs text-red-500 font-bold">{t('missing_assets')}</div>
-                                                     </div>
-                                                 </div>
-                                                 <span className="font-mono text-xs text-gray-400">{id}</span>
-                                             </div>
-                                         )
-                                     })}
-                                     {/* Found Assets */}
-                                     {activeAudit.found_assets.map(id => {
-                                         const asset = assets.find(a => a.asset_id === id);
-                                         return (
-                                             <div key={id} className="flex justify-between items-center p-3 border border-green-100 bg-green-50/50 rounded-xl opacity-60 animate-in slide-in-from-left">
-                                                 <div className="flex items-center gap-3">
-                                                     <Check size={16} className="text-green-600"/>
-                                                     <div>
-                                                         <div className="font-bold text-gray-900">{asset?.name}</div>
-                                                         <div className="text-xs text-green-600 font-bold">Verified</div>
-                                                     </div>
-                                                 </div>
-                                                 <span className="font-mono text-xs text-gray-400">{id}</span>
-                                             </div>
-                                         )
-                                     })}
-                                 </div>
-                             ) : (
-                                 <div className="p-12 text-center text-gray-400">Start an audit session to verify inventory.</div>
-                             )}
-                        </div>
-                    </div>
-                )}
-
-                {/* GATE MONITOR (REAL-TIME STATIC READERS) */}
-                {rfidTab === 'gate' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* LEFT: STATUS PANEL */}
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[600px] flex flex-col space-y-6">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-bold text-gray-900">{t('reader_status')}</h3>
-                                <div className={`w-3 h-3 rounded-full ${isGateMonitoring ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
-                            </div>
-
-                            <button 
-                                onClick={() => setIsGateMonitoring(!isGateMonitoring)}
-                                className={`w-full py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${isGateMonitoring ? 'bg-red-50 text-red-600 hover:bg-red-100' : 'bg-brand text-white shadow-lg shadow-brand/20'}`}
-                            >
-                                <Wifi size={20}/>
-                                {isGateMonitoring ? t('deactivate_gates') : t('activate_gates')}
-                            </button>
-                            
-                            <div className="space-y-3 flex-1 overflow-y-auto">
-                                {gateReaders.map(reader => (
-                                    <div key={reader.id} className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                        <div className="flex justify-between items-center mb-1">
-                                            <span className="font-bold text-sm text-gray-800">{reader.name}</span>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${reader.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-500'}`}>
-                                                {reader.status === 'online' ? t('reader_online') : t('reader_offline')}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-text-muted font-mono">
-                                            <span>ID: {reader.id}</span>
-                                            <span>Ping: {reader.lastPing || '--:--'}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            {/* Manual Override */}
-                            <div className="p-4 border-t border-gray-100">
-                                <p className="text-xs text-gray-400 mb-2">Simulate Manual Passage (Test)</p>
-                                <button onClick={simulateGatePassage} disabled={!isGateMonitoring} className="w-full btn-secondary text-xs disabled:opacity-50">
-                                    Test Single Pass
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* RIGHT: LIVE FEED */}
-                        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden h-[600px] flex flex-col">
-                             <div className="p-4 border-b bg-gray-50 font-bold text-lg flex items-center gap-2">
-                                <MonitorCheck size={20} className="text-brand"/> {t('live_gate_feed')}
-                             </div>
-                             
-                             {!isGateMonitoring && gateLogs.length === 0 ? (
-                                 <div className="flex-1 flex flex-col items-center justify-center text-gray-400 opacity-60">
-                                     <Radio size={48} className="mb-4"/>
-                                     <p>{t('gate_network_inactive')}</p>
-                                     <p className="text-xs">Activate monitoring to see real-time events.</p>
-                                 </div>
-                             ) : (
-                                 <div className="flex-1 overflow-y-auto p-4 space-y-3 relative">
-                                     {gateLogs.length === 0 ? (
-                                         <div className="text-center text-gray-400 mt-20">Monitoring... Waiting for tags.</div>
-                                     ) : (
-                                         gateLogs.map(log => {
-                                             const asset = assets.find(a => a.asset_id === log.asset_id);
-                                             // Determine if unauthorized: E.g., moving 'EXIT' from assigned department?
-                                             const assetLoc = getLocations().find(l => l.location_id === asset?.location_id);
-                                             const isUnauthorized = false; // Logic simplified for simulation
-
-                                             return (
-                                                 <div key={log.id} className={`flex items-center justify-between p-3 border rounded-xl animate-in slide-in-from-top duration-300 ${isUnauthorized ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
-                                                     <div className="flex items-center gap-4">
-                                                         <div className={`p-3 rounded-lg ${log.direction === 'ENTER' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                             {log.direction === 'ENTER' ? <LogIn size={20}/> : <LogOut size={20}/>}
-                                                         </div>
-                                                         <div>
-                                                             <div className="font-bold text-gray-900">{asset?.name} <span className="text-gray-400 font-normal text-xs">({asset?.model})</span></div>
-                                                             <div className="text-xs text-text-muted flex items-center gap-1">
-                                                                 <MapPin size={10}/> {gateReaders.find(r => r.id === log.gate_location_id)?.name || 'Unknown Gate'}
-                                                             </div>
-                                                         </div>
-                                                     </div>
-                                                     <div className="text-right">
-                                                         {isUnauthorized ? (
-                                                             <div className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded flex items-center gap-1">
-                                                                 <ShieldAlert size={12}/> {t('unauth_move')}
-                                                             </div>
-                                                         ) : (
-                                                             <div className={`text-xs font-bold ${log.direction === 'ENTER' ? 'text-green-600' : 'text-blue-600'}`}>
-                                                                 {log.direction}
-                                                             </div>
-                                                         )}
-                                                         <div className="text-[10px] font-mono text-gray-400 mt-1">{new Date(log.timestamp).toLocaleTimeString()}</div>
-                                                     </div>
-                                                 </div>
-                                             )
-                                         })
-                                     )}
-                                 </div>
-                             )}
-                        </div>
-                    </div>
-                )}
-            </div>
-        )
-    }
-
-    // Default Fallback
     if (currentView === 'users') {
         // ... (Keep Users render)
         return (
@@ -890,3 +1136,4 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     return <div>View not found</div>;
 };
+    
