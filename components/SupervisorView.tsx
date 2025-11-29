@@ -6,7 +6,7 @@ import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getD
 import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
-import { useZebraScanner } from '../services/zebraService'; // Import the new service
+import { useZebraScanner } from '../services/zebraService';
 import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -114,27 +114,22 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // ZEBRA SCANNER INTEGRATION
     const handleScannerInput = (scannedTag: string) => {
-        // If in Audit Mode
         if (rfidTab === 'audit' && activeAudit) {
             handleRealScan(scannedTag);
-        }
-        // If in Gate Mode - treat manual scan as an override or test
-        else if (rfidTab === 'gate') {
-            handleGateScan(scannedTag, 101); // Default to ICU gate for manual
+        } else if (rfidTab === 'gate') {
+            handleGateScan(scannedTag, 101);
         }
     };
 
-    // Activate scanner listener only when RFID view is open
     const { status: zebraStatus, lastScanned: lastZebraScan } = useZebraScanner({
         onScan: handleScannerInput,
         isActive: currentView === 'rfid'
     });
 
-    // --- DATA MEMOIZATION ---
+    // --- DATA MEMOIZATION & EFFECTS ---
     const kbDocuments = useMemo(() => getKnowledgeBaseDocs(), []);
     const filteredKbDocs = kbDocuments.filter(doc => doc.title.toLowerCase().includes(kbSearch.toLowerCase()));
     
-    // Risk Calculation Simulation
     useEffect(() => {
         const movementLogs = getMovementLogs();
         assets.forEach(asset => {
@@ -143,7 +138,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         });
     }, [assets, workOrders]);
 
-    // View Switching Logic
     useEffect(() => { 
         if (currentView === 'analysis') setActiveTab('tab_analytics'); 
         else setActiveTab('tab1'); 
@@ -156,7 +150,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (currentView !== 'rfid') setIsGateMonitoring(false);
     }, [currentView]);
 
-    // Simulation Loop (Dashboard Traffic)
     useEffect(() => { 
         let interval: NodeJS.Timeout; 
         if (isSimulationActive && currentView === 'dashboard') { 
@@ -177,26 +170,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
 
-    // --- REAL-TIME GATE SIMULATION LOOP ---
     useEffect(() => {
         let interval: NodeJS.Timeout;
         if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
-            // Set Readers Online
             setGateReaders(prev => prev.map(r => ({ ...r, status: 'online', lastPing: new Date().toLocaleTimeString() })));
-            
             interval = setInterval(() => {
-                // 1. Pick a random gate
                 const randomReader = gateReaders[Math.floor(Math.random() * gateReaders.length)];
-                
-                // 2. Pick a random asset
                 const randomAsset = assets[Math.floor(Math.random() * assets.length)];
-                
-                // 3. Determine if unauthorized (Simplified: If asset's designated department != gate's department)
-                // For this sim, we'll just check if it's moving
-                
                 const direction = Math.random() > 0.5 ? 'ENTER' : 'EXIT';
-                
-                // 4. Create Log
                 const newLog: RfidGateLog = {
                     id: Date.now(),
                     asset_id: randomAsset.asset_id,
@@ -205,32 +186,19 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     direction: direction,
                     timestamp: new Date().toISOString()
                 };
-                
-                setGateLogs(prev => [newLog, ...prev.slice(0, 49)]); // Keep last 50
-                
-                // 5. Trigger alert if 'EXIT' from ICU/OR for critical device
-                if (direction === 'EXIT' && (randomAsset.model.includes('Ventilator') || randomAsset.model.includes('Defib'))) {
-                     // Add alert logic here if desired
-                }
-
-                // Update ping
+                setGateLogs(prev => [newLog, ...prev.slice(0, 49)]);
                 setGateReaders(prev => prev.map(r => r.id === randomReader.id ? { ...r, lastPing: new Date().toLocaleTimeString() } : r));
-
-            }, 3500); // New event every 3.5 seconds
+            }, 3500); 
         } else {
-             // Set Readers Offline
              setGateReaders(prev => prev.map(r => ({ ...r, status: 'offline' })));
         }
         return () => clearInterval(interval);
     }, [isGateMonitoring, currentView, rfidTab, assets]);
 
 
-    // Analytics Calculations
+    // Analytics Calculations (Reused from previous)
     const analyticsData = useMemo(() => {
-        // ... (Existing Analytics Calculations - kept same)
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
-        
-        // MTTR Trend
         const mttrByMonth: {[key: string]: {total: number, count: number}} = {};
         closedWOs.forEach(wo => { 
             const month = new Date(wo.close_time!).toLocaleString('default', { month: 'short' }); 
@@ -241,349 +209,73 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         });
         const mttrTrend = Object.keys(mttrByMonth).map(m => ({ month: m, hours: parseFloat((mttrByMonth[m].total / mttrByMonth[m].count / (1000 * 60 * 60)).toFixed(1)) })).slice(0, 6);
         
-        // Tech Performance
-        const techStats: {[key: string]: {count: number, totalTime: number, totalRating: number, ratingCount: number, firstFix: number}} = {};
-        workOrders.filter(wo => wo.status === 'Closed').forEach(wo => {
-            const techId = wo.assigned_to_id;
-            if (!techStats[techId]) techStats[techId] = { count: 0, totalTime: 0, totalRating: 0, ratingCount: 0, firstFix: 0 };
-            techStats[techId].count += 1;
-            if (wo.start_time && wo.close_time) {
-                techStats[techId].totalTime += (new Date(wo.close_time).getTime() - new Date(wo.start_time).getTime());
-            }
-            if (wo.nurse_rating) { techStats[techId].totalRating += wo.nurse_rating; techStats[techId].ratingCount += 1; }
-            if (wo.is_first_time_fix) { techStats[techId].firstFix += 1; }
-        });
-
-        const techPerformance = Object.keys(techStats).map(id => {
-            const user = users.find(u => u.user_id === parseInt(id));
-            const stats = techStats[id];
-            return {
-                id: id,
-                name: user ? user.name : `Tech ${id}`,
-                woCount: stats.count,
-                avgMttr: parseFloat((stats.totalTime / stats.count / (1000 * 60 * 60)).toFixed(1)),
-                avgRating: stats.ratingCount > 0 ? (stats.totalRating / stats.ratingCount).toFixed(1) : 'N/A',
-                ftfr: ((stats.firstFix / stats.count) * 100).toFixed(0) + '%'
-            };
-        });
-
         const statusData = [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length, color: '#10B981' }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length, color: '#EF4444' }, { name: 'Maint.', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length, color: '#F59E0B' } ];
         const riskData = [...assets].sort((a,b) => b.risk_score - a.risk_score).slice(0, 10);
         
-        const tcoData = [...assets]
-            .filter(a => a.purchase_cost && a.accumulated_maintenance_cost)
-            .sort((a,b) => (b.accumulated_maintenance_cost || 0) - (a.accumulated_maintenance_cost || 0))
-            .slice(0, 5)
-            .map(a => ({
-                name: a.name,
-                purchase: a.purchase_cost || 0,
-                maintenance: a.accumulated_maintenance_cost || 0,
-                recommendation: (a.accumulated_maintenance_cost || 0) > ((a.purchase_cost || 0) * 0.4) ? 'Replace' : 'Keep'
-            }));
+        const tcoData = [...assets].filter(a => a.purchase_cost).sort((a,b) => (b.accumulated_maintenance_cost || 0) - (a.accumulated_maintenance_cost || 0)).slice(0, 5);
 
-        // Financial & Frequency Analysis Data
         const financialAnalysis = assets.map(a => {
             const woCount = workOrders.filter(w => w.asset_id === a.asset_id || w.asset_id === a.nfc_tag_id).length;
             const maintCost = a.accumulated_maintenance_cost || 0;
-            const purchase = a.purchase_cost || 1; // avoid div by zero
+            const purchase = a.purchase_cost || 1; 
             return {
-                id: a.asset_id,
-                name: a.name,
-                model: a.model,
-                purchase: purchase,
-                maintCost: maintCost,
-                woCount: woCount,
-                ratio: parseFloat((maintCost / purchase).toFixed(2))
+                id: a.asset_id, name: a.name, model: a.model, purchase: purchase, maintCost: maintCost, woCount: woCount, ratio: parseFloat((maintCost / purchase).toFixed(2))
             };
         }).sort((a,b) => b.ratio - a.ratio);
 
-        return { mttrTrend, techPerformance, statusData, riskData, tcoData, financialAnalysis };
+        return { mttrTrend, statusData, riskData, tcoData, financialAnalysis };
     }, [assets, workOrders, users]);
 
     // --- HANDLERS ---
-    const triggerNotification = () => {
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 3000);
-    };
-
-    // (Existing handlers kept same...)
-    const handleAiSearch = async () => {
-        if(!aiQuery) return;
-        setIsAiSearching(true);
-        setAiResult(null);
-        const availableTitles = kbDocuments.map(d => d.title);
-        const result = await searchKnowledgeBase(aiQuery, availableTitles, language);
-        setAiResult(result);
-        setIsAiSearching(false);
-    };
-
-    const handleAddSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        const asset: Asset = {
-            asset_id: newAssetForm.asset_id || `NFC-${Math.floor(Math.random() * 10000)}`,
-            name: newAssetForm.name,
-            model: newAssetForm.model,
-            location_id: Number(newAssetForm.location_id),
-            status: AssetStatus.RUNNING,
-            purchase_date: newAssetForm.purchase_date,
-            operating_hours: 0,
-            risk_score: 0,
-            last_calibration_date: newAssetForm.purchase_date,
-            next_calibration_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-            image: newAssetForm.image || 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
-        };
-        onAddAsset(asset);
-        setIsAddModalOpen(false);
-        setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
-    };
-
-    const handleAddUserSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!onAddUser) return;
-        const newUser: User = {
-            user_id: Math.floor(Math.random() * 100000),
-            name: newUserForm.name,
-            email: newUserForm.email,
-            role: newUserForm.role,
-            phone_number: newUserForm.phone,
-            password: newUserForm.password,
-            department: newUserForm.department,
-            digital_signature: newUserForm.signature,
-            location_id: 101
-        };
-        onAddUser(newUser);
-        setIsAddUserModalOpen(false);
-        refreshData();
-        setNewUserForm({ name: '', email: '', phone: '', password: '', role: UserRole.TECHNICIAN, department: '', signature: '' });
-    };
-
-    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => { setNewAssetForm(prev => ({ ...prev, image: reader.result as string })); };
-            reader.readAsDataURL(file);
-        }
-    };
-
+    const triggerNotification = () => { setShowToast(true); setTimeout(() => setShowToast(false), 3000); };
+    const handleAiSearch = async () => { if(!aiQuery) return; setIsAiSearching(true); setAiResult(null); const result = await searchKnowledgeBase(aiQuery, kbDocuments.map(d=>d.title), language); setAiResult(result); setIsAiSearching(false); };
+    const handleAddSubmit = (e: React.FormEvent) => { e.preventDefault(); onAddAsset({...newAssetForm, location_id: Number(newAssetForm.location_id)} as any); setIsAddModalOpen(false); setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' }); };
+    const handleAddUserSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!onAddUser) return; onAddUser({...newUserForm, user_id: Date.now(), location_id: 101} as User); setIsAddUserModalOpen(false); refreshData(); setNewUserForm({ name: '', email: '', phone: '', password: '', role: UserRole.TECHNICIAN, department: '', signature: '' }); };
+    const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setNewAssetForm(prev => ({ ...prev, image: reader.result as string })); }; reader.readAsDataURL(file); } };
     const initiateRestock = (part: InventoryPart) => { setSelectedPartForRestock(part); setRestockAmount(''); setRestockModalOpen(true); };
     const handleRestockPreCheck = () => { const qty = parseInt(restockAmount); if (!qty || qty <= 0) return; if (qty > 50) { setConfirmRestockOpen(true); } else { submitRestock(); } };
     const submitRestock = async () => { if (selectedPartForRestock && restockAmount) { await api.restockPart(selectedPartForRestock.part_id, parseInt(restockAmount)); refreshData(); setRestockModalOpen(false); setConfirmRestockOpen(false); setRestockAmount(''); setSelectedPartForRestock(null); } };
+    const handleCreateWOSubmit = async (e: React.FormEvent) => { e.preventDefault(); await api.createWorkOrder({ wo_id: Math.floor(Math.random() * 100000), asset_id: newWOForm.assetId, type: newWOForm.type, priority: newWOForm.priority, description: newWOForm.description, assigned_to_id: parseInt(newWOForm.assignedToId), status: 'Open', created_at: new Date().toISOString() }); refreshData(); setIsCreateWOModalOpen(false); setNewWOForm({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' }); };
+    const handleSmartAssign = () => { if (!selectedWOForAssignment) return; const asset = assets.find(a => a.asset_id === selectedWOForAssignment.asset_id || a.nfc_tag_id === selectedWOForAssignment.asset_id); const techs = users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER); if (asset) { const recommendations = recommendTechnicians(asset, techs, workOrders); setRecommendedTechs(recommendations); if (recommendations.length > 0) setSelectedTechForAssignment(recommendations[0].user.user_id.toString()); } };
+    const handleAssignSubmit = async (e: React.FormEvent) => { e.preventDefault(); if (selectedWOForAssignment && selectedTechForAssignment) { await api.assignWorkOrder(selectedWOForAssignment.wo_id, parseInt(selectedTechForAssignment)); triggerNotification(); refreshData(); setIsAssignModalOpen(false); setSelectedWOForAssignment(null); } };
+    const handleUpdateCalibration = async (e: React.FormEvent) => { e.preventDefault(); if (assetToCalibrate) { const nextCal = new Date(newCalibrationDate); nextCal.setFullYear(nextCal.getFullYear() + 1); await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]); refreshData(); setUpdateCalibrationModalOpen(false); setAssetToCalibrate(null); } };
+    const handleFindJobReport = async () => { if (reportType === 'PPM') { const report = await api.fetchPMReport(jobOrderSearchId || '5002'); if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.'); } else { if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]); else alert('Job Order Report not found. Try 2236.'); } };
+    const startAudit = () => { if(!selectedAuditDept) return alert("Select a department"); const expected = getAssetsInZone(selectedAuditDept); setActiveAudit({ id: Date.now(), date: new Date().toISOString(), department: selectedAuditDept, total_expected: expected.length, total_scanned: 0, missing_assets: expected.map(a => a.asset_id), found_assets: [], status: 'In Progress' }); };
+    const handleRealScan = (scannedId: string) => { if(!activeAudit) return; const cleanId = scannedId.trim(); if (activeAudit.missing_assets.includes(cleanId)) { setActiveAudit(prev => prev ? { ...prev, total_scanned: prev.total_scanned + 1, missing_assets: prev.missing_assets.filter(id => id !== cleanId), found_assets: [...prev.found_assets, cleanId] } : null); } };
+    const handleGateScan = (scannedId: string, locationId: number) => { const cleanId = scannedId.trim(); const asset = assets.find(a => a.asset_id === cleanId || a.rfid_tag_id === cleanId); if (asset) { setGateLogs(prev => [{ id: Date.now(), asset_id: asset.asset_id, rfid_tag: cleanId, gate_location_id: locationId, direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT', timestamp: new Date().toISOString() }, ...prev]); } };
     
-    const handleCreateWOSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await api.createWorkOrder({
-            wo_id: Math.floor(Math.random() * 100000),
-            asset_id: newWOForm.assetId,
-            type: newWOForm.type,
-            priority: newWOForm.priority,
-            description: newWOForm.description,
-            assigned_to_id: parseInt(newWOForm.assignedToId),
-            status: 'Open',
-            created_at: new Date().toISOString()
-        });
-        refreshData();
-        setIsCreateWOModalOpen(false);
-        setNewWOForm({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
-    };
-
-    const handleSmartAssign = () => {
-        if (!selectedWOForAssignment) return;
-        const asset = assets.find(a => a.asset_id === selectedWOForAssignment.asset_id || a.nfc_tag_id === selectedWOForAssignment.asset_id);
-        const techs = users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER);
-        if (asset) {
-            const recommendations = recommendTechnicians(asset, techs, workOrders);
-            setRecommendedTechs(recommendations);
-            if (recommendations.length > 0) setSelectedTechForAssignment(recommendations[0].user.user_id.toString());
-        }
-    };
-
-    const handleAssignSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (selectedWOForAssignment && selectedTechForAssignment) {
-            await api.assignWorkOrder(selectedWOForAssignment.wo_id, parseInt(selectedTechForAssignment));
-            
-            // Trigger Notification UI
-            console.log(`[UI] Notification triggered for assignment of WO #${selectedWOForAssignment.wo_id}`);
-            triggerNotification();
-
-            refreshData();
-            setIsAssignModalOpen(false);
-            setSelectedWOForAssignment(null);
-        }
-    };
-    
-    const handleUpdateCalibration = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (assetToCalibrate) {
-            const nextCal = new Date(newCalibrationDate);
-            nextCal.setFullYear(nextCal.getFullYear() + 1);
-            await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]);
-            refreshData();
-            setUpdateCalibrationModalOpen(false);
-            setAssetToCalibrate(null);
-        }
-    };
-
-    const handleFindJobReport = async () => {
-        if (reportType === 'PPM') {
-            const report = await api.fetchPMReport(jobOrderSearchId || '5002');
-            if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.');
-        } else {
-            if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]);
-            else alert('Job Order Report not found. Try 2236.');
-        }
-    };
-
-    // RFID HANDLERS
-    const startAudit = () => {
-        if(!selectedAuditDept) return alert("Select a department");
-        const expected = getAssetsInZone(selectedAuditDept);
-        const newAudit: AuditSession = {
-            id: Date.now(),
-            date: new Date().toISOString(),
-            department: selectedAuditDept,
-            total_expected: expected.length,
-            total_scanned: 0,
-            missing_assets: expected.map(a => a.asset_id),
-            found_assets: [],
-            status: 'In Progress'
-        };
-        setActiveAudit(newAudit);
-    };
-
-    const handleRealScan = (scannedId: string) => {
-         if(!activeAudit) return;
-         // Clean scanned ID (sometimes scanners add \r\n)
-         const cleanId = scannedId.trim();
-         
-         // Find if this asset is in missing list
-         if (activeAudit.missing_assets.includes(cleanId)) {
-             setActiveAudit(prev => {
-                if(!prev) return null;
-                return {
-                    ...prev,
-                    total_scanned: prev.total_scanned + 1,
-                    missing_assets: prev.missing_assets.filter(id => id !== cleanId),
-                    found_assets: [...prev.found_assets, cleanId]
-                };
-             });
-         } else {
-             console.log("Unexpected asset scanned:", cleanId);
-         }
-    };
-
-    const simulateRfidScan = () => {
-        if(!activeAudit) return;
-        // Randomly pick a missing asset to "scan"
-        if(activeAudit.missing_assets.length > 0) {
-            handleRealScan(activeAudit.missing_assets[0]);
-        }
-    };
-
-    const handleGateScan = (scannedId: string, locationId: number) => {
-        const cleanId = scannedId.trim();
-        const asset = assets.find(a => a.asset_id === cleanId || a.rfid_tag_id === cleanId);
-        
-        if (asset) {
-            const direction = Math.random() > 0.5 ? 'ENTER' : 'EXIT';
-            const newLog: RfidGateLog = {
-                id: Date.now(),
-                asset_id: asset.asset_id,
-                rfid_tag: cleanId,
-                gate_location_id: locationId, 
-                direction: direction,
-                timestamp: new Date().toISOString()
-            };
-            setGateLogs(prev => [newLog, ...prev]);
-        }
-    };
-
-    const simulateGatePassage = () => {
-        const randomAsset = assets[Math.floor(Math.random() * assets.length)];
-        handleGateScan(randomAsset.rfid_tag_id || randomAsset.asset_id, 101);
-    };
-
     // --- RENDER HELPERS ---
-    const departmentZones = [
-        // ... (Keep existing zones)
-        { id: 'ICU', name: 'Intensive Care', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' },
-        { id: 'Emergency', name: 'ER & Triage', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' },
-        { id: 'Radiology', name: 'Radiology', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' },
-        { id: 'Laboratory', name: 'Laboratory', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' },
-        { id: 'Pharmacy', name: 'Pharmacy', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' },
-        { id: 'Surgery', name: 'OR & Surgery', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' },
-        { id: 'Cardiology', name: 'Cardiology', x: 80, y: 35, width: 15, height: 20, color: 'bg-rose-100' },
-        { id: 'Neurology', name: 'Neurology', x: 10, y: 70, width: 20, height: 20, color: 'bg-purple-100' },
-        { id: 'NICU', name: 'NICU', x: 35, y: 65, width: 15, height: 15, color: 'bg-pink-100' },
-        { id: 'Maternity', name: 'Maternity', x: 55, y: 65, width: 20, height: 20, color: 'bg-fuchsia-100' },
-        { id: 'Dialysis', name: 'Dialysis', x: 80, y: 60, width: 15, height: 15, color: 'bg-cyan-100' },
-        { id: 'Oncology', name: 'Oncology', x: 80, y: 80, width: 15, height: 15, color: 'bg-amber-100' },
-        { id: 'Pediatrics', name: 'Pediatrics', x: 35, y: 85, width: 20, height: 10, color: 'bg-lime-100' },
-        { id: 'Orthopedics', name: 'Orthopedics', x: 60, y: 90, width: 15, height: 10, color: 'bg-orange-100' },
-        { id: 'General Ward', name: 'General Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' },
-    ];
-    
-    const getAssetsInZone = (deptId: string) => {
-        return assets.filter(a => {
-            const loc = getLocations().find(l => l.location_id === a.location_id);
-            return loc?.department === deptId || (loc?.department && loc.department.includes(deptId));
-        });
-    };
-    
+    const departmentZones = [ { id: 'ICU', name: 'Intensive Care', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' }, { id: 'Emergency', name: 'ER & Triage', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' }, { id: 'Radiology', name: 'Radiology', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' }, { id: 'Laboratory', name: 'Laboratory', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' }, { id: 'Pharmacy', name: 'Pharmacy', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' }, { id: 'Surgery', name: 'OR & Surgery', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' }, { id: 'Cardiology', name: 'Cardiology', x: 80, y: 35, width: 15, height: 20, color: 'bg-rose-100' }, { id: 'Neurology', name: 'Neurology', x: 10, y: 70, width: 20, height: 20, color: 'bg-purple-100' }, { id: 'NICU', name: 'NICU', x: 35, y: 65, width: 15, height: 15, color: 'bg-pink-100' }, { id: 'Maternity', name: 'Maternity', x: 55, y: 65, width: 20, height: 20, color: 'bg-fuchsia-100' }, { id: 'Dialysis', name: 'Dialysis', x: 80, y: 60, width: 15, height: 15, color: 'bg-cyan-100' }, { id: 'Oncology', name: 'Oncology', x: 80, y: 80, width: 15, height: 15, color: 'bg-amber-100' }, { id: 'Pediatrics', name: 'Pediatrics', x: 35, y: 85, width: 20, height: 10, color: 'bg-lime-100' }, { id: 'Orthopedics', name: 'Orthopedics', x: 60, y: 90, width: 15, height: 10, color: 'bg-orange-100' }, { id: 'General Ward', name: 'General Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' } ];
+    const getAssetsInZone = (deptId: string) => assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === deptId || (loc?.department && loc.department.includes(deptId)); });
+
     // ---------------- VIEW ROUTING ----------------
 
+    // 1. ASSETS VIEW
     if (currentView === 'assets') {
         if (selectedAsset) {
-            // ASSET DETAILS VIEW
             return (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                     <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold mb-4">
                         <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
                     </button>
-
-                    {/* Header Card */}
                     <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex flex-col md:flex-row gap-6">
                         <div className="w-32 h-32 bg-gray-50 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100 overflow-hidden">
                              {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover" /> : <Package size={40} className="text-gray-400"/>}
                         </div>
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
-                                <div>
-                                    <h2 className="text-2xl font-bold text-gray-900">{selectedAsset.name}</h2>
-                                    <p className="text-text-muted font-medium">{selectedAsset.manufacturer} • {selectedAsset.model}</p>
-                                </div>
-                                <div className={`px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider ${
-                                    selectedAsset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : 
-                                    selectedAsset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'
-                                }`}>
-                                    {selectedAsset.status}
-                                </div>
+                                <div><h2 className="text-2xl font-bold text-gray-900">{selectedAsset.name}</h2><p className="text-text-muted font-medium">{selectedAsset.manufacturer} • {selectedAsset.model}</p></div>
+                                <div className={`px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider ${selectedAsset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : selectedAsset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'}`}>{selectedAsset.status}</div>
                             </div>
-                            
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                                <div className="p-3 bg-gray-50 rounded-xl">
-                                    <div className="text-xs text-text-muted font-bold uppercase">{t('serial_number')}</div>
-                                    <div className="font-mono text-sm font-bold">{selectedAsset.serial_number || 'N/A'}</div>
-                                </div>
-                                <div className="p-3 bg-gray-50 rounded-xl">
-                                    <div className="text-xs text-text-muted font-bold uppercase">{t('location')}</div>
-                                    <div className="text-sm font-bold">{getLocationName(selectedAsset.location_id)}</div>
-                                </div>
-                                <div className="p-3 bg-gray-50 rounded-xl">
-                                    <div className="text-xs text-text-muted font-bold uppercase">{t('warranty_exp')}</div>
-                                    <div className="text-sm font-bold">{selectedAsset.warranty_expiration || 'N/A'}</div>
-                                </div>
-                                <div className="p-3 bg-gray-50 rounded-xl">
-                                    <div className="text-xs text-text-muted font-bold uppercase">{t('risk_score')}</div>
-                                    <div className={`text-sm font-bold ${selectedAsset.risk_score > 70 ? 'text-danger' : 'text-success'}`}>{selectedAsset.risk_score}/100</div>
-                                </div>
+                                <div className="p-3 bg-gray-50 rounded-xl"><div className="text-xs text-text-muted font-bold uppercase">{t('serial_number')}</div><div className="font-mono text-sm font-bold">{selectedAsset.serial_number || 'N/A'}</div></div>
+                                <div className="p-3 bg-gray-50 rounded-xl"><div className="text-xs text-text-muted font-bold uppercase">{t('location')}</div><div className="text-sm font-bold">{getLocationName(selectedAsset.location_id)}</div></div>
+                                <div className="p-3 bg-gray-50 rounded-xl"><div className="text-xs text-text-muted font-bold uppercase">{t('warranty_exp')}</div><div className="text-sm font-bold">{selectedAsset.warranty_expiration || 'N/A'}</div></div>
+                                <div className="p-3 bg-gray-50 rounded-xl"><div className="text-xs text-text-muted font-bold uppercase">{t('risk_score')}</div><div className={`text-sm font-bold ${selectedAsset.risk_score > 70 ? 'text-danger' : 'text-success'}`}>{selectedAsset.risk_score}/100</div></div>
                             </div>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Maintenance History */}
                         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-border shadow-soft">
                             <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><History size={18} className="text-brand"/> {t('maintenance_history')}</h3>
                             <div className="space-y-4">
@@ -592,60 +284,27 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                         const tech = users.find(u => u.user_id === wo.assigned_to_id);
                                         return (
                                             <div key={wo.wo_id} className="p-4 border border-border rounded-xl hover:bg-gray-50 transition flex justify-between items-center">
-                                                <div>
-                                                    <div className="font-bold text-gray-900 text-sm">{wo.description}</div>
-                                                    <div className="text-xs text-text-muted mt-1 flex items-center gap-2">
-                                                        <span className={`w-2 h-2 rounded-full ${wo.status === 'Closed' ? 'bg-success' : 'bg-warning'}`}></span>
-                                                        {new Date(wo.created_at).toLocaleDateString()} • {wo.type}
-                                                    </div>
-                                                </div>
-                                                <div className="text-right text-xs">
-                                                    <div className="font-bold text-gray-700">{tech ? tech.name : `Tech #${wo.assigned_to_id}`}</div>
-                                                    <div className="text-text-muted">#{wo.wo_id}</div>
-                                                </div>
+                                                <div><div className="font-bold text-gray-900 text-sm">{wo.description}</div><div className="text-xs text-text-muted mt-1 flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${wo.status === 'Closed' ? 'bg-success' : 'bg-warning'}`}></span>{new Date(wo.created_at).toLocaleDateString()} • {wo.type}</div></div>
+                                                <div className="text-right text-xs"><div className="font-bold text-gray-700">{tech ? tech.name : `Tech #${wo.assigned_to_id}`}</div><div className="text-text-muted">#{wo.wo_id}</div></div>
                                             </div>
                                         );
                                     })
-                                ) : (
-                                    <div className="text-center text-gray-400 py-8">No maintenance history available.</div>
-                                )}
+                                ) : ( <div className="text-center text-gray-400 py-8">No maintenance history available.</div> )}
                             </div>
                         </div>
-
-                        {/* Calibration & Docs */}
                         <div className="space-y-6">
                             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
                                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Activity size={18} className="text-purple-500"/> Calibration</h3>
                                 <div className="space-y-3">
-                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100">
-                                        <span className="text-sm font-medium text-purple-900">Last Calibrated</span>
-                                        <span className="text-sm font-bold text-purple-700">{selectedAsset.last_calibration_date}</span>
-                                    </div>
-                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100">
-                                        <span className="text-sm font-medium text-purple-900">Next Due</span>
-                                        <span className="text-sm font-bold text-purple-700">{selectedAsset.next_calibration_date}</span>
-                                    </div>
-                                    <div className="pt-2">
-                                        <div className="text-xs font-bold text-text-muted uppercase mb-2">History</div>
-                                        {workOrders.filter(wo => (wo.asset_id === selectedAsset.asset_id || wo.asset_id === selectedAsset.nfc_tag_id) && wo.type === WorkOrderType.CALIBRATION).slice(0, 3).map(wo => (
-                                            <div key={wo.wo_id} className="text-xs flex justify-between py-1 border-b border-gray-100 last:border-0">
-                                                <span>{new Date(wo.created_at).toLocaleDateString()}</span>
-                                                <span className="text-success font-bold">Pass</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100"><span className="text-sm font-medium text-purple-900">Last Calibrated</span><span className="text-sm font-bold text-purple-700">{selectedAsset.last_calibration_date}</span></div>
+                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100"><span className="text-sm font-medium text-purple-900">Next Due</span><span className="text-sm font-bold text-purple-700">{selectedAsset.next_calibration_date}</span></div>
                                 </div>
                             </div>
-                            
                             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
                                 <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BookOpen size={18} className="text-blue-500"/> Documents</h3>
                                 <div className="space-y-2">
                                     {getAssetDocuments(selectedAsset.asset_id).map(doc => (
-                                        <div key={doc.doc_id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer group">
-                                            <FileText size={16} className="text-text-muted group-hover:text-brand"/>
-                                            <span className="text-sm font-medium text-gray-700 group-hover:text-brand truncate">{doc.title}</span>
-                                            <Download size={14} className="ml-auto text-gray-300 group-hover:text-brand"/>
-                                        </div>
+                                        <div key={doc.doc_id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer group"><FileText size={16} className="text-text-muted group-hover:text-brand"/><span className="text-sm font-medium text-gray-700 group-hover:text-brand truncate">{doc.title}</span><Download size={14} className="ml-auto text-gray-300 group-hover:text-brand"/></div>
                                     ))}
                                 </div>
                             </div>
@@ -654,54 +313,300 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 </div>
             );
         }
-
         return (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
                   <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
-                  <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm">
-                      <Plus size={16}/> {t('add_equipment')}
-                  </button>
+                  <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
+                </div>
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">{t('form_name')}</th><th className="px-6 py-4">{t('form_model')}</th><th className="px-6 py-4">{t('serial_number')}</th><th className="px-6 py-4">{t('location')}</th><th className="px-6 py-4">{t('status')}</th><th className="px-6 py-4">{t('actions')}</th></tr></thead>
+                        <tbody className="divide-y divide-gray-100">{assets.map(asset => (<tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors"><td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3"><div className="w-8 h-8 rounded bg-gray-100 border border-gray-200 overflow-hidden shrink-0">{asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package size={16} className="m-auto text-gray-400"/>}</div>{asset.name}</td><td className="px-6 py-4 text-gray-600 font-medium">{asset.model}</td><td className="px-6 py-4 text-gray-500 font-mono text-xs">{asset.serial_number}</td><td className="px-6 py-4 text-text-muted">{getLocationName(asset.location_id)}</td><td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${asset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : asset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'}`}>{asset.status}</span></td><td className="px-6 py-4"><button onClick={() => setSelectedAsset(asset)} className="text-brand font-bold hover:underline text-xs">View Details</button></td></tr>))}</tbody>
+                    </table>
+                </div>
+                {isAddModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_add_title')}</h3>
+                            <form onSubmit={handleAddSubmit} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input className="input-modern" placeholder={t('form_name')} value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} required />
+                                    <input className="input-modern" placeholder={t('form_model')} value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} required />
+                                </div>
+                                <input className="input-modern" placeholder={t('form_sn')} value={newAssetForm.asset_id} onChange={e => setNewAssetForm({...newAssetForm, asset_id: e.target.value})} required />
+                                <select className="input-modern" value={newAssetForm.location_id} onChange={e => setNewAssetForm({...newAssetForm, location_id: parseInt(e.target.value)})}>
+                                    {getLocations().map(l => <option key={l.location_id} value={l.location_id}>{l.building} - {l.department} ({l.room})</option>)}
+                                </select>
+                                <input type="date" className="input-modern" value={newAssetForm.purchase_date} onChange={e => setNewAssetForm({...newAssetForm, purchase_date: e.target.value})} />
+                                <div className="border border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 cursor-pointer relative">
+                                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" onChange={handleImageChange} />
+                                    <UploadCloud size={24} className="mx-auto text-gray-400 mb-2"/>
+                                    <span className="text-sm text-text-muted">{t('form_image')}</span>
+                                    {newAssetForm.image && <img src={newAssetForm.image} className="mt-2 h-16 w-16 object-cover rounded mx-auto border" />}
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_save')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // 2. MAINTENANCE VIEW (RESTORED)
+    if (currentView === 'maintenance') {
+        const filteredWOs = workOrders.filter(wo => {
+            if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
+            if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
+            return true;
+        });
+
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                {/* Header Actions */}
+                <div className="flex flex-wrap gap-4 justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded-lg ${maintenanceViewMode === 'kanban' ? 'bg-brand text-white' : 'text-gray-500 hover:bg-gray-100'}`}><LayoutGrid size={20}/></button>
+                        <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded-lg ${maintenanceViewMode === 'list' ? 'bg-brand text-white' : 'text-gray-500 hover:bg-gray-100'}`}><List size={20}/></button>
+                        <div className="w-px h-6 bg-gray-200 mx-2"></div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500"><Filter size={16}/> <select className="bg-transparent font-medium outline-none" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}><option value="all">All Priorities</option>{Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}</select></div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 ml-4"><Wrench size={16}/> <select className="bg-transparent font-medium outline-none" value={maintenanceFilterType} onChange={e => setMaintenanceFilterType(e.target.value)}><option value="all">All Types</option>{Object.values(WorkOrderType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                    </div>
+                    <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_wo')}</button>
+                </div>
+
+                {maintenanceViewMode === 'kanban' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 overflow-x-auto pb-4">
+                        {['Open', 'In Progress', 'Closed'].map(status => (
+                            <div key={status} className="min-w-[300px] bg-gray-50/50 rounded-2xl p-4 border border-border/50 flex flex-col h-full">
+                                <div className="flex items-center justify-between mb-4 px-2">
+                                    <h3 className="font-bold text-gray-700">{status}</h3>
+                                    <span className="bg-white px-2 py-0.5 rounded-full text-xs font-bold text-gray-500 border border-gray-200">{filteredWOs.filter(wo => (status === 'Open' ? (wo.status === 'Open' || wo.status === 'Assigned') : wo.status === status)).length}</span>
+                                </div>
+                                <div className="space-y-3 flex-1">
+                                    {filteredWOs.filter(wo => (status === 'Open' ? (wo.status === 'Open' || wo.status === 'Assigned') : wo.status === status)).map(wo => {
+                                        const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                                        const tech = users.find(u => u.user_id === wo.assigned_to_id);
+                                        return (
+                                            <div key={wo.wo_id} className="bg-white p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-all group">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${wo.priority === Priority.CRITICAL ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{wo.priority}</span>
+                                                    <span className="text-[10px] text-text-muted">#{wo.wo_id}</span>
+                                                </div>
+                                                <h4 className="font-bold text-sm text-gray-900 mb-1">{asset?.name}</h4>
+                                                <p className="text-xs text-text-muted mb-3 line-clamp-2">{wo.description}</p>
+                                                <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500">{tech ? tech.name[0] : '?'}</div>
+                                                        <span className="text-xs text-gray-600">{tech ? tech.name.split(' ')[0] : 'Unassigned'}</span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        {status === 'Open' && (
+                                                            <button onClick={() => { setSelectedWOForAssignment(wo); setIsAssignModalOpen(true); }} className="p-1.5 text-brand hover:bg-brand/10 rounded" title="Assign">
+                                                                <UserPlus size={14}/>
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }}
+                                                            className="text-xs font-bold text-gray-400 hover:text-brand"
+                                                        >
+                                                            Details
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Asset</th><th className="px-6 py-4">Priority</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Assigned To</th><th className="px-6 py-4">Actions</th></tr></thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {filteredWOs.map(wo => {
+                                    const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                                    const tech = users.find(u => u.user_id === wo.assigned_to_id);
+                                    return (
+                                        <tr key={wo.wo_id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-mono text-xs">#{wo.wo_id}</td>
+                                            <td className="px-6 py-4 font-medium">{asset?.name}</td>
+                                            <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${wo.priority === Priority.CRITICAL ? 'bg-red-100 text-red-700' : 'bg-blue-50 text-blue-700'}`}>{wo.priority}</span></td>
+                                            <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{wo.status}</span></td>
+                                            <td className="px-6 py-4 text-xs">{tech?.name || '-'}</td>
+                                            <td className="px-6 py-4 flex gap-2">
+                                                <button onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }} className="text-brand font-bold text-xs hover:underline">Details</button>
+                                                {(wo.status === 'Open' || wo.status === 'Assigned') && <button onClick={() => { setSelectedWOForAssignment(wo); setIsAssignModalOpen(true); }} className="text-gray-500 font-bold text-xs hover:text-brand">Assign</button>}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* CREATE WO MODAL */}
+                {isCreateWOModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_create_wo')}</h3>
+                            <form onSubmit={handleCreateWOSubmit} className="space-y-4">
+                                <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})} required>
+                                    <option value="">{t('wo_asset')}</option>
+                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name} ({a.asset_id})</option>)}
+                                </select>
+                                <select className="input-modern" value={newWOForm.type} onChange={e => setNewWOForm({...newWOForm, type: e.target.value as WorkOrderType})}>
+                                    {Object.values(WorkOrderType).map(t => <option key={t} value={t}>{t}</option>)}
+                                </select>
+                                <select className="input-modern" value={newWOForm.priority} onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}>
+                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <textarea className="input-modern min-h-[80px]" placeholder={t('wo_description')} value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})} required />
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setIsCreateWOModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_dispatch')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {/* ASSIGN MODAL */}
+                {isAssignModalOpen && selectedWOForAssignment && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="font-bold text-lg mb-4">{t('assign_technician')}</h3>
+                            <div className="mb-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <div className="text-xs text-text-muted font-bold uppercase">Task</div>
+                                <div className="font-bold text-sm text-gray-900">{selectedWOForAssignment.description}</div>
+                            </div>
+                            <form onSubmit={handleAssignSubmit} className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between mb-1">
+                                        <label className="text-sm font-bold text-gray-700">{t('select_tech')}</label>
+                                        <button type="button" onClick={handleSmartAssign} className="text-xs font-bold text-brand flex items-center gap-1 hover:underline"><Sparkles size={12}/> {t('btn_smart_assign')}</button>
+                                    </div>
+                                    <select className="input-modern" value={selectedTechForAssignment} onChange={e => setSelectedTechForAssignment(e.target.value)} required>
+                                        <option value="">Select...</option>
+                                        {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => <option key={u.user_id} value={u.user_id}>{u.name} ({u.role})</option>)}
+                                    </select>
+                                </div>
+                                {recommendedTechs.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="text-xs font-bold text-gray-400 uppercase">AI Recommendations</div>
+                                        {recommendedTechs.slice(0, 2).map(rec => (
+                                            <div key={rec.user.user_id} onClick={() => setSelectedTechForAssignment(rec.user.user_id.toString())} className="p-2 border border-green-200 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition flex justify-between items-center">
+                                                <div><div className="font-bold text-sm text-gray-900">{rec.user.name}</div><div className="text-[10px] text-green-700">{rec.reason}</div></div>
+                                                <div className="text-xs font-bold text-green-600">{rec.score} pts</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex gap-2 pt-2">
+                                    <button type="button" onClick={() => setIsAssignModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_assign_confirm')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+                
+                {/* WORK ORDER DETAILS MODAL */}
+                {isWorkOrderDetailsModalOpen && selectedWorkOrderForDetails && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95">
+                            <div className="bg-gray-50 px-6 py-4 border-b border-border flex justify-between items-center">
+                                <h3 className="font-bold text-lg text-gray-900">Work Order #{selectedWorkOrderForDetails.wo_id} Details</h3>
+                                <button onClick={() => setIsWorkOrderDetailsModalOpen(false)} className="text-gray-400 hover:text-gray-600"><X size={20}/></button>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div><div className="text-xs text-text-muted font-bold uppercase">Status</div><span className={`px-2 py-1 rounded text-xs font-bold ${selectedWorkOrderForDetails.status === 'Closed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedWorkOrderForDetails.status}</span></div>
+                                    <div><div className="text-xs text-text-muted font-bold uppercase">Priority</div><span className={`px-2 py-1 rounded text-xs font-bold ${selectedWorkOrderForDetails.priority === Priority.CRITICAL ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>{selectedWorkOrderForDetails.priority}</span></div>
+                                    <div><div className="text-xs text-text-muted font-bold uppercase">Asset</div><div className="font-bold text-sm">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id || a.nfc_tag_id === selectedWorkOrderForDetails.asset_id)?.name}</div></div>
+                                    <div><div className="text-xs text-text-muted font-bold uppercase">Assigned To</div><div className="font-bold text-sm">{users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}</div></div>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-xl border border-border">
+                                    <div className="text-xs text-text-muted font-bold uppercase mb-1">Description</div>
+                                    <p className="text-sm text-gray-800">{selectedWorkOrderForDetails.description}</p>
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-sm text-gray-900 mb-2 flex items-center gap-2"><Box size={16}/> Parts Used</h4>
+                                    {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 ? (
+                                        <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
+                                            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase"><tr><th className="px-3 py-2 text-left">Part Name</th><th className="px-3 py-2 text-right">Qty</th></tr></thead>
+                                            <tbody>
+                                                {selectedWorkOrderForDetails.parts_used.map((p, i) => {
+                                                    const partDetails = inventory.find(inv => inv.part_id === p.part_id);
+                                                    return (
+                                                        <tr key={i} className="border-t border-border"><td className="px-3 py-2">{partDetails?.part_name || `Part #${p.part_id}`}</td><td className="px-3 py-2 text-right font-mono">{p.quantity}</td></tr>
+                                                    )
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    ) : ( <div className="text-sm text-gray-400 italic">No parts used recorded.</div> )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // 3. INVENTORY VIEW (RESTORED)
+    if (currentView === 'inventory') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_inventory')}</h2>
+                    <div className="flex gap-3">
+                         <div className="bg-red-50 text-danger px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-2 border border-red-100">
+                             <AlertCircle size={14}/> {inventory.filter(i => i.current_stock <= i.min_reorder_level).length} Low Stock
+                         </div>
+                         <button className="btn-primary py-2 px-4 text-sm"><Package size={16}/> {t('btn_order')}</button>
+                    </div>
                 </div>
 
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
                             <tr>
-                                <th className="px-6 py-4">{t('form_name')}</th>
-                                <th className="px-6 py-4">{t('form_model')}</th>
-                                <th className="px-6 py-4">{t('serial_number')}</th>
-                                <th className="px-6 py-4">{t('location')}</th>
+                                <th className="px-6 py-4">{t('part_name')}</th>
+                                <th className="px-6 py-4">{t('stock_level')}</th>
+                                <th className="px-6 py-4">{t('unit_cost')}</th>
                                 <th className="px-6 py-4">{t('status')}</th>
                                 <th className="px-6 py-4">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {assets.map(asset => (
-                                <tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded bg-gray-100 border border-gray-200 overflow-hidden shrink-0">
-                                            {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package size={16} className="m-auto text-gray-400"/>}
+                            {inventory.map(part => (
+                                <tr key={part.part_id} className="hover:bg-gray-50">
+                                    <td className="px-6 py-4 font-bold text-gray-900">{part.part_name}</td>
+                                    <td className="px-6 py-4 font-mono">
+                                        <div className="flex items-center gap-2">
+                                            <span>{part.current_stock}</span>
+                                            <span className="text-xs text-gray-400">/ min {part.min_reorder_level}</span>
                                         </div>
-                                        {asset.name}
                                     </td>
-                                    <td className="px-6 py-4 text-gray-600 font-medium">{asset.model}</td>
-                                    <td className="px-6 py-4 text-gray-500 font-mono text-xs">{asset.serial_number}</td>
-                                    <td className="px-6 py-4 text-text-muted">{getLocationName(asset.location_id)}</td>
+                                    <td className="px-6 py-4 text-gray-600">${part.cost}</td>
                                     <td className="px-6 py-4">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                                            asset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : 
-                                            asset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'
-                                        }`}>
-                                            {asset.status}
-                                        </span>
+                                        {part.current_stock <= part.min_reorder_level ? (
+                                            <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Low Stock</span>
+                                        ) : (
+                                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Good</span>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4">
-                                        <button 
-                                            onClick={() => setSelectedAsset(asset)}
-                                            className="text-brand font-bold hover:underline text-xs"
-                                        >
-                                            View Details
+                                        <button onClick={() => initiateRestock(part)} className="text-brand font-bold text-xs hover:underline flex items-center gap-1">
+                                            <RefreshCw size={12}/> {t('btn_restock')}
                                         </button>
                                     </td>
                                 </tr>
@@ -709,6 +614,115 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </tbody>
                     </table>
                 </div>
+
+                {/* Restock Modal */}
+                {restockModalOpen && selectedPartForRestock && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}</h3>
+                            <div className="mb-4">
+                                <div className="text-sm text-gray-600 mb-1">{selectedPartForRestock.part_name}</div>
+                                <div className="text-xs text-text-muted">Current: {selectedPartForRestock.current_stock}</div>
+                            </div>
+                            <input type="number" className="input-modern mb-4" placeholder={t('restock_qty')} value={restockAmount} onChange={e => setRestockAmount(e.target.value)} />
+                            <div className="flex gap-2">
+                                <button onClick={() => setRestockModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                <button onClick={handleRestockPreCheck} className="flex-1 btn-primary">{t('restock_btn')}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
+                {/* Confirmation Large Restock */}
+                {confirmRestockOpen && (
+                     <div className="fixed inset-0 bg-gray-900/60 z-[60] flex items-center justify-center p-4">
+                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm border-l-4 border-warning">
+                             <h3 className="font-bold text-lg mb-2 text-warning-dark flex items-center gap-2"><AlertTriangle size={20}/> {t('confirm_large_restock_title')}</h3>
+                             <p className="text-sm text-gray-600 mb-6">
+                                 {t('confirm_large_restock_msg').replace('{qty}', restockAmount)}
+                             </p>
+                             <div className="flex gap-2">
+                                 <button onClick={() => setConfirmRestockOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                 <button onClick={submitRestock} className="flex-1 btn-primary bg-warning hover:bg-yellow-600 border-none text-white">Confirm</button>
+                             </div>
+                         </div>
+                     </div>
+                )}
+            </div>
+        );
+    }
+    
+    // 4. CALIBRATION VIEW (RESTORED)
+    if (currentView === 'calibration') {
+        const overdueAssets = assets.filter(a => new Date(a.next_calibration_date || '') < new Date());
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('cal_dashboard')}</h2>
+                    <div className="flex gap-2">
+                        <div className="px-4 py-2 bg-purple-50 text-purple-700 rounded-xl font-bold text-sm border border-purple-100 flex items-center gap-2">
+                            <Activity size={16}/> {overdueAssets.length} {t('cal_overdue')}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <div className="p-4 border-b border-border bg-gray-50 flex justify-between items-center">
+                            <h3 className="font-bold text-gray-700">{t('cal_schedule')}</h3>
+                            <input type="text" placeholder="Search..." className="text-xs border rounded p-1" value={calibrationSearch} onChange={e => setCalibrationSearch(e.target.value)} />
+                        </div>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">Asset</th><th className="px-6 py-4">Last Cal.</th><th className="px-6 py-4">Next Due</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Action</th></tr></thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {assets.filter(a => a.name.toLowerCase().includes(calibrationSearch.toLowerCase())).map(asset => {
+                                    const isOverdue = new Date(asset.next_calibration_date || '') < new Date();
+                                    return (
+                                        <tr key={asset.asset_id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 font-bold text-gray-900">{asset.name}</td>
+                                            <td className="px-6 py-4 text-gray-500">{asset.last_calibration_date}</td>
+                                            <td className="px-6 py-4 font-mono">{asset.next_calibration_date}</td>
+                                            <td className="px-6 py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{isOverdue ? t('cal_overdue') : t('cal_compliant')}</span></td>
+                                            <td className="px-6 py-4"><button onClick={() => { setAssetToCalibrate(asset); setUpdateCalibrationModalOpen(true); }} className="text-purple-600 font-bold text-xs hover:underline">{t('btn_update_cal')}</button></td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
+                        <h3 className="font-bold text-lg mb-4">{t('cal_status')}</h3>
+                        <div className="h-48 flex items-center justify-center">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie data={[{ name: 'Compliant', value: assets.length - overdueAssets.length, color: '#10B981' }, { name: 'Overdue', value: overdueAssets.length, color: '#EF4444' }]} innerRadius={40} outerRadius={60} dataKey="value">
+                                        <Cell fill="#10B981"/><Cell fill="#EF4444"/>
+                                    </Pie>
+                                    <Legend verticalAlign="bottom"/>
+                                    <Tooltip/>
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+                
+                {/* Calibration Modal */}
+                {updateCalibrationModalOpen && assetToCalibrate && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="font-bold text-lg mb-4">{t('update_cal_title')}</h3>
+                            <div className="text-sm font-bold text-gray-900 mb-4">{assetToCalibrate.name}</div>
+                            <form onSubmit={handleUpdateCalibration}>
+                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('new_cal_date')}</label>
+                                <input type="date" className="input-modern mb-6" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} required />
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setUpdateCalibrationModalOpen(false)} className="flex-1 btn-secondary">Cancel</button>
+                                    <button type="submit" className="flex-1 btn-primary bg-purple-600 hover:bg-purple-700 border-none">{t('btn_record')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
