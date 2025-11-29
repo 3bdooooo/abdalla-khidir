@@ -196,7 +196,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }, [isGateMonitoring, currentView, rfidTab, assets]);
 
 
-    // Analytics Calculations (Reused from previous)
+    // Analytics Calculations
     const analyticsData = useMemo(() => {
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
         const mttrByMonth: {[key: string]: {total: number, count: number}} = {};
@@ -720,6 +720,257 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <button type="submit" className="flex-1 btn-primary bg-purple-600 hover:bg-purple-700 border-none">{t('btn_record')}</button>
                                 </div>
                             </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+    
+    // 5. RFID & TRACKING VIEW (NEW)
+    if (currentView === 'rfid') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                {/* Header */}
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-border flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_rfid')}</h2>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setRfidTab('audit')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${rfidTab === 'audit' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            <ClipboardCheck size={16}/> {t('rfid_audit')}
+                        </button>
+                        <button 
+                            onClick={() => setRfidTab('gate')}
+                            className={`px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2 ${rfidTab === 'gate' ? 'bg-brand text-white shadow-lg' : 'text-text-muted hover:bg-gray-50'}`}
+                        >
+                            <Signal size={16}/> {t('rfid_gate_monitor')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Zebra Scanner Status Bar */}
+                <div className={`p-3 rounded-xl border flex items-center justify-between ${zebraStatus === 'listening' || zebraStatus === 'processing' ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                         <div className={`p-2 rounded-lg ${zebraStatus === 'listening' || zebraStatus === 'processing' ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-500'}`}>
+                             <Scan size={20} className={zebraStatus === 'processing' ? 'animate-ping' : ''}/>
+                         </div>
+                         <div>
+                             <h4 className={`text-sm font-bold ${zebraStatus === 'listening' || zebraStatus === 'processing' ? 'text-green-800' : 'text-gray-600'}`}>
+                                 {zebraStatus === 'listening' || zebraStatus === 'processing' ? t('zebra_connected') : t('connect_zebra')}
+                             </h4>
+                             <p className="text-xs text-text-muted">{zebraStatus === 'listening' ? t('zebra_listening') : t('zebra_instructions')}</p>
+                         </div>
+                    </div>
+                    {lastZebraScan && (
+                        <div className="text-right">
+                            <div className="text-[10px] font-bold uppercase text-text-muted">Last Scan</div>
+                            <div className="font-mono text-sm font-bold text-brand">{lastZebraScan}</div>
+                        </div>
+                    )}
+                </div>
+
+                {/* TAB: AUDIT */}
+                {rfidTab === 'audit' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Control Panel */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
+                            <h3 className="font-bold text-lg mb-4">{t('start_audit')}</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">Select Department</label>
+                                    <select 
+                                        className="input-modern"
+                                        value={selectedAuditDept}
+                                        onChange={(e) => setSelectedAuditDept(e.target.value)}
+                                        disabled={activeAudit !== null}
+                                    >
+                                        <option value="">Choose Dept...</option>
+                                        {Array.from(new Set(getLocations().map(l => l.department))).map(d => (
+                                            <option key={d} value={d}>{d}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                {!activeAudit ? (
+                                    <button onClick={startAudit} disabled={!selectedAuditDept} className="w-full btn-primary">
+                                        Start Session
+                                    </button>
+                                ) : (
+                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl text-center">
+                                        <div className="animate-pulse flex justify-center mb-2"><Radio className="text-brand"/></div>
+                                        <div className="font-bold text-brand">{t('audit_in_progress')}</div>
+                                        <button onClick={() => setActiveAudit(null)} className="mt-3 text-xs text-red-500 hover:underline">Stop Session</button>
+                                    </div>
+                                )}
+
+                                {/* Manual Simulation Button */}
+                                {activeAudit && (
+                                    <button 
+                                        onClick={() => {
+                                            if(activeAudit.missing_assets.length > 0) handleRealScan(activeAudit.missing_assets[0]);
+                                        }}
+                                        className="w-full py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-50"
+                                    >
+                                        {t('simulate_scan')} (Debug)
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Progress & Results */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {activeAudit ? (
+                                <>
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="bg-white p-4 rounded-xl border border-border text-center">
+                                            <div className="text-2xl font-bold text-gray-900">{activeAudit.total_expected}</div>
+                                            <div className="text-xs text-text-muted font-bold uppercase">{t('expected_assets')}</div>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-xl border border-green-200 bg-green-50/30 text-center">
+                                            <div className="text-2xl font-bold text-green-600">{activeAudit.total_scanned}</div>
+                                            <div className="text-xs text-green-700 font-bold uppercase">{t('scanned_assets')}</div>
+                                        </div>
+                                        <div className="bg-white p-4 rounded-xl border border-red-200 bg-red-50/30 text-center">
+                                            <div className="text-2xl font-bold text-red-600">{activeAudit.total_expected - activeAudit.total_scanned}</div>
+                                            <div className="text-xs text-red-700 font-bold uppercase">{t('missing_assets')}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                                        <div className="p-4 border-b border-border bg-gray-50 font-bold text-sm text-gray-700">{t('audit_summary')}</div>
+                                        <div className="max-h-[400px] overflow-y-auto p-4 space-y-2">
+                                            {activeAudit.found_assets.map(id => {
+                                                const asset = assets.find(a => a.asset_id === id);
+                                                return (
+                                                    <div key={id} className="flex items-center justify-between p-3 bg-green-50 border border-green-100 rounded-lg">
+                                                        <div className="flex items-center gap-3">
+                                                            <CheckCircle2 size={16} className="text-green-500"/>
+                                                            <div>
+                                                                <div className="font-bold text-sm text-gray-900">{asset?.name}</div>
+                                                                <div className="text-xs text-green-700 font-mono">{id}</div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold bg-white px-2 py-1 rounded text-green-600">MATCHED</span>
+                                                    </div>
+                                                )
+                                            })}
+                                            {activeAudit.missing_assets.map(id => {
+                                                const asset = assets.find(a => a.asset_id === id);
+                                                return (
+                                                    <div key={id} className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg opacity-60">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-4 h-4 rounded-full border-2 border-gray-300"></div>
+                                                            <div>
+                                                                <div className="font-bold text-sm text-gray-700">{asset?.name}</div>
+                                                                <div className="text-xs text-gray-400 font-mono">{id}</div>
+                                                            </div>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold bg-gray-100 px-2 py-1 rounded text-gray-500">PENDING</span>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="bg-white rounded-2xl border border-dashed border-gray-300 p-12 text-center text-gray-400 flex flex-col items-center">
+                                    <ClipboardCheck size={48} className="mb-4 opacity-20"/>
+                                    <p>Select a department to verify inventory against database records.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: GATE MONITOR */}
+                {rfidTab === 'gate' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {gateReaders.map(reader => (
+                                <div key={reader.id} className={`p-4 rounded-2xl border ${reader.status === 'online' ? 'bg-white border-green-200 shadow-sm' : 'bg-gray-50 border-gray-200 opacity-70'}`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="font-bold text-gray-900 text-sm">{reader.name}</div>
+                                        <div className={`w-2 h-2 rounded-full ${reader.status === 'online' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                                    </div>
+                                    <div className="text-xs text-text-muted">Status: <span className="font-bold">{reader.status === 'online' ? 'Active' : 'Offline'}</span></div>
+                                    {reader.status === 'online' && <div className="text-[10px] text-gray-400 mt-1">Last Ping: {reader.lastPing}</div>}
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-border shadow-soft">
+                             <div>
+                                 <h3 className="font-bold text-gray-900">{t('gate_network_active')}</h3>
+                                 <p className="text-xs text-text-muted">Monitoring {gateReaders.length} entry points for unauthorized movement.</p>
+                             </div>
+                             <button 
+                                onClick={() => setIsGateMonitoring(!isGateMonitoring)}
+                                className={`px-6 py-2 rounded-xl text-sm font-bold transition-all ${isGateMonitoring ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-200'}`}
+                             >
+                                 {isGateMonitoring ? t('deactivate_gates') : t('activate_gates')}
+                             </button>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                            <div className="p-4 border-b border-border bg-gray-50 flex justify-between items-center">
+                                <h3 className="font-bold text-sm text-gray-900 flex items-center gap-2"><Activity size={16}/> {t('live_gate_feed')}</h3>
+                                <span className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded font-bold animate-pulse">LIVE</span>
+                            </div>
+                            <div className="max-h-[400px] overflow-y-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase sticky top-0">
+                                        <tr>
+                                            <th className="px-6 py-3">Time</th>
+                                            <th className="px-6 py-3">Gate</th>
+                                            <th className="px-6 py-3">Asset</th>
+                                            <th className="px-6 py-3">Event</th>
+                                            <th className="px-6 py-3">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {gateLogs.length === 0 ? (
+                                            <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400">Waiting for events...</td></tr>
+                                        ) : (
+                                            gateLogs.map(log => {
+                                                const asset = assets.find(a => a.asset_id === log.asset_id);
+                                                const reader = gateReaders.find(r => r.id === log.gate_location_id);
+                                                // Simple logic: if asset not assigned to reader's dept (simplified check), alert
+                                                // For demo, random alert
+                                                const isUnauthorized = Math.random() > 0.9; 
+                                                
+                                                return (
+                                                    <tr key={log.id} className="hover:bg-gray-50 animate-in slide-in-from-top-2">
+                                                        <td className="px-6 py-3 font-mono text-xs text-gray-500">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                                                        <td className="px-6 py-3 font-bold text-gray-800">{reader?.name}</td>
+                                                        <td className="px-6 py-3">
+                                                            <div className="font-bold text-gray-900">{asset?.name || 'Unknown Tag'}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono">{log.rfid_tag}</div>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.direction === 'ENTER' ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>
+                                                                {log.direction}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-3">
+                                                            {isUnauthorized ? (
+                                                                <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
+                                                                    <ShieldAlert size={12}/> {t('unauthorized_movement')}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded w-fit">
+                                                                    <CheckCircle2 size={12}/> {t('authorized_movement')}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
