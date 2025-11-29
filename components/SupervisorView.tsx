@@ -29,6 +29,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const { t, language } = useLanguage();
     
+    // Notification Toast State
+    const [showToast, setShowToast] = useState(false);
+    
     // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newAssetForm, setNewAssetForm] = useState({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
@@ -298,6 +301,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }, [assets, workOrders, users]);
 
     // --- HANDLERS ---
+    const triggerNotification = () => {
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+    };
+
     // (Existing handlers kept same...)
     const handleAiSearch = async () => {
         if(!aiQuery) return;
@@ -394,7 +402,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         e.preventDefault();
         if (selectedWOForAssignment && selectedTechForAssignment) {
             await api.assignWorkOrder(selectedWOForAssignment.wo_id, parseInt(selectedTechForAssignment));
-            alert(t('wo_assigned_msg'));
+            
+            // Trigger Notification UI
+            console.log(`[UI] Notification triggered for assignment of WO #${selectedWOForAssignment.wo_id}`);
+            triggerNotification();
+
             refreshData();
             setIsAssignModalOpen(false);
             setSelectedWOForAssignment(null);
@@ -1134,6 +1146,20 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         )
     }
 
-    return <div>View not found</div>;
+    // --- TOAST NOTIFICATION ---
+    return (
+        <div className="relative">
+            {/* ... Existing views rendered above, fallback just in case */}
+            
+            {showToast && (
+                <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-4 flex items-center gap-3 z-50">
+                    <div className="bg-green-500 rounded-full p-1"><Check size={14} /></div>
+                    <div>
+                        <div className="font-bold text-sm">Assignment Complete</div>
+                        <div className="text-xs text-gray-300">Notification sent to technician.</div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
 };
-    

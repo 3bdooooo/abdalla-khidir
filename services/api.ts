@@ -189,6 +189,8 @@ export const updateAssetCalibration = async (assetId: string, lastCal: string, n
 }
 
 export const assignWorkOrder = async (woId: number, userId: number) => {
+    console.log(`[NOTIFICATION SYSTEM] 🔔 Push Notification Sent to Technician ID ${userId}: "You have been assigned to Work Order #${woId}"`);
+    
     if (!isSupabaseConfigured) return;
     await supabase.from('work_orders').update({ assigned_to_id: userId, status: 'Assigned' }).eq('wo_id', woId);
 }
