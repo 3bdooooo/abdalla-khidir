@@ -532,7 +532,186 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     };
     
     // ---------------- VIEW ROUTING ----------------
-    // ... (Dashboard, Assets, Maintenance, Inventory, Calibration, Analysis, Users - Keep same)
+
+    if (currentView === 'assets') {
+        if (selectedAsset) {
+            // ASSET DETAILS VIEW
+            return (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold mb-4">
+                        <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
+                    </button>
+
+                    {/* Header Card */}
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex flex-col md:flex-row gap-6">
+                        <div className="w-32 h-32 bg-gray-50 rounded-2xl flex items-center justify-center shrink-0 border border-gray-100 overflow-hidden">
+                             {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover" /> : <Package size={40} className="text-gray-400"/>}
+                        </div>
+                        <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-gray-900">{selectedAsset.name}</h2>
+                                    <p className="text-text-muted font-medium">{selectedAsset.manufacturer} • {selectedAsset.model}</p>
+                                </div>
+                                <div className={`px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider ${
+                                    selectedAsset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : 
+                                    selectedAsset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'
+                                }`}>
+                                    {selectedAsset.status}
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                                <div className="p-3 bg-gray-50 rounded-xl">
+                                    <div className="text-xs text-text-muted font-bold uppercase">{t('serial_number')}</div>
+                                    <div className="font-mono text-sm font-bold">{selectedAsset.serial_number || 'N/A'}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-xl">
+                                    <div className="text-xs text-text-muted font-bold uppercase">{t('location')}</div>
+                                    <div className="text-sm font-bold">{getLocationName(selectedAsset.location_id)}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-xl">
+                                    <div className="text-xs text-text-muted font-bold uppercase">{t('warranty_exp')}</div>
+                                    <div className="text-sm font-bold">{selectedAsset.warranty_expiration || 'N/A'}</div>
+                                </div>
+                                <div className="p-3 bg-gray-50 rounded-xl">
+                                    <div className="text-xs text-text-muted font-bold uppercase">{t('risk_score')}</div>
+                                    <div className={`text-sm font-bold ${selectedAsset.risk_score > 70 ? 'text-danger' : 'text-success'}`}>{selectedAsset.risk_score}/100</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Maintenance History */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-border shadow-soft">
+                            <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><History size={18} className="text-brand"/> {t('maintenance_history')}</h3>
+                            <div className="space-y-4">
+                                {workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id || wo.asset_id === selectedAsset.nfc_tag_id).length > 0 ? (
+                                    workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id || wo.asset_id === selectedAsset.nfc_tag_id).map(wo => {
+                                        const tech = users.find(u => u.user_id === wo.assigned_to_id);
+                                        return (
+                                            <div key={wo.wo_id} className="p-4 border border-border rounded-xl hover:bg-gray-50 transition flex justify-between items-center">
+                                                <div>
+                                                    <div className="font-bold text-gray-900 text-sm">{wo.description}</div>
+                                                    <div className="text-xs text-text-muted mt-1 flex items-center gap-2">
+                                                        <span className={`w-2 h-2 rounded-full ${wo.status === 'Closed' ? 'bg-success' : 'bg-warning'}`}></span>
+                                                        {new Date(wo.created_at).toLocaleDateString()} • {wo.type}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right text-xs">
+                                                    <div className="font-bold text-gray-700">{tech ? tech.name : `Tech #${wo.assigned_to_id}`}</div>
+                                                    <div className="text-text-muted">#{wo.wo_id}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center text-gray-400 py-8">No maintenance history available.</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Calibration & Docs */}
+                        <div className="space-y-6">
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><Activity size={18} className="text-purple-500"/> Calibration</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100">
+                                        <span className="text-sm font-medium text-purple-900">Last Calibrated</span>
+                                        <span className="text-sm font-bold text-purple-700">{selectedAsset.last_calibration_date}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-xl border border-purple-100">
+                                        <span className="text-sm font-medium text-purple-900">Next Due</span>
+                                        <span className="text-sm font-bold text-purple-700">{selectedAsset.next_calibration_date}</span>
+                                    </div>
+                                    <div className="pt-2">
+                                        <div className="text-xs font-bold text-text-muted uppercase mb-2">History</div>
+                                        {workOrders.filter(wo => (wo.asset_id === selectedAsset.asset_id || wo.asset_id === selectedAsset.nfc_tag_id) && wo.type === WorkOrderType.CALIBRATION).slice(0, 3).map(wo => (
+                                            <div key={wo.wo_id} className="text-xs flex justify-between py-1 border-b border-gray-100 last:border-0">
+                                                <span>{new Date(wo.created_at).toLocaleDateString()}</span>
+                                                <span className="text-success font-bold">Pass</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BookOpen size={18} className="text-blue-500"/> Documents</h3>
+                                <div className="space-y-2">
+                                    {getAssetDocuments(selectedAsset.asset_id).map(doc => (
+                                        <div key={doc.doc_id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer group">
+                                            <FileText size={16} className="text-text-muted group-hover:text-brand"/>
+                                            <span className="text-sm font-medium text-gray-700 group-hover:text-brand truncate">{doc.title}</span>
+                                            <Download size={14} className="ml-auto text-gray-300 group-hover:text-brand"/>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                  <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
+                  <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm">
+                      <Plus size={16}/> {t('add_equipment')}
+                  </button>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                    <table className="w-full text-sm text-left">
+                        <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                            <tr>
+                                <th className="px-6 py-4">{t('form_name')}</th>
+                                <th className="px-6 py-4">{t('form_model')}</th>
+                                <th className="px-6 py-4">{t('serial_number')}</th>
+                                <th className="px-6 py-4">{t('location')}</th>
+                                <th className="px-6 py-4">{t('status')}</th>
+                                <th className="px-6 py-4">{t('actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                            {assets.map(asset => (
+                                <tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded bg-gray-100 border border-gray-200 overflow-hidden shrink-0">
+                                            {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package size={16} className="m-auto text-gray-400"/>}
+                                        </div>
+                                        {asset.name}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-600 font-medium">{asset.model}</td>
+                                    <td className="px-6 py-4 text-gray-500 font-mono text-xs">{asset.serial_number}</td>
+                                    <td className="px-6 py-4 text-text-muted">{getLocationName(asset.location_id)}</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                            asset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : 
+                                            asset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'
+                                        }`}>
+                                            {asset.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <button 
+                                            onClick={() => setSelectedAsset(asset)}
+                                            className="text-brand font-bold hover:underline text-xs"
+                                        >
+                                            View Details
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    }
 
     if (currentView === 'analysis') {
          // ANALYSIS & REPORTS
