@@ -28,6 +28,23 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     </button>
   );
 
+  // Logo Component
+  const BrandLogo = ({ compact = false }: { compact?: boolean }) => (
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 shrink-0">
+            <Activity size={20} />
+        </div>
+        {!compact && (
+            <div>
+                <h1 className="text-xl font-black text-gray-900 leading-none tracking-tight">
+                    A2M <span className="text-brand">MED</span>
+                </h1>
+                <p className="text-[9px] uppercase tracking-widest text-text-muted font-bold mt-0.5">Enterprise</p>
+            </div>
+        )}
+      </div>
+  );
+
   // --- NOTIFICATION PANEL ---
   const notifications = [
       { id: 1, type: 'critical', msg: t('alert_boundary_msg'), time: '2m ago' },
@@ -41,15 +58,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
       <div className="min-h-screen bg-background text-text-main font-sans pb-24 md:pb-0">
         {/* Top Header (Mobile) */}
         <header className="bg-white/90 backdrop-blur-md border-b border-border h-16 px-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-glow">
-              <Activity size={20} />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg text-gray-900 leading-none tracking-tight">{t('appName')}</h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-brand">{user.role}</span>
-            </div>
-          </div>
+          <BrandLogo />
           <div className="flex items-center gap-2">
             <LangToggle />
             <button onClick={onLogout} className="p-2 text-text-muted hover:text-danger transition-colors">
@@ -110,8 +119,6 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
   }
 
   // Logic for RTL Sidebar transition
-  // In RTL, "start-0" is right side. transform needs to be positive to hide (translate-x-full) 
-  // and 0 to show.
   const sidebarTransform = isSidebarOpen ? 'translate-x-0' : (dir === 'rtl' ? 'translate-x-full' : '-translate-x-full');
 
   return (
@@ -123,16 +130,8 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
         lg:relative lg:translate-x-0 flex flex-col
       `}>
         {/* Brand Area */}
-        <div className="h-20 flex items-center px-8 border-b border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20">
-                <Activity size={24} />
-            </div>
-            <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">{t('appName')}</h1>
-                <p className="text-[10px] uppercase tracking-widest text-text-muted font-bold">Enterprise</p>
-            </div>
-          </div>
+        <div className="h-24 flex items-center px-8 border-b border-border/50">
+          <BrandLogo />
         </div>
 
         {/* Navigation */}
@@ -231,7 +230,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg">
             <Menu size={24} />
           </button>
-          <span className="font-bold text-brand flex items-center gap-2 text-lg"><Activity size={20}/> {t('appName')}</span>
+          <BrandLogo compact={true} />
           <div className="w-8"></div>
         </header>
 
