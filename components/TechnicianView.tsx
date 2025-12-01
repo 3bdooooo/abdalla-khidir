@@ -18,7 +18,7 @@ interface TechnicianProps {
 export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, inventory, refreshData }) => {
     // State Management
     const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
-    const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); // New state for Start Job flow
+    const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); // Explicitly typed
     const [dashboardTab, setDashboardTab] = useState<'requests' | 'inprogress' | 'pms'>('requests');
     const [filterPriority, setFilterPriority] = useState<string>('All');
     const [filterStatus, setFilterStatus] = useState<string>('All');
