@@ -91,11 +91,24 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
     // --- HANDLERS ---
 
-    const handleStartJob = async (e: React.MouseEvent, wo: WorkOrder) => { 
-        e.stopPropagation(); 
-        setSelectedWO(wo); // Select immediately to show context if needed, but we stay on list usually until started? No, let's open details.
+    const executeStartJob = async () => {
+        if (!selectedWO) return;
         
-        // Actually, let's just start the logic and assume user is on the card
+        setIsStartingJob(true); // Show loader while API call happens
+        
+        await api.startWorkOrder(selectedWO.wo_id, locationData || undefined);
+        refreshData();
+        setSelectedWO(prev => prev ? ({...prev, status: 'In Progress'}) : null);
+        
+        setShowDocsModal(false);
+        setIsStartingJob(false);
+        setScanState('idle');
+    };
+
+    const handleStartJob = async (e: React.MouseEvent, wo: WorkOrder, method: 'nfc' | 'qr' = 'nfc') => { 
+        e.stopPropagation(); 
+        setSelectedWO(wo); 
+        
         const currentWoId = wo.wo_id; 
         const currentAssetId = wo.asset_id; 
         
@@ -103,7 +116,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         setScanState('scanning');
 
         // 1. Simulate NFC Scan Delay
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        await new Promise(resolve => setTimeout(resolve, method === 'qr' ? 2500 : 1500));
         setScanState('locating');
 
         // 2. Get Geolocation
@@ -113,12 +126,36 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 setLocationData(coords);
                 setScanState('verified');
 
-                await new Promise(resolve => setTimeout(resolve, 1000)); 
-                await api.startWorkOrder(currentWoId, coords); 
-                refreshData(); 
-                setSelectedWO(prev => ({...wo, status: 'In Progress'})); // Update local state to enter view
+                await new Promise(resolve => setTimeout(resolve, 800)); 
                 
-                // 3. Find Docs
+                // 3. Find Docs BEFORE starting timer
+                const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
+                let foundDocs = getAssetDocuments(currentAssetId);
+                
+                if (asset) {
+                    const smartMatches = findRelevantDocuments(asset.model, asset.manufacturer || '');
+                    const existingTitles = new Set(foundDocs.map(d => d.title));
+                    smartMatches.forEach(doc => { if (!existingTitles.has(doc.title)) foundDocs.push(doc); });
+                }
+                
+                if (foundDocs && foundDocs.length > 0) { 
+                    setAssetDocs(foundDocs); 
+                    setShowDocsModal(true);
+                    setIsStartingJob(false); // Hide the scan overlay, show the modal
+                } else {
+                    // No docs found? Start directly.
+                    await api.startWorkOrder(currentWoId, coords); 
+                    refreshData(); 
+                    setSelectedWO(prev => ({...wo, status: 'In Progress'}));
+                    setIsStartingJob(false);
+                    setScanState('idle');
+                }
+            },
+            async (error) => {
+                // Fallback if geo fails
+                console.warn("Geo failed, proceeding with manual fallback");
+                
+                // Still try to find docs
                 const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 if (asset) {
@@ -126,20 +163,20 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     const existingTitles = new Set(foundDocs.map(d => d.title));
                     smartMatches.forEach(doc => { if (!existingTitles.has(doc.title)) foundDocs.push(doc); });
                 }
-                if (foundDocs && foundDocs.length > 0) { setAssetDocs(foundDocs); setShowDocsModal(true); }
-                
-                setIsStartingJob(false);
-                setScanState('idle');
+
+                if (foundDocs && foundDocs.length > 0) {
+                    setAssetDocs(foundDocs);
+                    setShowDocsModal(true);
+                    setIsStartingJob(false);
+                } else {
+                    await api.startWorkOrder(currentWoId);
+                    refreshData();
+                    setSelectedWO({...wo, status: 'In Progress'});
+                    setIsStartingJob(false);
+                    setScanState('idle');
+                }
             },
-            async (error) => {
-                // Fallback if geo fails
-                await api.startWorkOrder(currentWoId);
-                refreshData();
-                setSelectedWO({...wo, status: 'In Progress'});
-                setIsStartingJob(false);
-                setScanState('idle');
-            },
-            { enableHighAccuracy: true, timeout: 5000 }
+            { enableHighAccuracy: true, timeout: 7000 }
         );
     };
 
@@ -327,13 +364,24 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                                     Continue Job
                                                 </button>
                                             ) : (
-                                                <button 
-                                                    onClick={(e) => handleStartJob(e, wo)}
-                                                    disabled={isStartingJob}
-                                                    className="px-4 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg shadow-md hover:bg-gray-800 transition-colors flex items-center gap-2 disabled:opacity-70"
-                                                >
-                                                    {isStartingJob ? 'Scanning...' : <><Scan size={14}/> {t('btn_start_job')}</>}
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button 
+                                                        onClick={(e) => handleStartJob(e, wo, 'nfc')}
+                                                        disabled={isStartingJob}
+                                                        className="px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg shadow-md hover:bg-gray-800 transition-colors flex items-center gap-1 disabled:opacity-70"
+                                                        title="Scan NFC"
+                                                    >
+                                                        {isStartingJob && scanState === 'scanning' ? <div className="w-3 h-3 border-2 border-white rounded-full animate-spin"></div> : <Scan size={14}/>}
+                                                    </button>
+                                                    <button 
+                                                        onClick={(e) => handleStartJob(e, wo, 'qr')}
+                                                        disabled={isStartingJob}
+                                                        className="px-3 py-2 bg-purple-600 text-white text-xs font-bold rounded-lg shadow-md hover:bg-purple-700 transition-colors flex items-center gap-1 disabled:opacity-70"
+                                                        title="Scan QR"
+                                                    >
+                                                        <QrCode size={14}/>
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -434,19 +482,24 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                 <BookOpen size={24}/>
                             </div>
                             <h3 className="text-xl font-bold text-center mb-2">{t('manuals_detected')}</h3>
-                            <p className="text-center text-gray-500 text-sm mb-6">{t('relevant_docs')}</p>
+                            <p className="text-center text-gray-500 text-sm mb-6">
+                                {t('relevant_docs')} for <strong>{selectedWO ? getAssetForWO(selectedWO.asset_id)?.model : 'Asset'}</strong>
+                            </p>
                             
                             <div className="space-y-3 mb-6">
                                 {assetDocs.map(doc => (
-                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors cursor-pointer">
                                         <FileText size={18} className="text-brand"/>
-                                        <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
-                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">{doc.type}</div>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
+                                            <div className="text-[10px] text-gray-500">{doc.type} • {doc.date}</div>
+                                        </div>
+                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">Open</div>
                                     </div>
                                 ))}
                             </div>
                             
-                            <button onClick={() => setShowDocsModal(false)} className="w-full btn-primary">
+                            <button onClick={executeStartJob} className="w-full btn-primary">
                                 {t('continue_work')}
                             </button>
                         </div>
@@ -544,6 +597,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                      >
                                          {isAnalyzing ? <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"/> : <Sparkles size={18}/>}
                                          {t('get_suggestions')}
+                                         <span className="opacity-70 font-normal text-xs ml-1">based on {asset?.model}</span>
                                      </button>
                                      
                                      {/* SMART ENGINEERING ASSISTANT (HISTORICAL) */}
