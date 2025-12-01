@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio, Home, ClipboardList, ScanLine, UserCircle } from 'lucide-react';
+import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio, Home, ClipboardList, ScanLine, UserCircle, X, Check, AlertTriangle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface LayoutProps {
@@ -14,8 +14,9 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onNavigate, children, badgeCounts }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
-  const { t, toggleLanguage, language } = useLanguage();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const { t, toggleLanguage, language, dir } = useLanguage();
 
   const LangToggle = () => (
     <button 
@@ -26,6 +27,13 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
         <Globe size={18} />
     </button>
   );
+
+  // --- NOTIFICATION PANEL ---
+  const notifications = [
+      { id: 1, type: 'critical', msg: t('alert_boundary_msg'), time: '2m ago' },
+      { id: 2, type: 'warning', msg: 'Low stock: Ventilator Filters', time: '1h ago' },
+      { id: 3, type: 'success', msg: t('wo_assigned_msg'), time: '3h ago' },
+  ];
 
   // --- MOBILE / TABLET LAYOUT (Nurse, Technician, Vendor) ---
   if (user.role === UserRole.NURSE || user.role === UserRole.TECHNICIAN || user.role === UserRole.VENDOR) {
@@ -62,7 +70,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
                 className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${currentView === 'dashboard' || currentView === 'tasks' || currentView === 'report' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'}`}
             >
                 <Home size={24} strokeWidth={currentView === 'dashboard' ? 2.5 : 2} />
-                <span className="text-[10px] font-bold">Home</span>
+                <span className="text-[10px] font-bold">{t('nav_dashboard')}</span>
             </button>
             
             {/* Contextual Middle Button */}
@@ -101,12 +109,17 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     navItems.push({ id: 'users', label: t('nav_users'), icon: UsersIcon });
   }
 
+  // Logic for RTL Sidebar transition
+  // In RTL, "start-0" is right side. transform needs to be positive to hide (translate-x-full) 
+  // and 0 to show.
+  const sidebarTransform = isSidebarOpen ? 'translate-x-0' : (dir === 'rtl' ? 'translate-x-full' : '-translate-x-full');
+
   return (
     <div className="min-h-screen bg-background flex font-sans text-text-main overflow-hidden">
       {/* Sidebar */}
       <aside className={`
         fixed inset-y-0 start-0 z-50 w-72 bg-white border-e border-border shadow-soft transform transition-transform duration-300 ease-out
-        ${isSidebarOpen ? 'translate-x-0' : (language === 'ar' ? 'translate-x-full' : '-translate-x-full')}
+        ${sidebarTransform}
         lg:relative lg:translate-x-0 flex flex-col
       `}>
         {/* Brand Area */}
@@ -124,7 +137,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-            <div className="text-xs font-bold text-gray-400 uppercase tracking-wider px-4 mb-2 mt-4">Main Menu</div>
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-wider px-4 mb-2 mt-4">{t('op_overview')}</div>
             {navItems.map((item) => {
               const isActive = currentView === item.id;
               const badge = badgeCounts?.[item.id] || 0;
@@ -165,10 +178,36 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
         <div className="p-4 border-t border-border/50 bg-gray-50/50">
           <div className="flex items-center justify-between mb-4 px-2">
              <LangToggle />
-             <button className="p-2 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-gray-100 relative">
-                 <Bell size={18} />
-                 <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>
-             </button>
+             <div className="relative">
+                 <button 
+                    onClick={() => setIsNotifOpen(!isNotifOpen)}
+                    className="p-2 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-gray-100 relative"
+                 >
+                     <Bell size={18} />
+                     {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>}
+                 </button>
+                 
+                 {/* Notification Dropdown */}
+                 {isNotifOpen && (
+                     <div className="absolute bottom-full mb-2 start-0 w-64 bg-white rounded-xl shadow-xl border border-border p-2 animate-in slide-in-from-bottom-2 z-50">
+                         <div className="flex justify-between items-center px-2 py-1 mb-2 border-b border-gray-100">
+                             <span className="text-xs font-bold text-gray-700">Notifications</span>
+                             <button onClick={() => setIsNotifOpen(false)}><X size={14} className="text-gray-400 hover:text-gray-600"/></button>
+                         </div>
+                         <div className="space-y-1 max-h-48 overflow-y-auto">
+                             {notifications.map(n => (
+                                 <div key={n.id} className="p-2 rounded-lg hover:bg-gray-50 flex gap-2 items-start">
+                                     <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${n.type === 'critical' ? 'bg-danger' : n.type === 'warning' ? 'bg-warning' : 'bg-success'}`}></div>
+                                     <div>
+                                         <p className="text-xs text-gray-800 leading-tight">{n.msg}</p>
+                                         <p className="text-[10px] text-gray-400 mt-1">{n.time}</p>
+                                     </div>
+                                 </div>
+                             ))}
+                         </div>
+                     </div>
+                 )}
+             </div>
           </div>
           <div className="flex items-center gap-3 p-3 bg-white border border-border rounded-xl shadow-sm">
              <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm">

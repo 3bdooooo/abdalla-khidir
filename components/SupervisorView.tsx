@@ -27,7 +27,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // State Management
     const [activeTab, setActiveTab] = useState('tab_analytics'); 
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-    const { t, language } = useLanguage();
+    const { t, language, dir } = useLanguage();
     
     // Notification Toast State
     const [showToast, setShowToast] = useState(false);
@@ -146,7 +146,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         });
     }, [assets, workOrders]);
 
-    // Fetch Roles on View Change or Init
     useEffect(() => {
         const loadRoles = async () => {
             const data = await api.fetchRoles();
@@ -163,11 +162,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         setSelectedCMReport(null); 
         setSelectedPMReport(null);
         
+        // Reset simulations on view change
         if (currentView !== 'dashboard') setIsSimulationActive(false); 
         if (currentView !== 'rfid') setIsGateMonitoring(false);
     }, [currentView]);
 
-    // ... (Keep existing Intervals for Simulation) ...
     useEffect(() => { 
         let interval: NodeJS.Timeout; 
         if (isSimulationActive && currentView === 'dashboard') { 
@@ -241,61 +240,41 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             };
         }).sort((a,b) => b.ratio - a.ratio);
 
-        // --- Reputation Calculation ---
         const departments = Array.from(new Set(getLocations().map(l => l.department)));
         const deptScores = departments.map(dept => {
-            // Find assets in dept
             const deptAssets = assets.filter(a => {
                 const loc = getLocations().find(l => l.location_id === a.location_id);
                 return loc?.department === dept;
             });
             const assetIds = deptAssets.map(a => a.asset_id);
-            
-            // Find WOs for these assets
             const deptWOs = workOrders.filter(wo => assetIds.includes(wo.asset_id) || assetIds.includes(wo.asset_id.replace('NFC-', 'AST-')));
-            
             const totalWOs = deptWOs.length;
             if (totalWOs === 0) return { name: dept, score: 100, totalWOs: 0, userErrors: 0 };
-
             const userErrors = deptWOs.filter(wo => wo.failure_type === 'UserError').length;
             const techFaults = deptWOs.filter(wo => wo.failure_type === 'Technical').length;
-            
-            // Formula: Start 100. -10 for UserError. -2 for Technical (machines break, but too often is bad)
-            // Cap at 0 min.
             let score = 100 - (userErrors * 15) - (techFaults * 2);
             if (score < 0) score = 0;
             if (score > 100) score = 100;
-
             return { name: dept, score, totalWOs, userErrors };
         });
 
-        // Best and Worst
         const topDepts = [...deptScores].sort((a, b) => b.score - a.score).slice(0, 5);
         const lowRepDepts = [...deptScores].sort((a, b) => a.score - b.score).slice(0, 5);
 
-        // Asset Reputation (Frequent User Errors)
         const assetReputation = assets.map(a => {
              const wos = workOrders.filter(w => w.asset_id === a.asset_id);
              const userErrors = wos.filter(w => w.failure_type === 'UserError').length;
              return { ...a, userErrors };
         }).sort((a, b) => b.userErrors - a.userErrors).slice(0, 10);
 
-        // --- NEW: Vendor Performance Score (VPS) ---
         const manufacturers = Array.from(new Set(assets.map(a => a.manufacturer || 'Generic')));
         const vendorStats = manufacturers.map(mfg => {
             const mfgAssets = assets.filter(a => (a.manufacturer || 'Generic') === mfg);
             const assetIds = mfgAssets.map(a => a.asset_id);
             const mfgWOs = workOrders.filter(wo => assetIds.includes(wo.asset_id.replace('NFC-', 'AST-')));
-            
-            // 1. Reliability Score (Failures per unit)
-            // If total WOs / total Assets is high, reliability is low.
-            // Normalize: If Ratio > 1 (more than 1 failure per unit avg), score drops.
             const correctiveWOs = mfgWOs.filter(wo => wo.type === WorkOrderType.CORRECTIVE).length;
             const failureRatio = mfgAssets.length > 0 ? correctiveWOs / mfgAssets.length : 0;
-            const reliabilityScore = Math.max(0, 100 - (failureRatio * 20)); // -20 points per avg failure
-
-            // 2. Support Score (MTTR)
-            // Calculate avg MTTR for this vendor's devices
+            const reliabilityScore = Math.max(0, 100 - (failureRatio * 20));
             let totalHours = 0;
             let countClosed = 0;
             mfgWOs.forEach(wo => {
@@ -306,19 +285,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 }
             });
             const avgMTTR = countClosed > 0 ? totalHours / countClosed : 0;
-            // Target MTTR < 4 hours = 100. > 48 hours = 0.
-            const supportScore = Math.max(0, 100 - (avgMTTR * 2)); // -2 points per hour
-
-            // Final Weighted Score (60% Reliability, 40% Support)
+            const supportScore = Math.max(0, 100 - (avgMTTR * 2));
             const finalScore = Math.round((reliabilityScore * 0.6) + (supportScore * 0.4));
-
-            return {
-                name: mfg,
-                assetCount: mfgAssets.length,
-                woCount: correctiveWOs,
-                avgMTTR: avgMTTR.toFixed(1),
-                score: finalScore
-            };
+            return { name: mfg, assetCount: mfgAssets.length, woCount: correctiveWOs, avgMTTR: avgMTTR.toFixed(1), score: finalScore };
         }).sort((a, b) => b.score - a.score);
 
         return { mttrTrend, statusData, riskData, tcoData, financialAnalysis, topDepts, lowRepDepts, assetReputation, vendorStats };
@@ -327,8 +296,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // TRAINING DATA CALCULATIONS
     const trainingData = useMemo(() => {
         if (!selectedTrainingDept) return null;
-
-        // 1. Filter WOs for dept and UserError
         const deptAssets = assets.filter(a => {
             const loc = getLocations().find(l => l.location_id === a.location_id);
             return loc?.department === selectedTrainingDept;
@@ -338,8 +305,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             (deptAssetIds.includes(wo.asset_id) || deptAssetIds.includes(wo.asset_id.replace('NFC-', 'AST-'))) && 
             wo.failure_type === 'UserError'
         );
-
-        // 2. Group by Error (Simulated using description keywords)
         const errorCounts: Record<string, number> = {};
         userErrorWOs.forEach(wo => {
             let errorKey = "General Misuse";
@@ -349,19 +314,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             else if (desc.includes('battery') || desc.includes('charge')) errorKey = "Battery Mgmt Failure";
             else if (desc.includes('clean') || desc.includes('fluid')) errorKey = "Improper Cleaning";
             else if (desc.includes('setting') || desc.includes('config')) errorKey = "Wrong Settings";
-            
             errorCounts[errorKey] = (errorCounts[errorKey] || 0) + 1;
         });
-
         const topErrors = Object.entries(errorCounts)
             .map(([error, count]) => ({ error, count }))
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
-
-        // 3. Recommendation
         const totalErrors = userErrorWOs.length;
-        const needsSession = totalErrors > 3; // Threshold for demo
-
+        const needsSession = totalErrors > 3;
         return { topErrors, totalErrors, needsSession };
     }, [selectedTrainingDept, assets, workOrders]);
 
@@ -383,60 +343,148 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const handleRealScan = (scannedId: string) => { if(!activeAudit) return; const cleanId = scannedId.trim(); if (activeAudit.missing_assets.includes(cleanId)) { setActiveAudit(prev => prev ? { ...prev, total_scanned: prev.total_scanned + 1, missing_assets: prev.missing_assets.filter(id => id !== cleanId), found_assets: [...prev.found_assets, cleanId] } : null); } };
     const handleGateScan = (scannedId: string, locationId: number) => { const cleanId = scannedId.trim(); const asset = assets.find(a => a.asset_id === cleanId || a.rfid_tag_id === cleanId); if (asset) { setGateLogs(prev => [{ id: Date.now(), asset_id: asset.asset_id, rfid_tag: cleanId, gate_location_id: locationId, direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT', timestamp: new Date().toISOString() }, ...prev]); } };
     
-    // ROLE MANAGEMENT HANDLERS
+    // ROLE MANAGEMENT
     const handleOpenRoleEditor = (role?: RoleDefinition) => {
-        if (role) {
-            setEditingRole({ ...role, permissions: JSON.parse(JSON.stringify(role.permissions)) }); // Deep copy
-        } else {
-            setEditingRole({
-                id: Date.now().toString(),
-                name: '',
-                description: '',
-                is_system_role: false,
-                permissions: { assets: [], work_orders: [], inventory: [], reports: [], users: [], settings: [] }
-            });
-        }
+        if (role) { setEditingRole({ ...role, permissions: JSON.parse(JSON.stringify(role.permissions)) }); } 
+        else { setEditingRole({ id: Date.now().toString(), name: '', description: '', is_system_role: false, permissions: { assets: [], work_orders: [], inventory: [], reports: [], users: [], settings: [] } }); }
         setIsRoleEditorOpen(true);
     };
-
-    const handlePermissionToggle = (resource: Resource, action: Action) => {
-        if (!editingRole) return;
-        const currentPerms = editingRole.permissions[resource] || [];
-        const hasPerm = currentPerms.includes(action);
-        
-        let newPerms;
-        if (hasPerm) {
-            newPerms = currentPerms.filter(a => a !== action);
-        } else {
-            newPerms = [...currentPerms, action];
-        }
-        
-        setEditingRole({
-            ...editingRole,
-            permissions: {
-                ...editingRole.permissions,
-                [resource]: newPerms
-            }
-        });
-    };
-
-    const handleSaveRole = async () => {
-        if (!editingRole || !editingRole.name) return;
-        await api.saveRole(editingRole);
-        const data = await api.fetchRoles();
-        setRoles(data);
-        setIsRoleEditorOpen(false);
-        setEditingRole(null);
-    };
-
-    const handlePrintFlyer = () => {
-        // Simple print trigger
-        window.print();
-    };
+    const handlePermissionToggle = (resource: Resource, action: Action) => { if (!editingRole) return; const currentPerms = editingRole.permissions[resource] || []; const hasPerm = currentPerms.includes(action); setEditingRole({ ...editingRole, permissions: { ...editingRole.permissions, [resource]: hasPerm ? currentPerms.filter(a => a !== action) : [...currentPerms, action] } }); };
+    const handleSaveRole = async () => { if (!editingRole || !editingRole.name) return; await api.saveRole(editingRole); const data = await api.fetchRoles(); setRoles(data); setIsRoleEditorOpen(false); setEditingRole(null); };
+    const handlePrintFlyer = () => { window.print(); };
 
     // --- RENDER HELPERS ---
-    const departmentZones = [ { id: 'ICU', name: 'Intensive Care', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' }, { id: 'Emergency', name: 'ER & Triage', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' }, { id: 'Radiology', name: 'Radiology', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' }, { id: 'Laboratory', name: 'Laboratory', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' }, { id: 'Pharmacy', name: 'Pharmacy', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' }, { id: 'Surgery', name: 'OR & Surgery', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' }, { id: 'Cardiology', name: 'Cardiology', x: 80, y: 35, width: 15, height: 20, color: 'bg-rose-100' }, { id: 'Neurology', name: 'Neurology', x: 10, y: 70, width: 20, height: 20, color: 'bg-purple-100' }, { id: 'NICU', name: 'NICU', x: 35, y: 65, width: 15, height: 15, color: 'bg-pink-100' }, { id: 'Maternity', name: 'Maternity', x: 55, y: 65, width: 20, height: 20, color: 'bg-fuchsia-100' }, { id: 'Dialysis', name: 'Dialysis', x: 80, y: 60, width: 15, height: 15, color: 'bg-cyan-100' }, { id: 'Oncology', name: 'Oncology', x: 80, y: 80, width: 15, height: 15, color: 'bg-amber-100' }, { id: 'Pediatrics', name: 'Pediatrics', x: 35, y: 85, width: 20, height: 10, color: 'bg-lime-100' }, { id: 'Orthopedics', name: 'Orthopedics', x: 60, y: 90, width: 15, height: 10, color: 'bg-orange-100' }, { id: 'General Ward', name: 'General Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' } ];
+    const departmentZones = [ { id: 'ICU', name: 'ICU', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' }, { id: 'Emergency', name: 'ER', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' }, { id: 'Radiology', name: 'Rad', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' }, { id: 'Laboratory', name: 'Lab', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' }, { id: 'Surgery', name: 'OR', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' }, { id: 'Pharmacy', name: 'Pharm', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' }, { id: 'General Ward', name: 'Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' } ];
     const getAssetsInZone = (deptId: string) => assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === deptId || (loc?.department && loc.department.includes(deptId)); });
+
+    // DASHBOARD MAIN VIEW
+    if (currentView === 'dashboard') {
+        const stats = [
+            { label: t('total_assets'), value: assets.length, icon: Box, color: 'bg-blue-500' },
+            { label: t('open_tickets'), value: workOrders.filter(w => w.status !== 'Closed').length, icon: AlertCircle, color: 'bg-red-500' },
+            { label: t('inventory_alerts'), value: inventory.filter(i => i.current_stock <= i.min_reorder_level).length, icon: Package, color: 'bg-orange-500' },
+            { label: t('kpi_availability'), value: '98.2%', icon: Activity, color: 'bg-green-500' },
+        ];
+
+        return (
+            <div className="space-y-8 animate-in fade-in">
+                {/* Hero Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {stats.map((stat, i) => (
+                        <div key={i} className="glass rounded-2xl p-5 relative overflow-hidden group hover:shadow-glow transition-all">
+                            <div className={`absolute top-0 end-0 p-3 rounded-bl-2xl opacity-10 ${stat.color} w-24 h-24 -mr-4 -mt-4`}></div>
+                            <div className="relative z-10">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-4 shadow-lg ${stat.color}`}>
+                                    <stat.icon size={24} />
+                                </div>
+                                <h3 className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</h3>
+                                <p className="text-sm font-medium text-text-muted">{stat.label}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* Left: 3D Map */}
+                    <div className="lg:col-span-2 glass-panel rounded-3xl p-6 min-h-[500px] flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-bold text-xl text-gray-900 flex items-center gap-2">
+                                <MapPin className="text-brand" /> {t('dept_map')}
+                            </h3>
+                            <button 
+                                onClick={() => setIsSimulationActive(!isSimulationActive)}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${isSimulationActive ? 'bg-green-100 text-green-700 animate-pulse' : 'bg-gray-100 text-gray-500'}`}
+                            >
+                                {isSimulationActive ? 'Simulation Active' : 'Start Sim'}
+                            </button>
+                        </div>
+                        
+                        <div className="flex-1 bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl border border-gray-200 relative overflow-hidden perspective-1000 shadow-inner group">
+                            <div className="absolute inset-0 flex items-center justify-center transform group-hover:scale-[1.02] transition-transform duration-700 ease-out" style={{ transformStyle: 'preserve-3d', transform: 'rotateX(20deg) rotateY(0deg) scale(0.9)' }}>
+                                <div className="relative w-full h-full max-w-2xl max-h-2xl">
+                                    {departmentZones.map(zone => {
+                                        const zoneAssets = getAssetsInZone(zone.id);
+                                        const hasIssues = zoneAssets.some(a => a.status === AssetStatus.DOWN);
+                                        const hasMaint = zoneAssets.some(a => a.status === AssetStatus.UNDER_MAINT);
+                                        
+                                        // Dynamic Color Logic based on status
+                                        let zoneColorClass = zone.color;
+                                        if (hasIssues) zoneColorClass = 'bg-red-200 shadow-red-200/50 border-red-300';
+                                        else if (hasMaint) zoneColorClass = 'bg-orange-200 shadow-orange-200/50 border-orange-300';
+                                        else zoneColorClass = 'bg-white shadow-gray-200/50 border-gray-200';
+
+                                        return (
+                                            <div 
+                                                key={zone.id}
+                                                onClick={() => setSelectedMapZone(zone.id)}
+                                                className={`absolute transition-all duration-500 cursor-pointer hover:translate-y-[-10px] hover:shadow-2xl border-2 ${zoneColorClass} rounded-lg flex flex-col items-center justify-center shadow-lg`}
+                                                style={{ 
+                                                    left: `${language === 'ar' ? (100 - zone.x - zone.width) : zone.x}%`, 
+                                                    top: `${zone.y}%`, 
+                                                    width: `${zone.width}%`, 
+                                                    height: `${zone.height}%` 
+                                                }}
+                                            >
+                                                <div className="font-bold text-[10px] md:text-xs text-gray-800 text-center px-1">{zone.name}</div>
+                                                <div className="flex gap-1 mt-1">
+                                                    {zoneAssets.length > 0 && <span className="w-2 h-2 rounded-full bg-gray-400"></span>}
+                                                    {hasIssues && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Right: Asset Health & Alerts */}
+                    <div className="space-y-6">
+                        <div className="glass-panel rounded-3xl p-6">
+                            <h3 className="font-bold text-lg text-gray-900 mb-4">{t('asset_health')}</h3>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie 
+                                            data={analyticsData.statusData} 
+                                            cx="50%" cy="50%" 
+                                            innerRadius={60} outerRadius={80} 
+                                            dataKey="value" paddingAngle={5}
+                                        >
+                                            {analyticsData.statusData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                        <Legend verticalAlign="bottom" height={36}/>
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Recent Alerts List */}
+                        <div className="glass-panel rounded-3xl p-6">
+                            <h3 className="font-bold text-lg text-gray-900 mb-4 flex items-center gap-2">
+                                <ShieldAlert className="text-brand" size={20}/> {t('alert_boundary')}
+                            </h3>
+                            <div className="space-y-3">
+                                {alerts.slice(0, 3).map(alert => (
+                                    <div key={alert.id} className="bg-red-50/50 border border-red-100 p-3 rounded-xl flex gap-3 items-start">
+                                        <AlertTriangle size={16} className="text-red-500 mt-1 shrink-0" />
+                                        <div>
+                                            <p className="text-xs font-bold text-gray-800">{alert.message}</p>
+                                            <p className="text-[10px] text-gray-500 mt-1">{new Date(alert.timestamp).toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     // ANALYSIS VIEW RENDER (Including new Reputation Section)
     if (currentView === 'analysis') {
@@ -455,7 +503,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     <div className="space-y-6">
                         {/* 1. Operational Efficiency */}
                         <div className="space-y-4">
-                            <h3 className="font-bold text-lg text-gray-900 border-l-4 border-brand pl-3">{t('pillar_operational')}</h3>
+                            <h3 className="font-bold text-lg text-gray-900 border-s-4 border-brand ps-3">{t('pillar_operational')}</h3>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div className="bg-white p-5 rounded-2xl border border-border shadow-soft h-[300px]">
                                     <h4 className="font-bold text-sm text-gray-700 mb-4">{t('chart_mttr_trend')}</h4>
@@ -494,7 +542,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
                         {/* 2. REPUTATION & COMPLIANCE */}
                         <div className="space-y-4">
-                            <h3 className="font-bold text-lg text-gray-900 border-l-4 border-indigo-500 pl-3">{t('reputation_score')}</h3>
+                            <h3 className="font-bold text-lg text-gray-900 border-s-4 border-indigo-500 ps-3">{t('reputation_score')}</h3>
                             <p className="text-sm text-gray-500">{t('reputation_desc')}</p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -572,7 +620,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             <div className="p-4 border-b border-border bg-gray-50">
                                 <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wide">{t('table_risk_report')}</h4>
                             </div>
-                            <table className="w-full text-sm text-left">
+                            <table className="w-full text-sm text-start">
                                 <thead className="bg-white text-gray-500 font-bold text-xs uppercase border-b border-gray-100">
                                     <tr>
                                         <th className="px-6 py-4">{t('form_sn')}</th>
@@ -646,7 +694,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             <div className="p-4 border-b border-border bg-gray-50">
                                 <h4 className="font-bold text-sm text-gray-800 uppercase tracking-wide">{t('vendor_table')}</h4>
                             </div>
-                            <table className="w-full text-sm text-left">
+                            <table className="w-full text-sm text-start">
                                 <thead className="bg-white text-gray-500 font-bold text-xs uppercase border-b border-gray-100">
                                     <tr>
                                         <th className="px-6 py-4">{t('manufacturer')}</th>
@@ -853,8 +901,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
                         <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft min-h-[500px] p-8 flex justify-center bg-gray-50 overflow-auto">
                             {selectedCMReport ? (
-                                <div className="w-full max-w-[210mm] bg-white shadow-lg p-[10mm] text-xs font-serif text-black border border-gray-200">
-                                    {/* HEADER */}
+                                <div className="w-full max-w-[210mm] bg-white shadow-lg p-[10mm] text-xs font-serif text-black border border-gray-200" dir="ltr">
+                                    {/* HEADER - Kept in LTR for Standard Forms, mixed language support */}
                                     <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
                                         <div>
                                             <div className="font-bold text-lg">FIRST GULF COMPANY</div>
@@ -987,7 +1035,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                         <h1 className="font-bold text-xl">PREVENTIVE MAINTENANCE CHECKLIST</h1>
                                         <div className="font-bold text-lg">{selectedPMReport.asset.name} - {selectedPMReport.asset.model}</div>
                                     </div>
-                                    {/* PM Content Mockup... reused similar structure */}
                                     <div className="p-10 text-center text-gray-500 italic">PM Report View Loaded for WO #{selectedPMReport.wo_id}</div>
                                 </div>
                             ) : (
@@ -1005,11 +1052,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     <div className="space-y-6">
                         <div className="flex gap-4">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
+                                <Search className="absolute start-3 top-3.5 text-gray-400" size={18}/>
                                 <input 
                                     type="text" 
                                     placeholder="Search manuals, error codes, guides..." 
-                                    className="input-modern pl-10"
+                                    className="input-modern ps-10"
                                     value={kbSearch}
                                     onChange={(e) => setKbSearch(e.target.value)}
                                 />
@@ -1128,8 +1175,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                   <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
                 </div>
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">{t('form_name')}</th><th className="px-6 py-4">{t('form_model')}</th><th className="px-6 py-4">{t('serial_number')}</th><th className="px-6 py-4">{t('location')}</th><th className="px-6 py-4">{t('status')}</th><th className="px-6 py-4">{t('actions')}</th></tr></thead>
+                    <table className="w-full text-sm text-start">
+                        <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4 text-start">{t('form_name')}</th><th className="px-6 py-4 text-start">{t('form_model')}</th><th className="px-6 py-4 text-start">{t('serial_number')}</th><th className="px-6 py-4 text-start">{t('location')}</th><th className="px-6 py-4 text-start">{t('status')}</th><th className="px-6 py-4 text-start">{t('actions')}</th></tr></thead>
                         <tbody className="divide-y divide-gray-100">{assets.map(asset => (<tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors"><td className="px-6 py-4 font-bold text-gray-900 flex items-center gap-3"><div className="w-8 h-8 rounded bg-gray-100 border border-gray-200 overflow-hidden shrink-0">{asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Package size={16} className="m-auto text-gray-400"/>}</div>{asset.name}</td><td className="px-6 py-4 text-gray-600 font-medium">{asset.model}</td><td className="px-6 py-4 text-gray-500 font-mono text-xs">{asset.serial_number}</td><td className="px-6 py-4 text-text-muted">{getLocationName(asset.location_id)}</td><td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${asset.status === AssetStatus.RUNNING ? 'bg-success/10 text-success' : asset.status === AssetStatus.DOWN ? 'bg-danger/10 text-danger' : 'bg-warning/10 text-warning-dark'}`}>{asset.status}</span></td><td className="px-6 py-4"><button onClick={() => setSelectedAsset(asset)} className="text-brand font-bold hover:underline text-xs">View Details</button></td></tr>))}</tbody>
                     </table>
                 </div>
@@ -1198,13 +1245,13 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             </button>
                         </div>
                         <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <table className="w-full text-sm text-left">
+                            <table className="w-full text-sm text-start">
                                 <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
                                     <tr>
-                                        <th className="px-6 py-4">Name</th>
-                                        <th className="px-6 py-4">Role</th>
-                                        <th className="px-6 py-4">Email</th>
-                                        <th className="px-6 py-4">Department</th>
+                                        <th className="px-6 py-4 text-start">Name</th>
+                                        <th className="px-6 py-4 text-start">Role</th>
+                                        <th className="px-6 py-4 text-start">Email</th>
+                                        <th className="px-6 py-4 text-start">Department</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -1329,10 +1376,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     </h4>
                                     
                                     <div className="border border-border rounded-xl overflow-hidden">
-                                        <table className="w-full text-sm">
+                                        <table className="w-full text-sm text-start">
                                             <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
                                                 <tr>
-                                                    <th className="px-4 py-3 text-left">Resource</th>
+                                                    <th className="px-4 py-3 text-start">Resource</th>
                                                     <th className="px-4 py-3 text-center">View</th>
                                                     <th className="px-4 py-3 text-center">Create</th>
                                                     <th className="px-4 py-3 text-center">Edit</th>
@@ -1389,7 +1436,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded-lg ${maintenanceViewMode === 'list' ? 'bg-brand text-white' : 'text-gray-500 hover:bg-gray-100'}`}><List size={20}/></button>
                         <div className="w-px h-6 bg-gray-200 mx-2"></div>
                         <div className="flex items-center gap-2 text-sm text-gray-500"><Filter size={16}/> <select className="bg-transparent font-medium outline-none" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}><option value="all">All Priorities</option>{Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}</select></div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 ml-4"><Wrench size={16}/> <select className="bg-transparent font-medium outline-none" value={maintenanceFilterType} onChange={e => setMaintenanceFilterType(e.target.value)}><option value="all">All Types</option>{Object.values(WorkOrderType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 ms-4"><Wrench size={16}/> <select className="bg-transparent font-medium outline-none" value={maintenanceFilterType} onChange={e => setMaintenanceFilterType(e.target.value)}><option value="all">All Types</option>{Object.values(WorkOrderType).map(t => <option key={t} value={t}>{t}</option>)}</select></div>
                     </div>
                     <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_wo')}</button>
                 </div>
@@ -1442,8 +1489,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </div>
                 ) : (
                     <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Asset</th><th className="px-6 py-4">Priority</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Assigned To</th><th className="px-6 py-4">Actions</th></tr></thead>
+                        <table className="w-full text-sm text-start">
+                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4 text-start">ID</th><th className="px-6 py-4 text-start">Asset</th><th className="px-6 py-4 text-start">Priority</th><th className="px-6 py-4 text-start">Status</th><th className="px-6 py-4 text-start">Assigned To</th><th className="px-6 py-4 text-start">Actions</th></tr></thead>
                             <tbody className="divide-y divide-gray-100">
                                 {filteredWOs.map(wo => {
                                     const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
@@ -1556,12 +1603,12 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <h4 className="font-bold text-sm text-gray-900 mb-2 flex items-center gap-2"><Box size={16}/> Parts Used</h4>
                                     {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 ? (
                                         <table className="w-full text-sm border border-border rounded-lg overflow-hidden">
-                                            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase"><tr><th className="px-3 py-2 text-left">Part Name</th><th className="px-3 py-2 text-right">Qty</th></tr></thead>
+                                            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase"><tr><th className="px-3 py-2 text-start">Part Name</th><th className="px-3 py-2 text-end">Qty</th></tr></thead>
                                             <tbody>
                                                 {selectedWorkOrderForDetails.parts_used.map((p, i) => {
                                                     const partDetails = inventory.find(inv => inv.part_id === p.part_id);
                                                     return (
-                                                        <tr key={i} className="border-t border-border"><td className="px-3 py-2">{partDetails?.part_name || `Part #${p.part_id}`}</td><td className="px-3 py-2 text-right font-mono">{p.quantity}</td></tr>
+                                                        <tr key={i} className="border-t border-border"><td className="px-3 py-2">{partDetails?.part_name || `Part #${p.part_id}`}</td><td className="px-3 py-2 text-end font-mono">{p.quantity}</td></tr>
                                                     )
                                                 })}
                                             </tbody>
@@ -1591,14 +1638,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 </div>
 
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                    <table className="w-full text-sm text-left">
+                    <table className="w-full text-sm text-start">
                         <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
                             <tr>
-                                <th className="px-6 py-4">{t('part_name')}</th>
-                                <th className="px-6 py-4">{t('stock_level')}</th>
-                                <th className="px-6 py-4">{t('unit_cost')}</th>
-                                <th className="px-6 py-4">{t('status')}</th>
-                                <th className="px-6 py-4">{t('actions')}</th>
+                                <th className="px-6 py-4 text-start">{t('part_name')}</th>
+                                <th className="px-6 py-4 text-start">{t('stock_level')}</th>
+                                <th className="px-6 py-4 text-start">{t('unit_cost')}</th>
+                                <th className="px-6 py-4 text-start">{t('status')}</th>
+                                <th className="px-6 py-4 text-start">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -1651,7 +1698,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 {/* Confirmation Large Restock */}
                 {confirmRestockOpen && (
                      <div className="fixed inset-0 bg-gray-900/60 z-[60] flex items-center justify-center p-4">
-                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm border-l-4 border-warning">
+                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm border-s-4 border-warning">
                              <h3 className="font-bold text-lg mb-2 text-warning-dark flex items-center gap-2"><AlertTriangle size={20}/> {t('confirm_large_restock_title')}</h3>
                              <p className="text-sm text-gray-600 mb-6">
                                  {t('confirm_large_restock_msg').replace('{qty}', restockAmount)}
@@ -1687,8 +1734,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             <h3 className="font-bold text-gray-700">{t('cal_schedule')}</h3>
                             <input type="text" placeholder="Search..." className="text-xs border rounded p-1" value={calibrationSearch} onChange={e => setCalibrationSearch(e.target.value)} />
                         </div>
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4">Asset</th><th className="px-6 py-4">Last Cal.</th><th className="px-6 py-4">Next Due</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Action</th></tr></thead>
+                        <table className="w-full text-sm text-start">
+                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase"><tr><th className="px-6 py-4 text-start">Asset</th><th className="px-6 py-4 text-start">Last Cal.</th><th className="px-6 py-4 text-start">Next Due</th><th className="px-6 py-4 text-start">Status</th><th className="px-6 py-4 text-start">Action</th></tr></thead>
                             <tbody className="divide-y divide-gray-100">
                                 {assets.filter(a => a.name.toLowerCase().includes(calibrationSearch.toLowerCase())).map(asset => {
                                     const isOverdue = new Date(asset.next_calibration_date || '') < new Date();
@@ -1779,7 +1826,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                          </div>
                     </div>
                     {lastZebraScan && (
-                        <div className="text-right">
+                        <div className="text-end">
                             <div className="text-[10px] font-bold uppercase text-text-muted">Last Scan</div>
                             <div className="font-mono text-sm font-bold text-brand">{lastZebraScan}</div>
                         </div>
@@ -1934,14 +1981,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <span className="text-xs bg-brand/10 text-brand px-2 py-0.5 rounded font-bold animate-pulse">LIVE</span>
                             </div>
                             <div className="max-h-[400px] overflow-y-auto">
-                                <table className="w-full text-sm text-left">
+                                <table className="w-full text-sm text-start">
                                     <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase sticky top-0">
                                         <tr>
-                                            <th className="px-6 py-3">Time</th>
-                                            <th className="px-6 py-3">Gate</th>
-                                            <th className="px-6 py-3">Asset</th>
-                                            <th className="px-6 py-3">Event</th>
-                                            <th className="px-6 py-3">Status</th>
+                                            <th className="px-6 py-3 text-start">Time</th>
+                                            <th className="px-6 py-3 text-start">Gate</th>
+                                            <th className="px-6 py-3 text-start">Asset</th>
+                                            <th className="px-6 py-3 text-start">Event</th>
+                                            <th className="px-6 py-3 text-start">Status</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
@@ -1998,7 +2045,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             {/* ... Existing views rendered above, fallback just in case */}
             
             {showToast && (
-                <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-4 flex items-center gap-3 z-50">
+                <div className={`fixed bottom-6 ${language === 'ar' ? 'left-6' : 'right-6'} bg-gray-900 text-white px-6 py-3 rounded-xl shadow-2xl animate-in slide-in-from-bottom-4 flex items-center gap-3 z-50`}>
                     <div className="bg-green-500 rounded-full p-1"><Check size={14} /></div>
                     <div>
                         <div className="font-bold text-sm">Assignment Complete</div>

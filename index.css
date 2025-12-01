@@ -1,12 +1,19 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&display=swap');
 
 body {
   @apply bg-background text-text-main antialiased font-sans;
+}
+
+/* RTL Specific Font Override */
+[dir="rtl"] body {
+  font-family: 'Cairo', 'Inter', system-ui, sans-serif;
 }
 
 /* Custom Scrollbar */
@@ -28,6 +35,10 @@ body {
 /* Glassmorphism Utility */
 .glass {
   @apply bg-white/80 backdrop-blur-md border border-white/20;
+}
+
+.glass-panel {
+  @apply bg-white/60 backdrop-blur-xl border border-white/40 shadow-soft;
 }
 
 .card-hover {
