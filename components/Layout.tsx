@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio } from 'lucide-react';
+import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio, Home, ClipboardList, ScanLine, UserCircle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface LayoutProps {
@@ -27,34 +27,66 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     </button>
   );
 
-  // Mobile Header for limited roles
+  // --- MOBILE / TABLET LAYOUT (Nurse, Technician, Vendor) ---
   if (user.role === UserRole.NURSE || user.role === UserRole.TECHNICIAN || user.role === UserRole.VENDOR) {
     return (
-      <div className="min-h-screen bg-background text-text-main font-sans">
-        <header className="bg-white border-b border-border h-16 px-4 flex justify-between items-center sticky top-0 z-50 shadow-sm/50 backdrop-blur-md bg-white/90">
+      <div className="min-h-screen bg-background text-text-main font-sans pb-24 md:pb-0">
+        {/* Top Header (Mobile) */}
+        <header className="bg-white/90 backdrop-blur-md border-b border-border h-16 px-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center text-white shadow-glow">
-              <Activity size={18} />
+            <div className="w-9 h-9 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-glow">
+              <Activity size={20} />
             </div>
             <div>
-              <h1 className="font-bold text-lg text-gray-900 leading-none">{t('appName')}</h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted">{user.role}</span>
+              <h1 className="font-bold text-lg text-gray-900 leading-none tracking-tight">{t('appName')}</h1>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-brand">{user.role}</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <LangToggle />
-            <div className="w-px h-6 bg-gray-200 mx-1"></div>
-            <button onClick={onLogout} className="text-sm font-medium text-text-muted hover:text-danger transition-colors">{t('logout')}</button>
+            <button onClick={onLogout} className="p-2 text-text-muted hover:text-danger transition-colors">
+                <LogOut size={20} className="rtl:rotate-180"/>
+            </button>
           </div>
         </header>
-        <main className="p-4 lg:p-6 max-w-5xl mx-auto">
+
+        {/* Main Content */}
+        <main className="p-4 md:p-6 max-w-5xl mx-auto animate-in fade-in duration-500">
           {children}
         </main>
+
+        {/* Bottom Navigation Bar (Mobile Only) */}
+        <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border px-6 py-2 pb-safe z-50 md:hidden flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+            <button 
+                onClick={() => onNavigate('dashboard')} 
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${currentView === 'dashboard' || currentView === 'tasks' || currentView === 'report' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+                <Home size={24} strokeWidth={currentView === 'dashboard' ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">Home</span>
+            </button>
+            
+            {/* Contextual Middle Button */}
+            {user.role === UserRole.TECHNICIAN && (
+                <button className="flex flex-col items-center gap-1 p-2 text-gray-400">
+                    <div className="w-12 h-12 bg-brand text-white rounded-full flex items-center justify-center -mt-8 shadow-lg shadow-brand/30 border-4 border-white">
+                        <ScanLine size={24} />
+                    </div>
+                    <span className="text-[10px] font-bold">Scan</span>
+                </button>
+            )}
+
+            <button 
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${currentView === 'profile' ? 'text-brand' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+                <UserCircle size={24} strokeWidth={currentView === 'profile' ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">Profile</span>
+            </button>
+        </nav>
       </div>
     );
   }
 
-  // Supervisor / Admin Sidebar Layout
+  // --- DESKTOP LAYOUT (Supervisor, Admin) ---
   const navItems = [
     { id: 'dashboard', label: t('nav_dashboard'), icon: LayoutDashboard },
     { id: 'assets', label: t('nav_assets'), icon: Boxes },
@@ -62,7 +94,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
     { id: 'inventory', label: t('nav_inventory'), icon: Package },
     { id: 'calibration', label: t('nav_calibration'), icon: Activity },
     { id: 'analysis', label: t('nav_analysis'), icon: FileText },
-    { id: 'rfid', label: t('nav_rfid'), icon: Radio }, // Added RFID Menu
+    { id: 'rfid', label: t('nav_rfid'), icon: Radio },
   ];
 
   if (user.role === UserRole.ADMIN) {
@@ -107,7 +139,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
                     w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 group relative
                     ${isActive 
                       ? 'bg-brand text-white shadow-lg shadow-brand/25' 
-                      : 'text-text-muted hover:bg-gray-50 hover:text-gray-900'
+                      : 'text-text-muted hover:bg-brand-soft hover:text-brand-dark'
                     }
                   `}
                 >
@@ -155,7 +187,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden bg-background relative">
-        {/* Mobile Header */}
+        {/* Mobile Header (For Admins on small screens) */}
         <header className="lg:hidden bg-white/80 backdrop-blur-md border-b border-border h-16 px-4 flex justify-between items-center sticky top-0 z-40">
           <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg">
             <Menu size={24} />
@@ -165,7 +197,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 scroll-smooth">
-          <div className="max-w-7xl mx-auto space-y-8 pb-10">
+          <div className="max-w-7xl mx-auto space-y-8 pb-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {children}
           </div>
         </main>

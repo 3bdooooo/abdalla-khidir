@@ -1,3 +1,4 @@
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -12,7 +13,8 @@ export default {
       },
       boxShadow: {
         'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
-        'glow': '0 0 15px rgba(59, 130, 246, 0.5)',
+        'card': '0 0 0 1px rgba(0,0,0,0.03), 0 2px 8px rgba(0,0,0,0.04)',
+        'glow': '0 0 15px rgba(37, 99, 235, 0.3)',
       },
       colors: {
         brand: {
@@ -20,8 +22,9 @@ export default {
           light: '#60A5FA',   // Blue 400
           dark: '#1E40AF',    // Blue 800
           accent: '#3B82F6',
+          soft: '#EFF6FF',    // Blue 50
         },
-        background: '#F1F5F9', // Slate 100
+        background: '#F8FAFC', // Slate 50 (Cooler white)
         surface: '#FFFFFF',
         border: '#E2E8F0',    // Slate 200
         text: {
