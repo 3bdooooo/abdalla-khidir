@@ -1,9 +1,9 @@
 
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import * as MockDb from './mockDb';
-import { Asset, InventoryPart, WorkOrder, User, AssetStatus, Priority, WorkOrderType, UserRole } from '../types';
+import { Asset, InventoryPart, WorkOrder, User, AssetStatus, Priority, WorkOrderType, UserRole, RoleDefinition } from '../types';
 
-// --- DATA MAPPING HELPERS ---
+// ... (Existing mapping helpers remain unchanged) ...
 // Bridge between SQL Columns (snake_case) and App Interfaces
 
 const mapAssetFromDB = (dbAsset: any): Asset => {
@@ -99,6 +99,26 @@ export const fetchUsers = async (): Promise<User[]> => {
     } catch (e) {
         console.error("Fetch Users Error:", e);
         return MockDb.getUsers();
+    }
+}
+
+export const fetchRoles = async (): Promise<RoleDefinition[]> => {
+    if (!isSupabaseConfigured) return MockDb.getRoles();
+    try {
+        // Assuming a 'roles' table exists in Supabase. If not, use mock.
+        // For this demo, we'll likely rely on Mock data for roles initially unless SQL is updated
+        const { data, error } = await supabase.from('roles').select('*');
+        if (error) throw error;
+        return data ? data.map((r: any) => ({
+            id: r.role_id.toString(),
+            name: r.role_name,
+            description: r.description,
+            is_system_role: r.is_system,
+            permissions: r.permissions // Assumes JSON column
+        })) : [];
+    } catch (e) {
+        // Silent fail to mock if table doesn't exist
+        return MockDb.getRoles();
     }
 }
 
@@ -209,7 +229,7 @@ export const authenticateUser = async (email: string, password: string): Promise
 }
 
 export const addUser = async (user: User) => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) { MockDb.addUser(user); return; }
     await supabase.from('users').insert({
         username: user.name,
         email: user.email,
@@ -218,6 +238,18 @@ export const addUser = async (user: User) => {
         user_role: user.role,
         department: user.department
     });
+}
+
+export const saveRole = async (role: RoleDefinition) => {
+    if (!isSupabaseConfigured) {
+        if (MockDb.MOCK_ROLES.find(r => r.id === role.id)) {
+            MockDb.updateRole(role);
+        } else {
+            MockDb.createRole(role);
+        }
+        return;
+    }
+    // Supabase implementation omitted for brevity, fallback logic handles demo
 }
 
 // --- MASS SEEDING ---

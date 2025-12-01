@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Asset, InventoryPart, WorkOrder, AssetDocument, WorkOrderType, Priority, User } from '../types';
 import { analyzeRootCause, suggestDiagnosisAndParts } from '../services/geminiService';
+import { analyzeHistoricalPatterns, HistoricalInsight } from '../services/predictiveService';
 import { getAssets, getAssetDocuments, findRelevantDocuments } from '../services/mockDb';
 import * as api from '../services/api';
-import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench } from 'lucide-react';
+import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TechnicianProps {
@@ -33,6 +34,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     
     // AI Parts Suggestion State
     const [suggestedPart, setSuggestedPart] = useState<{name: string, prob: number} | null>(null);
+    const [historicalInsight, setHistoricalInsight] = useState<HistoricalInsight | null>(null);
 
     const [operatingHours, setOperatingHours] = useState<string>('');
     const [selectedParts, setSelectedParts] = useState<{id: number, qty: number}[]>([]);
@@ -72,6 +74,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
             setOperatingHours(''); 
             setSelectedParts([]); 
             setSuggestedPart(null); 
+            setHistoricalInsight(null);
             setPartsSearch(''); 
             setShowConfirmModal(false); 
             setShowDocsModal(false); 
@@ -148,13 +151,18 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         const model = asset?.model || 'Generic';
         const name = asset?.name || 'Unknown Device';
 
+        // 1. Generative AI Analysis
         const result = await suggestDiagnosisAndParts(name, model, symptoms, inventory);
-        
         setRootCause(result.rootCause);
         if (result.recommendedPart && result.recommendedPart !== "None") {
             setSuggestedPart({ name: result.recommendedPart, prob: result.probability });
             setPartsSearch(result.recommendedPart);
         }
+
+        // 2. Historical Analysis (Smart Engineering Assistant)
+        const allWOs = await api.fetchWorkOrders(); // Using API to ensure we have broader context if possible
+        const history = analyzeHistoricalPatterns(model, symptoms, allWOs);
+        setHistoricalInsight(history);
 
         setIsAnalyzing(false); 
     };
@@ -538,10 +546,43 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                          {t('get_suggestions')}
                                      </button>
                                      
+                                     {/* SMART ENGINEERING ASSISTANT (HISTORICAL) */}
+                                     {historicalInsight && historicalInsight.similarCasesCount > 0 && (
+                                         <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 animate-in slide-in-from-top-2 space-y-3">
+                                             <div className="flex items-center gap-2 mb-2 pb-2 border-b border-teal-100">
+                                                 <BrainCircuit size={18} className="text-teal-600"/>
+                                                 <h4 className="font-bold text-teal-900 text-sm">{t('smart_assistant')}</h4>
+                                             </div>
+                                             
+                                             <div className="grid grid-cols-2 gap-2 text-xs">
+                                                 <div className="bg-white p-2 rounded border border-teal-100">
+                                                     <div className="text-teal-500 font-bold uppercase">{t('historical_matches')}</div>
+                                                     <div className="text-lg font-bold text-gray-800">{historicalInsight.similarCasesCount}</div>
+                                                 </div>
+                                                 <div className="bg-white p-2 rounded border border-teal-100">
+                                                     <div className="text-teal-500 font-bold uppercase">{t('avg_repair_time')}</div>
+                                                     <div className="text-lg font-bold text-gray-800">{historicalInsight.avgRepairTimeHours}h</div>
+                                                 </div>
+                                             </div>
+
+                                             <div>
+                                                 <div className="text-teal-800 text-xs font-bold mb-1">{t('common_parts')}:</div>
+                                                 <div className="flex flex-wrap gap-1">
+                                                     {historicalInsight.topPartsUsed.map((p, i) => (
+                                                         <span key={i} className="text-xs bg-white text-gray-700 px-2 py-1 rounded border border-teal-100 font-medium">
+                                                             {p.partName} ({p.count})
+                                                         </span>
+                                                     ))}
+                                                 </div>
+                                             </div>
+                                         </div>
+                                     )}
+
+                                     {/* AI SUGGESTION */}
                                      {rootCause && (
                                          <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 animate-in slide-in-from-top-2 space-y-3">
                                              <div>
-                                                <h4 className="font-bold text-indigo-900 text-sm mb-1 flex items-center gap-2"><Sparkles size={14}/> Diagnosis</h4>
+                                                <h4 className="font-bold text-indigo-900 text-sm mb-1 flex items-center gap-2"><Sparkles size={14}/> AI Diagnosis</h4>
                                                 <p className="text-sm text-indigo-800 leading-relaxed">{rootCause}</p>
                                              </div>
                                              {suggestedPart && (

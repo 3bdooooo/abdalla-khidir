@@ -1,9 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
 import * as api from '../services/api';
-import { LOCATIONS } from '../services/mockDb';
+import { LOCATIONS, getAssetDocuments } from '../services/mockDb';
 import { Priority, WorkOrderType, Asset, User, AssetStatus, WorkOrder } from '../types';
-import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star, QrCode, Camera, Lightbulb, BookOpen, ChevronDown, ChevronUp, FileText, Smartphone } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface NurseViewProps {
@@ -19,8 +19,12 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
   const [description, setDescription] = useState('');
   const [selectedAssetId, setSelectedAssetId] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
+  const [scanMethod, setScanMethod] = useState<'nfc' | 'qr'>('nfc');
   const { t } = useLanguage();
 
+  // Smart Point State
+  const [showSmartPoint, setShowSmartPoint] = useState(false);
+  
   // Verification State
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [selectedWoForVerify, setSelectedWoForVerify] = useState<WorkOrder | null>(null);
@@ -78,6 +82,7 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
         setIsSubmitted(false);
         setDescription('');
         setSelectedAssetId('');
+        setShowSmartPoint(false);
         setActiveTab('dashboard');
         refreshData();
     }, 3000);
@@ -88,13 +93,16 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
       setActiveTab('report');
   };
 
-  const handleNfcScan = () => {
+  const handleScan = (method: 'nfc' | 'qr') => {
+    setScanMethod(method);
     setIsScanning(true);
+    // Simulate scanning process
     setTimeout(() => {
         const randomAsset = deptAssets[Math.floor(Math.random() * deptAssets.length)];
         setSelectedAssetId(randomAsset.asset_id);
         setIsScanning(false);
-    }, 2000);
+        setShowSmartPoint(true); // Open Smart Point instead of form directly
+    }, 2500);
   };
 
   const openVerifyModal = (wo: WorkOrder) => {
@@ -115,6 +123,108 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
       }
   };
 
+  const SmartPointOverlay = ({ asset, onClose, onReport }: { asset: Asset, onClose: () => void, onReport: () => void }) => {
+      const [expandedStep, setExpandedStep] = useState<number | null>(null);
+      const docs = getAssetDocuments(asset.asset_id);
+      
+      // Mock Troubleshooting Steps based on simple logic
+      const steps = [
+          { title: "Power Cycle Device", desc: "Turn off the device using the rear switch, wait 10 seconds, and turn it back on." },
+          { title: "Check Connections", desc: "Ensure all patient cables and power cords are securely plugged in." },
+          { title: "Verify Settings", desc: "Reset alarm limits to default to clear transient errors." }
+      ];
+
+      return (
+          <div className="fixed inset-0 bg-gray-900/90 z-50 overflow-y-auto font-sans animate-in slide-in-from-bottom-10">
+              <div className="min-h-screen flex flex-col p-4 md:p-6 max-w-lg mx-auto">
+                  <div className="flex justify-between items-center text-white mb-6">
+                      <h2 className="text-xl font-bold flex items-center gap-2"><Smartphone size={24}/> {t('smart_point_title')}</h2>
+                      <button onClick={onClose} className="p-2 bg-white/10 rounded-full hover:bg-white/20"><X size={20}/></button>
+                  </div>
+
+                  {/* 1. Device Status Card */}
+                  <div className="bg-white rounded-2xl overflow-hidden shadow-2xl mb-6">
+                      <div className="relative h-48">
+                          <img src={asset.image} className="w-full h-full object-cover" alt={asset.name} />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
+                              <div>
+                                  <div className="text-white/80 text-xs font-bold uppercase tracking-wider mb-1">{t('detected')}</div>
+                                  <h1 className="text-2xl font-bold text-white leading-none">{asset.name}</h1>
+                                  <p className="text-white/70 text-sm mt-1">{asset.model} • {asset.asset_id}</p>
+                              </div>
+                          </div>
+                      </div>
+                      <div className="p-4 flex items-center justify-between bg-gray-50 border-b border-gray-100">
+                          <div className="text-xs font-bold text-gray-500 uppercase">{t('status')}</div>
+                          <div className={`px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2 ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              <div className={`w-2 h-2 rounded-full ${asset.status === AssetStatus.RUNNING ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                              {asset.status}
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* 2. Quick Troubleshooting */}
+                  <div className="space-y-4 mb-8">
+                      <div className="flex items-center gap-2 text-white/90">
+                          <Lightbulb className="text-yellow-400" size={20}/>
+                          <h3 className="font-bold">{t('troubleshooting')}</h3>
+                      </div>
+                      <div className="space-y-2">
+                          {steps.map((step, idx) => (
+                              <div key={idx} className="bg-white rounded-xl overflow-hidden shadow-sm">
+                                  <button 
+                                    onClick={() => setExpandedStep(expandedStep === idx ? null : idx)}
+                                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
+                                  >
+                                      <span className="font-bold text-gray-800 text-sm">{idx + 1}. {step.title}</span>
+                                      {expandedStep === idx ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
+                                  </button>
+                                  {expandedStep === idx && (
+                                      <div className="px-4 pb-4 pt-0 text-sm text-gray-600 bg-gray-50 border-t border-gray-100">
+                                          {step.desc}
+                                      </div>
+                                  )}
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+
+                  {/* 3. Docs */}
+                  <div className="mb-8">
+                      <div className="flex items-center gap-2 text-white/90 mb-3">
+                          <BookOpen className="text-blue-300" size={20}/>
+                          <h3 className="font-bold">{t('quick_guide')}</h3>
+                      </div>
+                      <div className="bg-white/10 rounded-xl p-1 backdrop-blur-sm border border-white/10">
+                          {docs.length > 0 ? docs.map(doc => (
+                              <div key={doc.doc_id} className="flex items-center justify-between p-3 hover:bg-white/5 rounded-lg text-white transition-colors cursor-pointer">
+                                  <div className="flex items-center gap-3">
+                                      <FileText size={18} className="text-white/70"/>
+                                      <span className="text-sm font-medium">{doc.title}</span>
+                                  </div>
+                                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded">{t('manual_link')}</span>
+                              </div>
+                          )) : <div className="p-4 text-white/50 text-sm text-center">No documents found.</div>}
+                      </div>
+                  </div>
+
+                  {/* 4. Action */}
+                  <div className="mt-auto bg-white rounded-t-2xl -mx-4 -mb-6 p-6 pb-8 space-y-4">
+                      <h3 className="text-center font-bold text-gray-900">{t('is_problem_solved')}</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                          <button onClick={onClose} className="py-4 bg-green-500 hover:bg-green-600 text-white rounded-xl font-bold shadow-lg shadow-green-200 transition-all active:scale-95">
+                              {t('btn_solved')}
+                          </button>
+                          <button onClick={onReport} className="py-4 bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 rounded-xl font-bold transition-all active:scale-95 border border-gray-200">
+                              {t('btn_not_solved')}
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )
+  };
+
   if (isSubmitted) {
     return (
         <div className="flex flex-col items-center justify-center h-[60vh] animate-in zoom-in duration-300 font-sans">
@@ -129,6 +239,21 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
 
   return (
     <div className="space-y-4 pb-16 font-sans">
+      {/* SMART POINT OVERLAY */}
+      {showSmartPoint && identifiedAsset && (
+          <SmartPointOverlay 
+            asset={identifiedAsset} 
+            onClose={() => {
+                setShowSmartPoint(false);
+                setSelectedAssetId('');
+            }}
+            onReport={() => {
+                setShowSmartPoint(false);
+                // User stays on 'report' tab with ID selected, ready to type description
+            }}
+          />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-1">
         <div>
@@ -269,35 +394,58 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
           </div>
       )}
 
-      {/* REPORT VIEW */}
+      {/* REPORT VIEW (Includes NFC and QR) */}
       {activeTab === 'report' && (
         <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-6 animate-in fade-in slide-in-from-right-4">
              
-            {/* NFC Scanner Component */}
+            {/* Scanner Component */}
             <div className="w-full max-w-md">
                 {!selectedAssetId ? (
-                    <button 
-                        onClick={handleNfcScan}
-                        disabled={isScanning}
-                        className={`w-full py-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 transition-all bg-white shadow-sm ${isScanning ? 'border-brand animate-pulse' : 'border-gray-300 hover:border-brand hover:bg-gray-50'}`}
-                    >
-                        {isScanning ? (
-                            <>
-                                <div className="w-10 h-10 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
-                                <span className="text-brand font-bold">{t('identifying')}</span>
-                            </>
-                        ) : (
-                            <>
-                                <div className="p-4 bg-brand/10 text-brand rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                                    <Scan size={32} />
-                                </div>
-                                <div className="text-center">
-                                    <span className="text-lg font-bold text-gray-900 block">{t('scan_nfc')}</span>
-                                    <span className="text-xs text-text-muted font-medium">{t('tap_instruction')}</span>
-                                </div>
-                            </>
-                        )}
-                    </button>
+                    <div className="grid grid-cols-2 gap-4">
+                        <button 
+                            onClick={() => handleScan('nfc')}
+                            disabled={isScanning}
+                            className={`py-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 transition-all bg-white shadow-sm ${isScanning && scanMethod === 'nfc' ? 'border-brand animate-pulse' : 'border-gray-300 hover:border-brand hover:bg-gray-50'}`}
+                        >
+                            {isScanning && scanMethod === 'nfc' ? (
+                                <>
+                                    <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-brand font-bold text-sm">{t('identifying')}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="p-3 bg-brand/10 text-brand rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                        <Scan size={28} />
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="font-bold text-gray-900 block text-sm">{t('scan_nfc')}</span>
+                                    </div>
+                                </>
+                            )}
+                        </button>
+
+                        <button 
+                            onClick={() => handleScan('qr')}
+                            disabled={isScanning}
+                            className={`py-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 transition-all bg-white shadow-sm ${isScanning && scanMethod === 'qr' ? 'border-purple-500 animate-pulse' : 'border-gray-300 hover:border-purple-500 hover:bg-purple-50'}`}
+                        >
+                            {isScanning && scanMethod === 'qr' ? (
+                                <>
+                                    <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-purple-600 font-bold text-sm">{t('scanning_qr')}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="p-3 bg-purple-100 text-purple-600 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                                        <QrCode size={28} />
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="font-bold text-gray-900 block text-sm">{t('scan_qr')}</span>
+                                    </div>
+                                </>
+                            )}
+                        </button>
+                    </div>
                 ) : (
                     <div className="bg-white border border-brand rounded-2xl overflow-hidden shadow-md">
                          {identifiedAsset?.image && (
@@ -313,7 +461,7 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
                          <div className="p-4 flex items-center justify-between">
                              <div className="flex items-center gap-3">
                                  <div className="p-2 bg-brand/10 text-brand rounded-lg">
-                                     <Wifi size={20} />
+                                     {scanMethod === 'nfc' ? <Wifi size={20} /> : <QrCode size={20} />}
                                  </div>
                                  <div>
                                      <div className="text-xs text-brand font-bold uppercase tracking-wider">{t('detected')}</div>

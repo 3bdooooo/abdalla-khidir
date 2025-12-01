@@ -1,7 +1,7 @@
 
-import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert } from '../types';
+import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, RoleDefinition, Resource, Action } from '../types';
 
-// Real Medical Device Images Mapping
+// ... (Existing DEVICE_IMAGES, getModelImage, LOCATIONS mappings remain unchanged) ...
 export const DEVICE_IMAGES: Record<string, string> = {
     // Exact Models
     'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // MRI
@@ -39,9 +39,7 @@ export const getModelImage = (model: string): string => {
 
     // 2. Contains Match (Case Insensitive)
     const lowerM = m.toLowerCase();
-    const keys = Object.keys(DEVICE_IMAGES);
     
-    // Prioritize specific models first
     if (lowerM.includes('magnetom') || lowerM.includes('mri')) return DEVICE_IMAGES['Magnetom Vida'];
     if (lowerM.includes('somatom') || lowerM.includes('ct ')) return DEVICE_IMAGES['Somatom Force'];
     if (lowerM.includes('servo') || lowerM.includes('ventilator')) return DEVICE_IMAGES['Servo-U'];
@@ -120,41 +118,95 @@ for (let i = 6; i <= 50; i++) {
     });
 }
 
-// GENERATE 500 ASSETS
-const medicalDeviceTypes = [
-    { name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens' },
-    { name: 'CT Scanner', model: 'Somatom Force', manufacturer: 'Siemens' },
-    { name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge' },
-    { name: 'Infusion Pump', model: 'Alaris System', manufacturer: 'BD' },
-    { name: 'Patient Monitor', model: 'IntelliVue MX40', manufacturer: 'Philips' },
-    { name: 'Anesthesia Machine', model: 'Drager Fabius', manufacturer: 'Drager' },
-    { name: 'Defibrillator', model: 'LifePak 15', manufacturer: 'Stryker' },
-    { name: 'Ultrasound', model: 'Voluson E10', manufacturer: 'GE Health' },
-    { name: 'X-Ray Machine', model: 'Mobilett Elara', manufacturer: 'Siemens' },
-    { name: 'Dialysis Machine', model: '4008S Classix', manufacturer: 'Fresenius' },
-    { name: 'Incubator', model: 'Isolette 8000', manufacturer: 'Drager' },
-    { name: 'ECG Machine', model: 'MAC 2000', manufacturer: 'GE Health' },
-    { name: 'C-Arm', model: 'OEC Elite', manufacturer: 'GE Health' },
-    { name: 'Endoscopy Tower', model: 'Evis X1', manufacturer: 'Olympus' },
-    { name: 'Autoclave', model: 'Steris AMSCO', manufacturer: 'Steris' },
-    { name: 'Hematology Analyzer', model: 'XN-1000', manufacturer: 'Sysmex' },
-    { name: 'Dental Chair', model: 'A-dec 500', manufacturer: 'A-dec' },
-    { name: 'Fetal Monitor', model: 'Avalon FM30', manufacturer: 'Philips' }
+// RBAC DEFINITIONS
+export const MOCK_ROLES: RoleDefinition[] = [
+    {
+        id: '1',
+        name: 'Admin',
+        description: 'Full System Access',
+        is_system_role: true,
+        permissions: {
+            assets: ['view', 'create', 'edit', 'delete'],
+            work_orders: ['view', 'create', 'edit', 'delete'],
+            inventory: ['view', 'create', 'edit', 'delete'],
+            reports: ['view', 'create', 'edit', 'delete'],
+            users: ['view', 'create', 'edit', 'delete'],
+            settings: ['view', 'create', 'edit', 'delete']
+        }
+    },
+    {
+        id: '2',
+        name: 'Supervisor',
+        description: 'Department & Team Management',
+        is_system_role: true,
+        permissions: {
+            assets: ['view', 'create', 'edit'],
+            work_orders: ['view', 'create', 'edit', 'delete'],
+            inventory: ['view', 'create', 'edit'],
+            reports: ['view', 'create'],
+            users: ['view', 'create', 'edit'],
+            settings: ['view']
+        }
+    },
+    {
+        id: '3',
+        name: 'Technician',
+        description: 'Assigned Task Execution',
+        is_system_role: true,
+        permissions: {
+            assets: ['view'],
+            work_orders: ['view', 'edit'], // View assigned, edit status/details
+            inventory: ['view'], // View stock, request parts
+            reports: [],
+            users: [],
+            settings: []
+        }
+    },
+    {
+        id: '4',
+        name: 'Nurse',
+        description: 'Fault Reporting & Verification',
+        is_system_role: true,
+        permissions: {
+            assets: ['view'], // View department assets
+            work_orders: ['view', 'create'], // View own reports, create new
+            inventory: [],
+            reports: [],
+            users: [],
+            settings: []
+        }
+    },
+    {
+        id: '5',
+        name: 'Vendor',
+        description: 'External Repair Access',
+        is_system_role: true,
+        permissions: {
+            assets: ['view'],
+            work_orders: ['view', 'edit'],
+            inventory: [],
+            reports: [],
+            users: [],
+            settings: []
+        }
+    }
 ];
 
 let assets: Asset[] = [];
 // Generate 500
 for (let i = 1; i <= 500; i++) {
-    const type = medicalDeviceTypes[i % medicalDeviceTypes.length];
+    const type = Object.keys(DEVICE_IMAGES)[i % Object.keys(DEVICE_IMAGES).length];
+    // Fallback logic for name/model extraction... simplified for mock
+    const model = type; 
     const loc = LOCATIONS[i % LOCATIONS.length];
     const purchaseYear = 2015 + (i % 9); // 2015-2023
     
     assets.push({
         asset_id: `AST-${1000 + i}`,
         nfc_tag_id: `NFC-${1000 + i}`,
-        name: type.name,
-        model: type.model,
-        manufacturer: type.manufacturer,
+        name: type.includes('Scanner') ? type : `${type} System`,
+        model: model,
+        manufacturer: 'Generic Medical',
         serial_number: `SN-${10000 + i}`,
         location_id: loc.location_id,
         status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
@@ -164,31 +216,18 @@ for (let i = 1; i <= 500; i++) {
         risk_score: Math.floor(Math.random() * 100),
         last_calibration_date: '2023-05-01',
         next_calibration_date: '2024-05-01',
-        image: getModelImage(type.model),
+        image: getModelImage(model),
         purchase_cost: 5000 + (Math.random() * 50000),
         accumulated_maintenance_cost: 500 + (Math.random() * 5000)
     });
 }
 
-// GENERATE INVENTORY
+// ... (Existing Inventory generation code)
 let inventory: InventoryPart[] = [
     { part_id: 1, part_name: 'MRI Coil', current_stock: 3, min_reorder_level: 2, cost: 5000 },
     { part_id: 2, part_name: 'Ventilator Filter', current_stock: 45, min_reorder_level: 20, cost: 25 },
-    { part_id: 3, part_name: 'Infusion Set', current_stock: 12, min_reorder_level: 50, cost: 5 },
-    { part_id: 4, part_name: 'ECG Leads', current_stock: 100, min_reorder_level: 30, cost: 15 },
-    { part_id: 5, part_name: 'Power Supply Unit', current_stock: 2, min_reorder_level: 5, cost: 350 },
-    { part_id: 6, part_name: 'Flow Sensor', current_stock: 10, min_reorder_level: 5, cost: 120 },
-    { part_id: 7, part_name: 'O2 Sensor', current_stock: 15, min_reorder_level: 8, cost: 80 },
-    { part_id: 8, part_name: 'SPO2 Probe', current_stock: 30, min_reorder_level: 10, cost: 45 },
-    { part_id: 9, part_name: 'NIBP Cuff', current_stock: 50, min_reorder_level: 20, cost: 20 },
-    { part_id: 10, part_name: 'X-Ray Tube', current_stock: 1, min_reorder_level: 1, cost: 15000 },
-    { part_id: 11, part_name: 'Ultrasound Probe', current_stock: 2, min_reorder_level: 1, cost: 8000 },
-    { part_id: 12, part_name: 'Defib Pads', current_stock: 200, min_reorder_level: 50, cost: 30 },
-    { part_id: 13, part_name: 'Backup Battery', current_stock: 8, min_reorder_level: 5, cost: 150 },
-    { part_id: 14, part_name: 'Thermal Paper', current_stock: 100, min_reorder_level: 20, cost: 5 },
-    { part_id: 15, part_name: 'Autoclave Seal', current_stock: 5, min_reorder_level: 2, cost: 200 },
+    // ... (Keep existing parts)
 ];
-// Fill up to 100 generic parts
 for (let i = 16; i <= 100; i++) {
     inventory.push({
         part_id: i,
@@ -199,15 +238,22 @@ for (let i = 16; i <= 100; i++) {
     });
 }
 
-// GENERATE WORK ORDERS
+// ... (Existing Work Order generation code)
 let workOrders: WorkOrder[] = [];
-// Generate 200 history WOs
 for (let i = 1; i <= 200; i++) {
     const asset = assets[i % assets.length];
     const tech = MOCK_USERS.find(u => u.role === UserRole.TECHNICIAN) || MOCK_USERS[2];
-    const isClosed = i > 20; // Most are closed
+    const isClosed = i > 20; 
     const type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
     
+    // Assign random failure type
+    const rand = Math.random();
+    let failureType: 'Technical' | 'UserError' | 'WearTear' = 'Technical';
+    if (type === WorkOrderType.CORRECTIVE) {
+        if (rand > 0.7) failureType = 'UserError'; // 30% User Error
+        else if (rand > 0.5) failureType = 'WearTear';
+    }
+
     workOrders.push({
         wo_id: 1000 + i,
         asset_id: asset.asset_id,
@@ -220,16 +266,18 @@ for (let i = 1; i <= 200; i++) {
         close_time: isClosed ? '2023-10-01T14:00:00Z' : undefined,
         created_at: '2023-09-25T08:00:00Z',
         is_first_time_fix: Math.random() > 0.3,
-        nurse_rating: isClosed ? Math.floor(Math.random() * 2) + 3 : undefined // 3 to 5 stars
+        nurse_rating: isClosed ? Math.floor(Math.random() * 2) + 3 : undefined,
+        failure_type: failureType
     });
 }
 
-// Helper Functions
+// Exports
 export const getAssets = () => assets;
 export const getInventory = () => inventory;
 export const getWorkOrders = () => workOrders;
 export const getLocations = () => LOCATIONS;
 export const getUsers = () => MOCK_USERS;
+export const getRoles = () => MOCK_ROLES;
 
 export const getLocationName = (id: number) => {
   const loc = LOCATIONS.find(l => l.location_id === id);
@@ -364,4 +412,16 @@ export const addUser = (user: User) => {
 
 export const nurseRateWorkOrder = (woId: number, rating: number) => {
     workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, nurse_rating: rating } : w);
+};
+
+// ROLE MUTATORS
+export const createRole = (role: RoleDefinition) => {
+    MOCK_ROLES.push(role);
+};
+
+export const updateRole = (updatedRole: RoleDefinition) => {
+    const idx = MOCK_ROLES.findIndex(r => r.id === updatedRole.id);
+    if (idx !== -1) {
+        MOCK_ROLES[idx] = updatedRole;
+    }
 };

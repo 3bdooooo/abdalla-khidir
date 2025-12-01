@@ -28,6 +28,23 @@ export enum Priority {
   CRITICAL = 'Critical',
 }
 
+// RBAC Types
+export type Resource = 'assets' | 'work_orders' | 'inventory' | 'reports' | 'users' | 'settings';
+export type Action = 'view' | 'create' | 'edit' | 'delete';
+
+export interface Permission {
+  resource: Resource;
+  actions: Action[];
+}
+
+export interface RoleDefinition {
+  id: string;
+  name: string; // e.g. "Maintenance Manager"
+  description: string;
+  is_system_role: boolean; // Prevent deleting core roles
+  permissions: Record<Resource, Action[]>;
+}
+
 // Location/Department Table
 export interface Location {
   location_id: number;
@@ -42,7 +59,7 @@ export interface Location {
 export interface User {
   user_id: number;
   name: string;
-  role: UserRole;
+  role: string; // Changed from Enum to string to support custom roles
   email: string;
   location_id?: number; 
   // New Fields for User Management
@@ -105,6 +122,9 @@ export interface WorkOrder {
   // Performance Metrics
   nurse_rating?: number; // 1-5 Star Rating
   is_first_time_fix?: boolean; // Did it get resolved without reopening?
+  
+  // Reputation & Failure Analysis
+  failure_type?: 'Technical' | 'UserError' | 'WearTear'; // NEW: For Reputation System
 
   // Approval Tracking
   approvals?: {

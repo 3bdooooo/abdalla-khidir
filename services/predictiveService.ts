@@ -1,6 +1,6 @@
 
-import { Asset, User, WorkOrder, AssetStatus, MovementLog } from '../types';
-import { LOCATIONS } from './mockDb';
+import { Asset, User, WorkOrder, AssetStatus, MovementLog, InventoryPart } from '../types';
+import { LOCATIONS, getAssets, getInventory } from './mockDb';
 
 // --- 1. Predictive Risk Scoring Engine ---
 
@@ -109,4 +109,89 @@ export const recommendTechnicians = (
 
     // Return sorted by score (Highest first)
     return scoredTechs.sort((a, b) => b.score - a.score);
+};
+
+// --- 3. Smart Engineering Assistant (Historical Analysis) ---
+
+export interface HistoricalInsight {
+    similarCasesCount: number;
+    avgRepairTimeHours: number;
+    topPartsUsed: { partName: string, count: number }[];
+    commonSolutions: string[];
+}
+
+export const analyzeHistoricalPatterns = (
+    assetModel: string,
+    currentFaultDescription: string,
+    allWorkOrders: WorkOrder[]
+): HistoricalInsight => {
+    // 1. Find Closed WOs for same Model
+    const assets = getAssets();
+    const inventory = getInventory();
+    
+    // Find all assets of this model
+    const sameModelAssetIds = assets
+        .filter(a => a.model.toLowerCase() === assetModel.toLowerCase())
+        .map(a => a.asset_id);
+
+    // Filter WOs: Closed, Corrective, Same Model
+    const similarWOs = allWorkOrders.filter(wo => 
+        sameModelAssetIds.includes(wo.asset_id.replace('NFC-', 'AST-')) && 
+        wo.status === 'Closed' && 
+        wo.type === 'Corrective'
+        // Ideally, we'd also do fuzzy matching on description here, 
+        // but for now we assume model-specific faults are relevant enough
+    );
+
+    if (similarWOs.length === 0) {
+        return { similarCasesCount: 0, avgRepairTimeHours: 0, topPartsUsed: [], commonSolutions: [] };
+    }
+
+    // 2. Calculate MTTR
+    let totalTime = 0;
+    let timeCount = 0;
+    similarWOs.forEach(wo => {
+        if (wo.start_time && wo.close_time) {
+            const start = new Date(wo.start_time).getTime();
+            const end = new Date(wo.close_time).getTime();
+            const diff = end - start;
+            if (diff > 0) {
+                totalTime += diff;
+                timeCount++;
+            }
+        }
+    });
+    const avgTime = timeCount > 0 ? (totalTime / timeCount) / (1000 * 60 * 60) : 0;
+
+    // 3. Aggregate Parts
+    const partCounts: Record<number, number> = {};
+    similarWOs.forEach(wo => {
+        if (wo.parts_used) {
+            wo.parts_used.forEach(p => {
+                partCounts[p.part_id] = (partCounts[p.part_id] || 0) + p.quantity;
+            });
+        }
+    });
+
+    const topParts = Object.entries(partCounts)
+        .map(([id, count]) => {
+            const part = inventory.find(i => i.part_id === parseInt(id));
+            return { partName: part ? part.part_name : `Part #${id}`, count };
+        })
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3); // Top 3
+
+    // 4. Common Solutions (Extract logic would be more complex with NLP, mocking simple extraction)
+    // In a real app, we would cluster these texts.
+    // Here we just take the last 2 valid descriptions to show as examples.
+    const commonSolutions = similarWOs
+        .slice(0, 2)
+        .map(wo => "Ref WO#" + wo.wo_id); 
+
+    return {
+        similarCasesCount: similarWOs.length,
+        avgRepairTimeHours: parseFloat(avgTime.toFixed(1)),
+        topPartsUsed: topParts,
+        commonSolutions
+    };
 };
