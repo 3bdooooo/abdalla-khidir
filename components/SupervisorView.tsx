@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
@@ -6,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, LayoutKanban, Table } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -23,7 +24,7 @@ interface SupervisorProps {
 }
 
 export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, currentUser, assets, workOrders, inventory, users = [], onAddAsset, onAddUser, refreshData, onNavigate }) => {
-    // ... (Keep existing state management unchanged)
+    // --- STATE MANAGEMENT ---
     const [activeTab, setActiveTab] = useState('tab_analytics'); 
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const { t, language, dir } = useLanguage();
@@ -51,8 +52,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     
     // Reporting State
     const [reportType, setReportType] = useState<'CM' | 'PPM' | 'COMPLIANCE'>('CM');
-    const [reportStartDate, setReportStartDate] = useState('2023-01-01');
-    const [reportEndDate, setReportEndDate] = useState('2023-12-31');
     const [jobOrderSearchId, setJobOrderSearchId] = useState('');
     const [selectedCMReport, setSelectedCMReport] = useState<DetailedJobOrderReport | null>(null);
     const [selectedPMReport, setSelectedPMReport] = useState<PreventiveMaintenanceReport | null>(null);
@@ -91,18 +90,12 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // Knowledge Base State
     const [kbSearch, setKbSearch] = useState('');
-    const [kbMode, setKbMode] = useState<'list' | 'ai'>('list');
     const [aiQuery, setAiQuery] = useState('');
     const [aiResult, setAiResult] = useState<{explanation: string, solution: string, relevantDocs: string[]} | null>(null);
     const [isAiSearching, setIsAiSearching] = useState(false);
 
     // Training Dashboard State
     const [selectedTrainingDept, setSelectedTrainingDept] = useState('');
-
-    // Approval Workflow State
-    const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
-    const [selectedWOForApproval, setSelectedWOForApproval] = useState<WorkOrder | null>(null);
-    const [approvalSignature, setApprovalSignature] = useState('');
 
     // RFID & Audit State
     const [rfidTab, setRfidTab] = useState<'audit' | 'gate'>('audit');
@@ -128,7 +121,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         }
     };
 
-    const { status: zebraStatus, lastScanned: lastZebraScan } = useZebraScanner({
+    const { status: zebraStatus } = useZebraScanner({
         onScan: handleScannerInput,
         isActive: currentView === 'rfid'
     });
@@ -212,7 +205,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }, [isGateMonitoring, currentView, rfidTab, assets]);
 
 
-    // Analytics Calculations (Keep existing logic)
+    // Analytics Calculations
     const analyticsData = useMemo(() => {
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
         const mttrByMonth: {[key: string]: {total: number, count: number}} = {};
@@ -349,15 +342,15 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     };
     const handlePermissionToggle = (resource: Resource, action: Action) => { if (!editingRole) return; const currentPerms = editingRole.permissions[resource] || []; const hasPerm = currentPerms.includes(action); setEditingRole({ ...editingRole, permissions: { ...editingRole.permissions, [resource]: hasPerm ? currentPerms.filter(a => a !== action) : [...currentPerms, action] } }); };
     const handleSaveRole = async () => { if (!editingRole || !editingRole.name) return; await api.saveRole(editingRole); const data = await api.fetchRoles(); setRoles(data); setIsRoleEditorOpen(false); setEditingRole(null); };
-    const handlePrintFlyer = () => { window.print(); };
-
+    
     // --- RENDER HELPERS ---
     const departmentZones = [ { id: 'ICU', name: 'ICU', x: 10, y: 10, width: 20, height: 20, color: 'bg-indigo-100' }, { id: 'Emergency', name: 'ER', x: 40, y: 10, width: 25, height: 15, color: 'bg-red-100' }, { id: 'Radiology', name: 'Rad', x: 70, y: 10, width: 20, height: 20, color: 'bg-blue-100' }, { id: 'Laboratory', name: 'Lab', x: 10, y: 40, width: 15, height: 20, color: 'bg-yellow-100' }, { id: 'Surgery', name: 'OR', x: 50, y: 30, width: 25, height: 25, color: 'bg-teal-100' }, { id: 'Pharmacy', name: 'Pharm', x: 30, y: 40, width: 15, height: 15, color: 'bg-green-100' }, { id: 'General Ward', name: 'Ward', x: 5, y: 90, width: 25, height: 10, color: 'bg-gray-100' } ];
     const getAssetsInZone = (deptId: string) => assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === deptId || (loc?.department && loc.department.includes(deptId)); });
 
-    // DASHBOARD MAIN VIEW
+    // ============================================
+    // 1. DASHBOARD VIEW
+    // ============================================
     if (currentView === 'dashboard') {
-       // ... (Keep existing dashboard code)
        const stats = [
             { label: t('total_assets'), value: assets.length, icon: Box, color: 'bg-blue-500' },
             { label: t('open_tickets'), value: workOrders.filter(w => w.status !== 'Closed').length, icon: AlertCircle, color: 'bg-red-500' },
@@ -485,7 +478,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         );
     }
 
-    // ANALYSIS VIEW RENDER (Including Report Generator)
+    // ============================================
+    // 2. ANALYSIS VIEW (With Report Generator)
+    // ============================================
     if (currentView === 'analysis') {
         return (
             <div className="space-y-6 animate-in fade-in">
@@ -498,10 +493,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     <button onClick={() => setActiveTab('tab_kb')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_kb' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_kb')}</button>
                 </div>
 
-                {/* ... (Keep existing Tabs) ... */}
                 {activeTab === 'tab_analytics' && (
                     <div className="space-y-6">
-                        {/* ... (Existing analytics charts) ... */}
                         <div className="space-y-4">
                             <h3 className="font-bold text-lg text-gray-900 border-s-4 border-brand ps-3">{t('pillar_operational')}</h3>
                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -542,7 +535,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </div>
                 )}
 
-                {/* TAB: REPORT GENERATOR WITH LOGOS */}
                 {activeTab === 'tab_gen_report' && (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
@@ -746,38 +738,494 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </div>
                 )}
 
-                {/* ... (Keep other tabs) ... */}
                 {activeTab === 'tab_kb' && (
                     <div className="space-y-6">
-                        {/* ... (Keep existing KB logic) ... */}
-                    </div>
-                )}
-                {activeTab === 'tab_training' && (
-                    <div className="space-y-6">
-                        {/* ... (Keep existing Training logic) ... */}
-                    </div>
-                )}
-                {activeTab === 'tab_vendor' && (
-                    <div className="space-y-6">
-                        {/* ... (Keep existing Vendor logic) ... */}
+                        <div className="flex gap-4 mb-6">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-3.5 text-gray-400" size={18} />
+                                <input type="text" placeholder={t('ai_search_placeholder')} className="input-modern pl-10" value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} />
+                            </div>
+                            <button onClick={handleAiSearch} className="btn-primary" disabled={isAiSearching}>{isAiSearching ? t('analyzing') : t('btn_analyze')}</button>
+                        </div>
+                        {aiResult && (
+                            <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 animate-in slide-in-from-top-4">
+                                <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2"><Sparkles size={18}/> {t('ai_explanation')}</h3>
+                                <p className="text-sm text-indigo-800 mb-4">{aiResult.explanation}</p>
+                                <h3 className="font-bold text-indigo-900 mb-2">{t('ai_solution')}</h3>
+                                <p className="text-sm text-indigo-800 mb-4">{aiResult.solution}</p>
+                                <h3 className="font-bold text-indigo-900 mb-2">{t('ai_ref_docs')}</h3>
+                                <div className="flex gap-2 flex-wrap">
+                                    {aiResult.relevantDocs.map((doc, idx) => (<span key={idx} className="px-3 py-1 bg-white border border-indigo-200 rounded-full text-xs font-bold text-indigo-700">{doc}</span>))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
         );
     }
 
-    // ... (Keep existing Assets, Users, Maintenance, Inventory, Calibration, RFID logic)
-    return (
-        <div className="relative">
-            {/* Fallback for other views if needed, using existing patterns */}
-            {/* Note: I'm ensuring the 'analysis' view is updated above. The rest of the component handles other views. */}
-            {currentView === 'assets' && (
-                <div className="space-y-6 animate-in fade-in">
-                    <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
-                        <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
-                        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
+    // ============================================
+    // 3. USERS VIEW
+    // ============================================
+    if (currentView === 'users') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('users_title')}</h2>
+                    <div className="flex gap-2">
+                        <button onClick={() => setUserMgmtTab('roles')} className={`px-4 py-2 rounded-lg text-sm font-bold ${userMgmtTab === 'roles' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_roles')}</button>
+                        <button onClick={() => setUserMgmtTab('users')} className={`px-4 py-2 rounded-lg text-sm font-bold ${userMgmtTab === 'users' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>Users List</button>
+                        <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm ml-2"><UserPlus size={16}/> {t('add_user')}</button>
                     </div>
-                    {/* ... Asset Table ... */}
+                </div>
+
+                {userMgmtTab === 'users' ? (
+                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="bg-gray-50 border-b border-border text-xs uppercase text-text-muted">
+                                    <th className="p-4 font-bold">{t('user_name')}</th>
+                                    <th className="p-4 font-bold">{t('user_role')}</th>
+                                    <th className="p-4 font-bold">{t('user_dept')}</th>
+                                    <th className="p-4 font-bold">{t('user_email')}</th>
+                                    <th className="p-4 font-bold">{t('actions')}</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {users.map(u => (
+                                    <tr key={u.user_id} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="p-4 font-bold text-gray-900 flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs">{u.name.charAt(0)}</div>
+                                            {u.name}
+                                        </td>
+                                        <td className="p-4 text-sm"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{u.role}</span></td>
+                                        <td className="p-4 text-sm text-text-muted">{u.department}</td>
+                                        <td className="p-4 text-sm text-text-muted font-mono">{u.email}</td>
+                                        <td className="p-4"><button className="text-gray-400 hover:text-brand"><Wrench size={16}/></button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-lg text-gray-800">{t('manage_roles')}</h3>
+                            <button onClick={() => handleOpenRoleEditor()} className="btn-secondary py-2 px-3 text-xs"><Plus size={14}/> {t('create_role')}</button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {roles.map(role => (
+                                <div key={role.id} className="bg-white p-5 rounded-xl border border-border hover:shadow-md transition-shadow">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-gray-900">{role.name}</h4>
+                                        {role.is_system_role && <span title="System Role"><Lock size={14} className="text-gray-400" /></span>}
+                                    </div>
+                                    <p className="text-xs text-text-muted mb-4 line-clamp-2">{role.description}</p>
+                                    <button onClick={() => handleOpenRoleEditor(role)} className="w-full py-2 bg-gray-50 text-gray-600 text-xs font-bold rounded hover:bg-gray-100">Edit Permissions</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                
+                {/* Add User Modal */}
+                {isAddUserModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_add_user')}</h3>
+                            <form onSubmit={handleAddUserSubmit} className="space-y-3">
+                                <div><label className="text-xs font-bold text-gray-500">{t('user_name')}</label><input className="input-modern" value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-gray-500">{t('user_email')}</label><input className="input-modern" type="email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} required /></div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div><label className="text-xs font-bold text-gray-500">{t('user_role')}</label>
+                                        <select className="input-modern" value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value})}>
+                                            <option value="Technician">Technician</option><option value="Nurse">Nurse</option><option value="Supervisor">Supervisor</option><option value="Engineer">Engineer</option>
+                                        </select>
+                                    </div>
+                                    <div><label className="text-xs font-bold text-gray-500">{t('user_dept')}</label><input className="input-modern" value={newUserForm.department} onChange={e => setNewUserForm({...newUserForm, department: e.target.value})} /></div>
+                                </div>
+                                <div className="flex gap-2 pt-4">
+                                    <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_create_user')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 4. MAINTENANCE VIEW
+    // ============================================
+    if (currentView === 'maintenance') {
+        const filteredWOs = workOrders.filter(wo => {
+            if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
+            if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
+            return true;
+        });
+
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('wo_title')}</h2>
+                    <div className="flex items-center gap-3">
+                        <div className="bg-gray-100 p-1 rounded-lg flex">
+                            <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded ${maintenanceViewMode === 'kanban' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><LayoutGrid size={18}/></button>
+                            <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded ${maintenanceViewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}><List size={18}/></button>
+                        </div>
+                        <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_wo')}</button>
+                    </div>
+                </div>
+
+                {/* Filters */}
+                <div className="flex gap-4">
+                    <select className="input-modern w-48" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}>
+                        <option value="all">{t('filter_all')} Priority</option>
+                        <option value={Priority.HIGH}>High</option><option value={Priority.CRITICAL}>Critical</option>
+                    </select>
+                    <select className="input-modern w-48" value={maintenanceFilterType} onChange={e => setMaintenanceFilterType(e.target.value)}>
+                        <option value="all">{t('filter_all')} Type</option>
+                        <option value={WorkOrderType.CORRECTIVE}>Corrective</option><option value={WorkOrderType.PREVENTIVE}>PM</option>
+                    </select>
+                </div>
+
+                {/* KANBAN BOARD */}
+                {maintenanceViewMode === 'kanban' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[calc(100vh-250px)] overflow-x-auto pb-4">
+                        {['Open', 'In Progress', 'Closed'].map(status => (
+                            <div key={status} className="bg-gray-50 rounded-2xl p-4 border border-border flex flex-col h-full">
+                                <h3 className="font-bold text-gray-500 uppercase text-xs mb-4 flex justify-between">{status} <span className="bg-gray-200 px-2 py-0.5 rounded text-gray-700">{filteredWOs.filter(w => status === 'Open' ? (w.status === 'Open' || w.status === 'Assigned') : w.status === status).length}</span></h3>
+                                <div className="space-y-3 overflow-y-auto flex-1 pr-2">
+                                    {filteredWOs.filter(w => status === 'Open' ? (w.status === 'Open' || w.status === 'Assigned') : w.status === status).map(wo => {
+                                        const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                                        return (
+                                            <div key={wo.wo_id} className="bg-white p-4 rounded-xl border border-border shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }}>
+                                                <div className="flex justify-between mb-2">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${wo.priority === Priority.CRITICAL ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{wo.priority}</span>
+                                                    <span className="text-xs font-mono text-gray-400">#{wo.wo_id}</span>
+                                                </div>
+                                                <div className="font-bold text-gray-900 text-sm mb-1 line-clamp-1">{asset?.name || 'Unknown Asset'}</div>
+                                                <div className="text-xs text-text-muted mb-3 line-clamp-2">{wo.description}</div>
+                                                <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                                                    <div className="flex -space-x-2">
+                                                        <div className="w-6 h-6 rounded-full bg-brand text-white text-[10px] flex items-center justify-center border-2 border-white">
+                                                            {wo.assigned_to_id ? 'U'+wo.assigned_to_id : '?'}
+                                                        </div>
+                                                    </div>
+                                                    {status === 'Open' && (
+                                                        <button onClick={(e) => { e.stopPropagation(); setSelectedWOForAssignment(wo); setIsAssignModalOpen(true); }} className="text-xs bg-gray-900 text-white px-2 py-1 rounded hover:bg-black">{t('assign')}</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    // LIST VIEW
+                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                                <tr><th className="p-4">WO ID</th><th className="p-4">Asset</th><th className="p-4">Priority</th><th className="p-4">Status</th><th className="p-4">Actions</th></tr>
+                            </thead>
+                            <tbody>
+                                {filteredWOs.map(wo => (
+                                    <tr key={wo.wo_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="p-4 font-mono text-sm">#{wo.wo_id}</td>
+                                        <td className="p-4 font-bold text-sm">{assets.find(a => a.asset_id === wo.asset_id)?.name}</td>
+                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${wo.priority === Priority.CRITICAL ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>{wo.priority}</span></td>
+                                        <td className="p-4 text-sm">{wo.status}</td>
+                                        <td className="p-4"><button onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }} className="text-brand hover:underline text-xs font-bold">Details</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Create WO Modal */}
+                {isCreateWOModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+                            <h3 className="font-bold text-lg mb-4">{t('create_wo')}</h3>
+                            <form onSubmit={handleCreateWOSubmit} className="space-y-4">
+                                <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})}>
+                                    <option value="">{t('wo_asset')}</option>
+                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name}</option>)}
+                                </select>
+                                <textarea className="input-modern" placeholder={t('wo_description')} value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})} />
+                                <div className="flex gap-2">
+                                    <button type="button" onClick={() => setIsCreateWOModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_dispatch')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 5. INVENTORY VIEW
+    // ============================================
+    if (currentView === 'inventory') {
+        const lowStockItems = inventory.filter(i => i.current_stock <= i.min_reorder_level);
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+                        <div className="text-text-muted text-xs font-bold uppercase mb-1">{t('total_assets')} Value</div>
+                        <div className="text-2xl font-bold text-gray-900">${inventory.reduce((acc, i) => acc + (i.cost * i.current_stock), 0).toLocaleString()}</div>
+                    </div>
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-sm">
+                        <div className="text-text-muted text-xs font-bold uppercase mb-1">Low Stock Items</div>
+                        <div className="text-2xl font-bold text-red-600">{lowStockItems.length}</div>
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                    <div className="p-4 border-b border-border font-bold text-lg">{t('tab_stock')}</div>
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                            <tr><th className="p-4">{t('part_name')}</th><th className="p-4">{t('stock_level')}</th><th className="p-4">{t('unit_cost')}</th><th className="p-4">{t('actions')}</th></tr>
+                        </thead>
+                        <tbody>
+                            {inventory.map(part => (
+                                <tr key={part.part_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    <td className="p-4 font-bold text-sm text-gray-900">{part.part_name}</td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-20 h-2 rounded-full bg-gray-200 overflow-hidden`}>
+                                                <div className={`h-full ${part.current_stock < part.min_reorder_level ? 'bg-red-500' : 'bg-green-500'}`} style={{ width: `${Math.min((part.current_stock / 50) * 100, 100)}%` }}></div>
+                                            </div>
+                                            <span className="text-xs font-bold">{part.current_stock}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-sm font-mono">${part.cost}</td>
+                                    <td className="p-4"><button onClick={() => initiateRestock(part)} className="text-brand hover:underline text-xs font-bold">{t('btn_restock')}</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Restock Modal */}
+                {restockModalOpen && selectedPartForRestock && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}: {selectedPartForRestock.part_name}</h3>
+                            <input type="number" className="input-modern mb-4" placeholder={t('restock_qty')} value={restockAmount} onChange={e => setRestockAmount(e.target.value)} />
+                            <div className="flex gap-2">
+                                <button onClick={() => setRestockModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                <button onClick={handleRestockPreCheck} className="flex-1 btn-primary">{t('restock_btn')}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 6. CALIBRATION VIEW
+    // ============================================
+    if (currentView === 'calibration') {
+        const calibrationAssets = assets.filter(a => a.next_calibration_date);
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('cal_dashboard')}</h2>
+                </div>
+                
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                            <tr><th className="p-4">Asset</th><th className="p-4">{t('last_cal')}</th><th className="p-4">{t('next_due')}</th><th className="p-4">{t('status')}</th><th className="p-4">{t('actions')}</th></tr>
+                        </thead>
+                        <tbody>
+                            {calibrationAssets.map(asset => {
+                                const isOverdue = new Date(asset.next_calibration_date!) < new Date();
+                                return (
+                                    <tr key={asset.asset_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="p-4 font-bold text-sm">{asset.name}</td>
+                                        <td className="p-4 text-sm text-text-muted">{asset.last_calibration_date}</td>
+                                        <td className="p-4 text-sm font-bold">{asset.next_calibration_date}</td>
+                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${isOverdue ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{isOverdue ? t('cal_overdue') : t('cal_compliant')}</span></td>
+                                        <td className="p-4"><button onClick={() => { setAssetToCalibrate(asset); setUpdateCalibrationModalOpen(true); }} className="btn-secondary py-1 px-3 text-xs">{t('btn_update_cal')}</button></td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+
+                {updateCalibrationModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="font-bold text-lg mb-4">{t('update_cal_title')}</h3>
+                            <input type="date" className="input-modern mb-4" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} />
+                            <div className="flex gap-2">
+                                <button onClick={() => setUpdateCalibrationModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                <button onClick={handleUpdateCalibration} className="flex-1 btn-primary">{t('btn_record')}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 7. RFID VIEW
+    // ============================================
+    if (currentView === 'rfid') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm w-fit mb-6">
+                    <button onClick={() => setRfidTab('audit')} className={`px-6 py-2 rounded-lg font-bold text-sm ${rfidTab === 'audit' ? 'bg-brand text-white shadow' : 'text-gray-500'}`}>{t('rfid_audit')}</button>
+                    <button onClick={() => setRfidTab('gate')} className={`px-6 py-2 rounded-lg font-bold text-sm ${rfidTab === 'gate' ? 'bg-brand text-white shadow' : 'text-gray-500'}`}>{t('rfid_gate_monitor')}</button>
+                </div>
+
+                {rfidTab === 'audit' ? (
+                    <div className="space-y-6">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-lg text-gray-900 mb-1">{t('start_audit')}</h3>
+                                <p className="text-sm text-text-muted">Select a department to begin rapid inventory scan.</p>
+                            </div>
+                            <div className="flex gap-3">
+                                <select className="input-modern w-48" value={selectedAuditDept} onChange={e => setSelectedAuditDept(e.target.value)}>
+                                    <option value="">Select Dept...</option>
+                                    {getLocations().map(l => <option key={l.location_id} value={l.department}>{l.department}</option>)}
+                                </select>
+                                <button onClick={startAudit} className="btn-primary" disabled={!!activeAudit}>{t('btn_record')}</button>
+                            </div>
+                        </div>
+                        {activeAudit && (
+                            <div className="bg-white p-6 rounded-2xl border border-brand border-2 shadow-lg animate-pulse">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-xl text-brand">{t('audit_in_progress')}</h3>
+                                    <span className="font-mono text-2xl font-bold">{activeAudit.total_scanned} / {activeAudit.total_expected}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 rounded-full h-4">
+                                    <div className="bg-brand h-4 rounded-full transition-all duration-300" style={{ width: `${(activeAudit.total_scanned / activeAudit.total_expected) * 100}%` }}></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        <div className="flex gap-4 items-center">
+                            <button onClick={() => setIsGateMonitoring(!isGateMonitoring)} className={`btn-primary ${isGateMonitoring ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                                {isGateMonitoring ? t('deactivate_gates') : t('activate_gates')}
+                            </button>
+                            <div className="flex gap-2">
+                                {gateReaders.map(r => (
+                                    <div key={r.id} className={`px-3 py-1 rounded-full text-xs font-bold border ${r.status === 'online' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
+                                        {r.name}: {r.status}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="bg-black rounded-2xl p-6 h-[400px] overflow-y-auto font-mono text-sm text-green-400 shadow-inner">
+                            {gateLogs.length === 0 ? <div className="opacity-50 text-center mt-32">-- NO GATE ACTIVITY --</div> : 
+                                gateLogs.map(log => (
+                                    <div key={log.id} className="mb-2 border-b border-green-900/30 pb-1 flex justify-between">
+                                        <span>[{new Date(log.timestamp).toLocaleTimeString()}] GATE-{log.gate_location_id}</span>
+                                        <span>ASSET: {log.asset_id}</span>
+                                        <span className={log.direction === 'ENTER' ? 'text-blue-400' : 'text-orange-400'}>{log.direction} >></span>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // DEFAULT VIEW (ASSETS LIST)
+    // ============================================
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
+                <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                <table className="w-full text-left">
+                    <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-border">
+                        <tr>
+                            <th className="p-4">{t('asset_info')}</th>
+                            <th className="p-4 hidden md:table-cell">{t('form_model')}</th>
+                            <th className="p-4 hidden md:table-cell">{t('form_sn')}</th>
+                            <th className="p-4">{t('location')}</th>
+                            <th className="p-4">{t('status')}</th>
+                            <th className="p-4">{t('risk_score')}</th>
+                            <th className="p-4">{t('actions')}</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                        {assets.map(asset => {
+                            const locName = getLocationName(asset.location_id);
+                            return (
+                                <tr key={asset.asset_id} className="hover:bg-gray-50/50 transition-colors">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                                                {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Box size={20} className="m-auto text-gray-400"/>}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-gray-900 text-sm">{asset.name}</div>
+                                                <div className="text-[10px] text-text-muted">{asset.manufacturer}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-xs font-medium text-gray-600 hidden md:table-cell">{asset.model}</td>
+                                    <td className="p-4 text-xs font-mono text-gray-500 hidden md:table-cell">{asset.serial_number}</td>
+                                    <td className="p-4 text-xs font-medium text-text-muted">{locName}</td>
+                                    <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{asset.status}</span></td>
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1 h-1.5 w-16 bg-gray-200 rounded-full overflow-hidden">
+                                                <div className={`h-full ${asset.risk_score > 70 ? 'bg-red-500' : asset.risk_score > 40 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{width: `${asset.risk_score}%`}}></div>
+                                            </div>
+                                            <span className="text-xs font-bold">{asset.risk_score}</span>
+                                        </div>
+                                    </td>
+                                    <td className="p-4"><button className="text-brand hover:underline text-xs font-bold">Details</button></td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Add Asset Modal */}
+            {isAddModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-lg">
+                        <h3 className="font-bold text-lg mb-4">{t('modal_add_title')}</h3>
+                        <form onSubmit={handleAddSubmit} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="text-xs font-bold text-gray-500 uppercase">{t('form_name')}</label><input className="input-modern" value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} required /></div>
+                                <div><label className="text-xs font-bold text-gray-500 uppercase">{t('form_model')}</label><input className="input-modern" value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} required /></div>
+                            </div>
+                            <div><label className="text-xs font-bold text-gray-500 uppercase">{t('form_sn')}</label><input className="input-modern" value={newAssetForm.asset_id} onChange={e => setNewAssetForm({...newAssetForm, asset_id: e.target.value})} required /></div>
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                <button type="submit" className="flex-1 btn-primary">{t('btn_save')}</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             )}
             
