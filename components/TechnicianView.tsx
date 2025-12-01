@@ -18,6 +18,7 @@ interface TechnicianProps {
 export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, inventory, refreshData }) => {
     // State Management
     const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
+    const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); // New state for Start Job flow
     const [dashboardTab, setDashboardTab] = useState<'requests' | 'inprogress' | 'pms'>('requests');
     const [filterPriority, setFilterPriority] = useState<string>('All');
     const [filterStatus, setFilterStatus] = useState<string>('All');
@@ -50,6 +51,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     const [assetDocs, setAssetDocs] = useState<AssetDocument[]>([]);
     const [isStartingJob, setIsStartingJob] = useState(false);
     const [scanState, setScanState] = useState<'idle' | 'scanning' | 'locating' | 'verified'>('idle');
+    const [scanType, setScanType] = useState<'nfc' | 'qr'>('nfc');
     const [locationData, setLocationData] = useState<{lat: number, lng: number} | null>(null);
     
     // PM Checklist
@@ -62,7 +64,10 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     ]);
 
     // Helpers
-    const getAssetForWO = (assetId: string) => getAssets().find(a => a.asset_id === assetId || a.nfc_tag_id === assetId);
+    const getAssetForWO = (assetId: string) => {
+        const assets = getAssets();
+        return assets.find(a => a.asset_id === assetId || a.nfc_tag_id === assetId);
+    };
 
     // Reset state when WO is selected
     useEffect(() => { 
@@ -92,13 +97,16 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     // --- HANDLERS ---
 
     const executeStartJob = async () => {
-        if (!selectedWO) return;
+        if (!pendingWO) return;
         
-        setIsStartingJob(true); // Show loader while API call happens
+        setIsStartingJob(true); 
         
-        await api.startWorkOrder(selectedWO.wo_id, locationData || undefined);
+        await api.startWorkOrder(pendingWO.wo_id, locationData || undefined);
         refreshData();
-        setSelectedWO(prev => prev ? ({...prev, status: 'In Progress'}) : null);
+        
+        // Transition to Detail View
+        setSelectedWO({...pendingWO, status: 'In Progress'});
+        setPendingWO(null);
         
         setShowDocsModal(false);
         setIsStartingJob(false);
@@ -107,7 +115,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
     const handleStartJob = async (e: React.MouseEvent, wo: WorkOrder, method: 'nfc' | 'qr' = 'nfc') => { 
         e.stopPropagation(); 
-        setSelectedWO(wo); 
+        setPendingWO(wo); // Set pending, don't switch view yet
+        setScanType(method);
         
         const currentWoId = wo.wo_id; 
         const currentAssetId = wo.asset_id; 
@@ -128,7 +137,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
                 await new Promise(resolve => setTimeout(resolve, 800)); 
                 
-                // 3. Find Docs BEFORE starting timer
+                // 3. Find Docs
                 const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 
@@ -141,21 +150,19 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 if (foundDocs && foundDocs.length > 0) { 
                     setAssetDocs(foundDocs); 
                     setShowDocsModal(true);
-                    setIsStartingJob(false); // Hide the scan overlay, show the modal
+                    setIsStartingJob(false); // Hide scan overlay
                 } else {
-                    // No docs found? Start directly.
+                    // No docs? Start immediately
                     await api.startWorkOrder(currentWoId, coords); 
                     refreshData(); 
-                    setSelectedWO(prev => ({...wo, status: 'In Progress'}));
+                    setSelectedWO({...wo, status: 'In Progress'});
+                    setPendingWO(null);
                     setIsStartingJob(false);
                     setScanState('idle');
                 }
             },
             async (error) => {
-                // Fallback if geo fails
-                console.warn("Geo failed, proceeding with manual fallback");
-                
-                // Still try to find docs
+                // Fallback
                 const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 if (asset) {
@@ -172,6 +179,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     await api.startWorkOrder(currentWoId);
                     refreshData();
                     setSelectedWO({...wo, status: 'In Progress'});
+                    setPendingWO(null);
                     setIsStartingJob(false);
                     setScanState('idle');
                 }
@@ -241,13 +249,10 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         let matchesTab = false; 
         // 1. Tab Logic
         if (dashboardTab === 'requests') {
-            // New requests are Open or Assigned Corrective tasks
             matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && wo.type === WorkOrderType.CORRECTIVE;
         } else if (dashboardTab === 'inprogress') {
-            // Tasks currently being worked on
             matchesTab = wo.status === 'In Progress';
         } else if (dashboardTab === 'pms') {
-            // PMs and Calibration
             matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && (wo.type === WorkOrderType.PREVENTIVE || wo.type === WorkOrderType.CALIBRATION);
         } 
         
@@ -319,7 +324,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                         filteredOrders.map(wo => {
                             const asset = getAssetForWO(wo.asset_id);
                             const isAssigned = wo.status === 'Assigned';
-                            const isPm = wo.type !== WorkOrderType.CORRECTIVE;
                             
                             return (
                                 <div key={wo.wo_id} className="bg-white rounded-2xl p-5 border border-border shadow-soft hover:shadow-md transition-all group relative overflow-hidden">
@@ -371,7 +375,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                                         className="px-3 py-2 bg-gray-900 text-white text-xs font-bold rounded-lg shadow-md hover:bg-gray-800 transition-colors flex items-center gap-1 disabled:opacity-70"
                                                         title="Scan NFC"
                                                     >
-                                                        {isStartingJob && scanState === 'scanning' ? <div className="w-3 h-3 border-2 border-white rounded-full animate-spin"></div> : <Scan size={14}/>}
+                                                        {isStartingJob && scanType === 'nfc' ? <div className="w-3 h-3 border-2 border-white rounded-full animate-spin"></div> : <Scan size={14}/>}
                                                     </button>
                                                     <button 
                                                         onClick={(e) => handleStartJob(e, wo, 'qr')}
@@ -457,13 +461,14 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                         <div className="relative">
                             <div className="w-24 h-24 rounded-full border-4 border-white/20 animate-ping absolute inset-0"></div>
                             <div className="w-24 h-24 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-md border border-white/30">
-                                {scanState === 'scanning' && <Scan size={40} className="animate-pulse"/>}
+                                {scanState === 'scanning' && scanType === 'nfc' && <Scan size={40} className="animate-pulse"/>}
+                                {scanState === 'scanning' && scanType === 'qr' && <QrCode size={40} className="animate-pulse"/>}
                                 {scanState === 'locating' && <MapPin size={40} className="animate-bounce"/>}
                                 {scanState === 'verified' && <Check size={40} className="text-green-400"/>}
                             </div>
                         </div>
                         <h3 className="mt-8 text-xl font-bold">
-                            {scanState === 'scanning' && t('identifying')}
+                            {scanState === 'scanning' && (scanType === 'nfc' ? t('identifying') : t('scanning_qr'))}
                             {scanState === 'locating' && t('acquiring_location')}
                             {scanState === 'verified' && t('match_verified')}
                         </h3>
@@ -474,8 +479,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     </div>
                 )}
                 
-                {/* Docs Found Modal */}
-                {showDocsModal && (
+                {/* Docs Found Modal - Uses pendingWO to display data while in dashboard state */}
+                {showDocsModal && pendingWO && (
                     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
                             <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4 mx-auto">
@@ -483,18 +488,15 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                             </div>
                             <h3 className="text-xl font-bold text-center mb-2">{t('manuals_detected')}</h3>
                             <p className="text-center text-gray-500 text-sm mb-6">
-                                {t('relevant_docs')} for <strong>{selectedWO ? getAssetForWO(selectedWO.asset_id)?.model : 'Asset'}</strong>
+                                {t('relevant_docs')} for <strong>{getAssetForWO(pendingWO.asset_id)?.model || 'Asset'}</strong>
                             </p>
                             
                             <div className="space-y-3 mb-6">
                                 {assetDocs.map(doc => (
-                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors cursor-pointer">
+                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
                                         <FileText size={18} className="text-brand"/>
-                                        <div className="flex-1">
-                                            <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
-                                            <div className="text-[10px] text-gray-500">{doc.type} • {doc.date}</div>
-                                        </div>
-                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">Open</div>
+                                        <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
+                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">{doc.type}</div>
                                     </div>
                                 ))}
                             </div>
