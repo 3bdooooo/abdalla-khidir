@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState, useEffect } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
@@ -1138,7 +1139,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <div key={log.id} className="mb-2 border-b border-green-900/30 pb-1 flex justify-between">
                                         <span>[{new Date(log.timestamp).toLocaleTimeString()}] GATE-{log.gate_location_id}</span>
                                         <span>ASSET: {log.asset_id}</span>
-                                        <span className={log.direction === 'ENTER' ? 'text-blue-400' : 'text-orange-400'}>{log.direction} >></span>
+                                        <span className={log.direction === 'ENTER' ? 'text-blue-400' : 'text-orange-400'}>{log.direction} &gt;&gt;</span>
                                     </div>
                                 ))
                             }
