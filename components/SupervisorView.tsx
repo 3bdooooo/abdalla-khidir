@@ -7,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -333,7 +333,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const startAudit = () => { if(!selectedAuditDept) return alert("Select a department"); const expected = getAssetsInZone(selectedAuditDept); setActiveAudit({ id: Date.now(), date: new Date().toISOString(), department: selectedAuditDept, total_expected: expected.length, total_scanned: 0, missing_assets: expected.map(a => a.asset_id), found_assets: [], status: 'In Progress' }); };
     const handleRealScan = (scannedId: string) => { if(!activeAudit) return; const cleanId = scannedId.trim(); if (activeAudit.missing_assets.includes(cleanId)) { setActiveAudit(prev => prev ? { ...prev, total_scanned: prev.total_scanned + 1, missing_assets: prev.missing_assets.filter(id => id !== cleanId), found_assets: [...prev.found_assets, cleanId] } : null); } };
     const handleGateScan = (scannedId: string, locationId: number) => { const cleanId = scannedId.trim(); const asset = assets.find(a => a.asset_id === cleanId || a.rfid_tag_id === cleanId); if (asset) { setGateLogs(prev => [{ id: Date.now(), asset_id: asset.asset_id, rfid_tag: cleanId, gate_location_id: locationId, direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT', timestamp: new Date().toISOString() }, ...prev]); } };
-    
+    const handleSimulateAuditScan = () => { if(activeAudit && activeAudit.missing_assets.length > 0) { const randomId = activeAudit.missing_assets[Math.floor(Math.random() * activeAudit.missing_assets.length)]; handleRealScan(randomId); }};
+
     // ROLE MANAGEMENT
     const handleOpenRoleEditor = (role?: RoleDefinition) => {
         if (role) { setEditingRole({ ...role, permissions: JSON.parse(JSON.stringify(role.permissions)) }); } 
@@ -1063,14 +1064,71 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <button onClick={startAudit} className="btn-primary" disabled={!!activeAudit}>{t('btn_record')}</button>
                             </div>
                         </div>
+                        
                         {activeAudit && (
-                            <div className="bg-white p-6 rounded-2xl border border-brand border-2 shadow-lg animate-pulse">
-                                <div className="flex justify-between items-center mb-4">
-                                    <h3 className="font-bold text-xl text-brand">{t('audit_in_progress')}</h3>
-                                    <span className="font-mono text-2xl font-bold">{activeAudit.total_scanned} / {activeAudit.total_expected}</span>
+                            <div className="space-y-6 animate-in slide-in-from-bottom-2">
+                                <div className="bg-white p-6 rounded-2xl border border-brand border-2 shadow-lg animate-pulse">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-xl text-brand">{t('audit_in_progress')}</h3>
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-mono text-2xl font-bold">{activeAudit.total_scanned} / {activeAudit.total_expected}</span>
+                                            {/* SIMULATION BUTTON FOR TESTING */}
+                                            <button 
+                                                onClick={handleSimulateAuditScan}
+                                                className="bg-gray-100 hover:bg-gray-200 text-xs font-bold px-3 py-1 rounded-lg border border-gray-300"
+                                            >
+                                                {t('simulate_scan')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-4">
+                                        <div className="bg-brand h-4 rounded-full transition-all duration-300" style={{ width: `${(activeAudit.total_scanned / activeAudit.total_expected) * 100}%` }}></div>
+                                    </div>
                                 </div>
-                                <div className="w-full bg-gray-200 rounded-full h-4">
-                                    <div className="bg-brand h-4 rounded-full transition-all duration-300" style={{ width: `${(activeAudit.total_scanned / activeAudit.total_expected) * 100}%` }}></div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* FOUND LIST */}
+                                    <div className="bg-green-50 border border-green-100 rounded-2xl p-4 max-h-[400px] overflow-y-auto">
+                                        <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2 sticky top-0 bg-green-50 pb-2 border-b border-green-200">
+                                            <CheckCircle2 size={18} /> {t('scanned_assets')} ({activeAudit.found_assets.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {activeAudit.found_assets.map(id => {
+                                                const asset = assets.find(a => a.asset_id === id);
+                                                return (
+                                                    <div key={id} className="bg-white p-3 rounded-lg border border-green-100 flex justify-between items-center shadow-sm">
+                                                        <div>
+                                                            <div className="font-bold text-sm text-gray-800">{asset?.name || 'Unknown Asset'}</div>
+                                                            <div className="text-xs text-gray-500">{asset?.model}</div>
+                                                        </div>
+                                                        <div className="text-xs font-mono bg-green-100 text-green-700 px-2 py-1 rounded">{id}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {activeAudit.found_assets.length === 0 && <div className="text-center text-green-800/50 py-4 text-sm italic">Waiting for scans...</div>}
+                                        </div>
+                                    </div>
+
+                                    {/* MISSING LIST */}
+                                    <div className="bg-red-50 border border-red-100 rounded-2xl p-4 max-h-[400px] overflow-y-auto">
+                                        <h4 className="font-bold text-red-800 mb-3 flex items-center gap-2 sticky top-0 bg-red-50 pb-2 border-b border-red-200">
+                                            <XCircle size={18} /> {t('missing_assets')} ({activeAudit.missing_assets.length})
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {activeAudit.missing_assets.map(id => {
+                                                const asset = assets.find(a => a.asset_id === id);
+                                                return (
+                                                    <div key={id} className="bg-white p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm opacity-80">
+                                                        <div>
+                                                            <div className="font-bold text-sm text-gray-800">{asset?.name || 'Unknown Asset'}</div>
+                                                            <div className="text-xs text-gray-500">{asset?.model}</div>
+                                                        </div>
+                                                        <div className="text-xs font-mono bg-red-100 text-red-700 px-2 py-1 rounded">{id}</div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         )}
