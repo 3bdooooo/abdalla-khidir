@@ -7,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -58,10 +58,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     
     // Alerts State
     const [alerts, setAlerts] = useState<SystemAlert[]>(getSystemAlerts());
-    const [showAlertPanel, setShowAlertPanel] = useState(false);
-    const [justificationModalOpen, setJustificationModalOpen] = useState(false);
-    const [selectedAlert, setSelectedAlert] = useState<SystemAlert | null>(null);
-    const [justificationReason, setJustificationReason] = useState('');
     
     // 3D Map State
     const [selectedMapZone, setSelectedMapZone] = useState<string | null>(null);
@@ -77,7 +73,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [isWorkOrderDetailsModalOpen, setIsWorkOrderDetailsModalOpen] = useState(false);
     
     // Calibration State
-    const [calibrationSearch, setCalibrationSearch] = useState('');
     const [updateCalibrationModalOpen, setUpdateCalibrationModalOpen] = useState(false);
     const [assetToCalibrate, setAssetToCalibrate] = useState<Asset | null>(null);
     const [newCalibrationDate, setNewCalibrationDate] = useState(new Date().toISOString().split('T')[0]);
@@ -867,6 +862,25 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </tbody>
                     </table>
                 </div>
+                
+                {updateCalibrationModalOpen && assetToCalibrate && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="text-xl font-bold mb-4">{t('update_cal_title')}</h3>
+                            <div className="space-y-4">
+                                <p className="text-sm">Device: <strong>{assetToCalibrate.name}</strong></p>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">{t('new_cal_date')}</label>
+                                    <input type="date" className="input-modern" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setUpdateCalibrationModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button onClick={handleUpdateCalibration} className="flex-1 btn-primary">{t('btn_record')}</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -880,6 +894,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 {/* Analytics Nav */}
                 <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto">
                     <button onClick={() => setActiveTab('tab_analytics')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_analytics' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_analytics')}</button>
+                    <button onClick={() => setActiveTab('tab_financial')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_financial' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_financial')}</button>
                     <button onClick={() => setActiveTab('tab_vendor')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_vendor' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_vendor')}</button>
                     <button onClick={() => setActiveTab('tab_training')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_training' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_training')}</button>
                     <button onClick={() => setActiveTab('tab_gen_report')} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg ${activeTab === 'tab_gen_report' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('tab_gen_report')}</button>
@@ -954,7 +969,45 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     )}
 
-                    {/* 6.3 TRAINING DASHBOARD */}
+                    {/* 6.3 FINANCIAL ANALYSIS */}
+                    {activeTab === 'tab_financial' && (
+                        <div className="space-y-6 animate-in slide-in-from-bottom-2">
+                            <h3 className="font-bold text-xl text-gray-900 mb-4">{t('tco_analysis')}</h3>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div className="h-[350px]">
+                                    <h4 className="text-sm font-bold text-gray-500 mb-4 uppercase">Top 5 Costly Assets (Purchase vs Maint)</h4>
+                                    <ResponsiveContainer>
+                                        <BarChart data={analyticsData.tcoData} layout="vertical">
+                                            <XAxis type="number"/><YAxis dataKey="name" type="category" width={100} style={{fontSize:'10px'}}/>
+                                            <Tooltip/>
+                                            <Legend/>
+                                            <Bar dataKey="purchase_cost" name="Purchase" fill="#8884d8" stackId="a" />
+                                            <Bar dataKey="accumulated_maintenance_cost" name="Maintenance" fill="#82ca9d" stackId="a" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-bold text-gray-500 mb-4 uppercase">{t('table_financial_report')}</h4>
+                                    <div className="overflow-hidden border border-border rounded-xl">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50 font-bold text-gray-600"><tr><th className="p-3 text-left">Asset</th><th className="p-3 text-center">Cost Ratio</th><th className="p-3 text-center">Action</th></tr></thead>
+                                            <tbody className="divide-y divide-border">
+                                                {analyticsData.financialAnalysis.slice(0, 8).map(a => (
+                                                    <tr key={a.id}>
+                                                        <td className="p-3 font-bold text-xs">{a.name}</td>
+                                                        <td className="p-3 text-center">{(a.ratio * 100).toFixed(0)}%</td>
+                                                        <td className="p-3 text-center"><span className={`px-2 py-1 rounded text-xs font-bold ${a.ratio > 0.4 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>{a.ratio > 0.4 ? 'Replace' : 'Keep'}</span></td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 6.4 TRAINING DASHBOARD */}
                     {activeTab === 'tab_training' && (
                         <div className="space-y-6 animate-in slide-in-from-bottom-2">
                             <div className="flex justify-between items-center">
@@ -996,7 +1049,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     )}
 
-                    {/* 6.4 KNOWLEDGE BASE */}
+                    {/* 6.5 KNOWLEDGE BASE */}
                     {activeTab === 'tab_kb' && (
                         <div className="space-y-6">
                             <div className="flex gap-4">
@@ -1022,9 +1075,88 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     )}
                     
-                    {/* 6.5 REPORT GENERATOR (Placeholder for brevity, can be expanded) */}
+                    {/* 6.6 REPORT GENERATOR */}
                     {activeTab === 'tab_gen_report' && (
-                        <div className="text-center py-20 text-gray-400">Report Generator Interface Loaded</div>
+                        <div className="space-y-6 animate-in slide-in-from-bottom-2">
+                            <div className="flex gap-4 items-end bg-gray-50 p-4 rounded-xl border border-border">
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">{t('report_type')}</label>
+                                    <select className="input-modern" value={reportType} onChange={(e:any) => setReportType(e.target.value)}>
+                                        <option value="CM">{t('cm_report')}</option>
+                                        <option value="PPM">{t('ppm_report')}</option>
+                                    </select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-gray-500 mb-1">Job Order / Report ID</label>
+                                    <div className="relative">
+                                        <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
+                                        <input 
+                                            type="text" 
+                                            className="input-modern pl-10" 
+                                            placeholder="e.g. 2236"
+                                            value={jobOrderSearchId}
+                                            onChange={e => setJobOrderSearchId(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <button onClick={handleFindJobReport} className="btn-primary mb-0.5">{t('gen_report')}</button>
+                            </div>
+
+                            {selectedCMReport && (
+                                <div className="bg-white border border-gray-300 shadow-lg p-8 max-w-4xl mx-auto min-h-[800px] text-gray-900">
+                                    {/* Report Header */}
+                                    <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-6">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-16 h-16 bg-blue-600 text-white flex items-center justify-center font-bold text-xl rounded">A2M</div>
+                                            <div>
+                                                <h1 className="text-2xl font-black uppercase tracking-widest">Job Order Report</h1>
+                                                <p className="text-sm font-bold text-gray-600">Corrective Maintenance</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-bold text-gray-500 uppercase">Report ID</div>
+                                            <div className="text-lg font-mono font-bold">{selectedCMReport.report_id}</div>
+                                            <div className="text-xs text-gray-500 mt-1">{new Date().toLocaleDateString()}</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Asset Details */}
+                                    <div className="grid grid-cols-2 gap-4 mb-6 text-sm border p-4 rounded">
+                                        <div><span className="font-bold">Asset:</span> {selectedCMReport.asset.name}</div>
+                                        <div><span className="font-bold">Model:</span> {selectedCMReport.asset.model}</div>
+                                        <div><span className="font-bold">S/N:</span> {selectedCMReport.asset.serial_no}</div>
+                                        <div><span className="font-bold">Location:</span> {selectedCMReport.location.department} / {selectedCMReport.location.room}</div>
+                                    </div>
+
+                                    {/* Fault Info */}
+                                    <div className="mb-6">
+                                        <h4 className="font-bold border-b border-gray-300 mb-2">Fault & Remedy</h4>
+                                        <p className="text-sm mb-2"><span className="font-bold">Problem:</span> {selectedCMReport.fault_details.fault_description}</p>
+                                        <p className="text-sm bg-gray-50 p-2 rounded border border-gray-200"><span className="font-bold">Work Done:</span> {selectedCMReport.fault_details.remedy_work_done}</p>
+                                    </div>
+
+                                    {/* Parts */}
+                                    <div className="mb-6">
+                                        <h4 className="font-bold border-b border-gray-300 mb-2">Spare Parts</h4>
+                                        <table className="w-full text-xs border border-gray-300">
+                                            <thead className="bg-gray-100"><tr><th className="p-2 border">Part</th><th className="p-2 border">P/N</th><th className="p-2 border">Qty</th></tr></thead>
+                                            <tbody>
+                                                {selectedCMReport.spare_parts.map((p,i) => (
+                                                    <tr key={i}><td className="p-2 border">{p.part_name}</td><td className="p-2 border">{p.part_no}</td><td className="p-2 border">{p.quantity}</td></tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Signatures */}
+                                    <div className="grid grid-cols-3 gap-8 mt-12 text-center text-xs">
+                                        <div className="border-t border-black pt-2">Technician Sign</div>
+                                        <div className="border-t border-black pt-2">Supervisor Sign</div>
+                                        <div className="border-t border-black pt-2">Dept Head Sign</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>
