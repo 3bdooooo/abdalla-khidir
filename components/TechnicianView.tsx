@@ -69,6 +69,9 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         return assets.find(a => a.asset_id === assetId || a.nfc_tag_id === assetId);
     };
 
+    // Derived State for Pending WO Asset (Fix for TS Error)
+    const pendingAsset = pendingWO ? getAssetForWO(pendingWO.asset_id) : null;
+
     // Reset state when WO is selected
     useEffect(() => { 
         if (selectedWO) { 
@@ -488,7 +491,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                             </div>
                             <h3 className="text-xl font-bold text-center mb-2">{t('manuals_detected')}</h3>
                             <p className="text-center text-gray-500 text-sm mb-6">
-                                {t('relevant_docs')} for <strong>{getAssetForWO(pendingWO.asset_id)?.model || 'Asset'}</strong>
+                                {t('relevant_docs')} for <strong>{pendingAsset?.model || 'Asset'}</strong>
                             </p>
                             
                             <div className="space-y-3 mb-6">
