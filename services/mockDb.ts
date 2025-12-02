@@ -1,7 +1,6 @@
-
 import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, RoleDefinition, Resource, Action } from '../types';
 
-// ... (Existing DEVICE_IMAGES, getModelImage, LOCATIONS mappings remain unchanged) ...
+// DEVICE IMAGES MAPPING
 export const DEVICE_IMAGES: Record<string, string> = {
     // Exact Models
     'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // MRI
@@ -33,11 +32,7 @@ export const DEVICE_IMAGES: Record<string, string> = {
 export const getModelImage = (model: string): string => {
     if (!model) return DEVICE_IMAGES['Generic'];
     const m = model.trim();
-    
-    // 1. Exact Match
     if (DEVICE_IMAGES[m]) return DEVICE_IMAGES[m];
-
-    // 2. Contains Match (Case Insensitive)
     const lowerM = m.toLowerCase();
     
     if (lowerM.includes('magnetom') || lowerM.includes('mri')) return DEVICE_IMAGES['Magnetom Vida'];
@@ -95,7 +90,7 @@ export const MOCK_USERS: User[] = [
   { user_id: 5, name: 'Vendor Rep', role: UserRole.VENDOR, email: 'vendor@hospital.com', password: 'password', location_id: 101, department: 'External', phone_number: '555-0005' },
 ];
 
-// GENERATE 45 MORE USERS (Total 50)
+// GENERATE 45 MORE USERS
 const extraRoles = [UserRole.NURSE, UserRole.TECHNICIAN, UserRole.SUPERVISOR, UserRole.NURSE, UserRole.NURSE];
 const firstNames = ["Ahmed", "Mohamed", "Fatima", "Ali", "Sara", "Omar", "Layla", "Khalid", "Noura", "Hassan", "Aisha", "Yousef", "Mariam", "Ibrahim"];
 const lastNames = ["Al-Sayed", "Khan", "Smith", "Johnson", "Al-Harbi", "Nasser", "Othman", "Kamal", "Fawzi", "Salim"];
@@ -125,88 +120,75 @@ export const MOCK_ROLES: RoleDefinition[] = [
         name: 'Admin',
         description: 'Full System Access',
         is_system_role: true,
-        permissions: {
-            assets: ['view', 'create', 'edit', 'delete'],
-            work_orders: ['view', 'create', 'edit', 'delete'],
-            inventory: ['view', 'create', 'edit', 'delete'],
-            reports: ['view', 'create', 'edit', 'delete'],
-            users: ['view', 'create', 'edit', 'delete'],
-            settings: ['view', 'create', 'edit', 'delete']
-        }
+        permissions: { assets: ['view', 'create', 'edit', 'delete'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit', 'delete'], reports: ['view', 'create', 'edit', 'delete'], users: ['view', 'create', 'edit', 'delete'], settings: ['view', 'create', 'edit', 'delete'] }
     },
     {
         id: '2',
         name: 'Supervisor',
         description: 'Department & Team Management',
         is_system_role: true,
-        permissions: {
-            assets: ['view', 'create', 'edit'],
-            work_orders: ['view', 'create', 'edit', 'delete'],
-            inventory: ['view', 'create', 'edit'],
-            reports: ['view', 'create'],
-            users: ['view', 'create', 'edit'],
-            settings: ['view']
-        }
+        permissions: { assets: ['view', 'create', 'edit'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit'], reports: ['view', 'create'], users: ['view', 'create', 'edit'], settings: ['view'] }
     },
     {
         id: '3',
         name: 'Technician',
         description: 'Assigned Task Execution',
         is_system_role: true,
-        permissions: {
-            assets: ['view'],
-            work_orders: ['view', 'edit'], // View assigned, edit status/details
-            inventory: ['view'], // View stock, request parts
-            reports: [],
-            users: [],
-            settings: []
-        }
+        permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: ['view'], reports: [], users: [], settings: [] }
     },
     {
         id: '4',
         name: 'Nurse',
         description: 'Fault Reporting & Verification',
         is_system_role: true,
-        permissions: {
-            assets: ['view'], // View department assets
-            work_orders: ['view', 'create'], // View own reports, create new
-            inventory: [],
-            reports: [],
-            users: [],
-            settings: []
-        }
+        permissions: { assets: ['view'], work_orders: ['view', 'create'], inventory: [], reports: [], users: [], settings: [] }
     },
     {
         id: '5',
         name: 'Vendor',
         description: 'External Repair Access',
         is_system_role: true,
-        permissions: {
-            assets: ['view'],
-            work_orders: ['view', 'edit'],
-            inventory: [],
-            reports: [],
-            users: [],
-            settings: []
-        }
+        permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: [], reports: [], users: [], settings: [] }
     }
 ];
 
+// --- VENDOR & ASSET GENERATION ---
+
+// 1. Define Vendors with Performance Profiles
+const VENDORS = [
+    { name: 'GE Healthcare', reliability: 0.95, speed: 1.2 }, // Very reliable, Fast support
+    { name: 'Siemens Healthineers', reliability: 0.94, speed: 1.1 },
+    { name: 'Philips Medical', reliability: 0.92, speed: 1.0 },
+    { name: 'Drager', reliability: 0.96, speed: 0.9 }, // High reliability, slightly slower
+    { name: 'Mindray', reliability: 0.85, speed: 1.1 }, // Good speed, lower reliability
+    { name: 'Getinge', reliability: 0.90, speed: 1.0 },
+    { name: 'Stryker', reliability: 0.93, speed: 1.3 },
+    { name: 'Olympus', reliability: 0.91, speed: 0.8 },
+    { name: 'Nihon Kohden', reliability: 0.88, speed: 0.9 },
+    { name: 'Baxter', reliability: 0.89, speed: 1.0 }
+];
+
 let assets: Asset[] = [];
-// Generate 500
+// Generate 500 Assets
 for (let i = 1; i <= 500; i++) {
     const type = Object.keys(DEVICE_IMAGES)[i % Object.keys(DEVICE_IMAGES).length];
-    // Fallback logic for name/model extraction... simplified for mock
     const model = type; 
     const loc = LOCATIONS[i % LOCATIONS.length];
     const purchaseYear = 2015 + (i % 9); // 2015-2023
     
+    // Assign Vendor based on Model or Randomly distributed
+    let vendor = VENDORS[i % VENDORS.length].name;
+    if (model.includes('Magnetom') || model.includes('Somatom')) vendor = 'Siemens Healthineers';
+    else if (model.includes('IntelliVue') || model.includes('EPIQ')) vendor = 'Philips Medical';
+    else if (model.includes('Drager') || model.includes('Fabius')) vendor = 'Drager';
+    else if (model.includes('GE') || model.includes('Voluson')) vendor = 'GE Healthcare';
+
     assets.push({
         asset_id: `AST-${1000 + i}`,
         nfc_tag_id: `NFC-${1000 + i}`,
         name: type.includes('Scanner') ? type : `${type} System`,
         model: model,
-        manufacturer: 'Generic Medical',
+        manufacturer: vendor,
         serial_number: `SN-${10000 + i}`,
         location_id: loc.location_id,
         status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
@@ -222,11 +204,10 @@ for (let i = 1; i <= 500; i++) {
     });
 }
 
-// ... (Existing Inventory generation code)
+// INVENTORY GENERATION
 let inventory: InventoryPart[] = [
     { part_id: 1, part_name: 'MRI Coil', current_stock: 3, min_reorder_level: 2, cost: 5000 },
     { part_id: 2, part_name: 'Ventilator Filter', current_stock: 45, min_reorder_level: 20, cost: 25 },
-    // ... (Keep existing parts)
 ];
 for (let i = 16; i <= 100; i++) {
     inventory.push({
@@ -238,19 +219,40 @@ for (let i = 16; i <= 100; i++) {
     });
 }
 
-// ... (Existing Work Order generation code)
+// WORK ORDER GENERATION WITH BIAS
 let workOrders: WorkOrder[] = [];
 for (let i = 1; i <= 200; i++) {
     const asset = assets[i % assets.length];
     const tech = MOCK_USERS.find(u => u.role === UserRole.TECHNICIAN) || MOCK_USERS[2];
     const isClosed = i > 20; 
-    const type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
+    let type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
     
-    // Assign random failure type
+    // VENDOR BIAS LOGIC
+    // High reliability vendors should have fewer Corrective WOs in simulation
+    // We can simulate this by flipping some Corrective to Preventive if reliability is high
+    const vendorProfile = VENDORS.find(v => v.name === asset.manufacturer);
+    if (vendorProfile && type === WorkOrderType.CORRECTIVE) {
+        if (Math.random() > vendorProfile.reliability) { 
+            // Keep Corrective
+        } else {
+            // Flip to Preventive to simulate reliability (less breakdowns)
+            if (Math.random() > 0.5) type = WorkOrderType.PREVENTIVE; 
+        }
+    }
+
+    // Repair Time Simulation
+    // Speed factor: >1 means faster repair (shorter duration)
+    const baseDurationHours = 4;
+    const speedFactor = vendorProfile ? vendorProfile.speed : 1.0;
+    const actualDuration = baseDurationHours / speedFactor + (Math.random() * 2);
+    
+    const startTime = new Date('2023-10-01T09:00:00Z');
+    const closeTime = new Date(startTime.getTime() + actualDuration * 60 * 60 * 1000);
+
     const rand = Math.random();
     let failureType: 'Technical' | 'UserError' | 'WearTear' = 'Technical';
     if (type === WorkOrderType.CORRECTIVE) {
-        if (rand > 0.7) failureType = 'UserError'; // 30% User Error
+        if (rand > 0.7) failureType = 'UserError';
         else if (rand > 0.5) failureType = 'WearTear';
     }
 
@@ -262,12 +264,33 @@ for (let i = 1; i <= 200; i++) {
         assigned_to_id: tech.user_id,
         description: type === WorkOrderType.PREVENTIVE ? `Scheduled PM for ${asset.name}` : `Reported fault in ${asset.name}`,
         status: isClosed ? 'Closed' : (i % 2 === 0 ? 'In Progress' : 'Open'),
-        start_time: '2023-10-01T09:00:00Z',
-        close_time: isClosed ? '2023-10-01T14:00:00Z' : undefined,
+        start_time: startTime.toISOString(),
+        close_time: isClosed ? closeTime.toISOString() : undefined,
         created_at: '2023-09-25T08:00:00Z',
         is_first_time_fix: Math.random() > 0.3,
         nurse_rating: isClosed ? Math.floor(Math.random() * 2) + 3 : undefined,
         failure_type: failureType
+    });
+}
+
+// --- DYNAMIC DOCUMENT GENERATION (100 DOCS) ---
+let kbDocs: any[] = [];
+const docTypes = ['Service Manual', 'User Guide', 'Calibration Protocol', 'Safety Datasheet'];
+const docCategories = ['Imaging', 'Life Support', 'Monitoring', 'General'];
+
+for (let i = 1; i <= 100; i++) {
+    const asset = assets[i % assets.length];
+    const docType = docTypes[i % docTypes.length];
+    const category = docCategories[i % docCategories.length];
+    
+    kbDocs.push({
+        id: i,
+        title: `${asset.manufacturer} ${asset.model} - ${docType}`,
+        category: category,
+        type: docType,
+        updated: `2023-${(i % 12) + 1}-15`,
+        fileSize: `${(Math.random() * 10 + 1).toFixed(1)} MB`,
+        url: '#'
     });
 }
 
@@ -297,10 +320,20 @@ export const getAssetDocuments = (assetId: string): AssetDocument[] => {
 };
 
 export const findRelevantDocuments = (model: string, manufacturer: string): AssetDocument[] => {
-    return [
-        { doc_id: 101, asset_id: '', title: `${manufacturer} ${model} User Guide`, type: 'Manual', url: '#', date: '2020-01-01' },
-        { doc_id: 102, asset_id: '', title: 'Troubleshooting Guide', type: 'Manual', url: '#', date: '2021-05-01' }
-    ];
+    // Search in the large generated list
+    const matches = kbDocs.filter(d => 
+        d.title.toLowerCase().includes(model.toLowerCase()) || 
+        d.title.toLowerCase().includes(manufacturer.toLowerCase())
+    );
+    
+    return matches.map((d, idx) => ({
+        doc_id: 1000 + idx,
+        asset_id: '',
+        title: d.title,
+        type: 'Manual' as const,
+        url: '#',
+        date: d.updated
+    })).slice(0, 3);
 };
 
 export const getMovementLogs = (): MovementLog[] => [
@@ -362,12 +395,7 @@ export const getSystemAlerts = (): SystemAlert[] => [
     { id: 2, type: 'STOCK', message: 'Low stock for "Power Supply Unit" (2 remaining).', timestamp: '2023-10-25T09:00:00Z', severity: 'medium', status: 'active' }
 ];
 
-export const getKnowledgeBaseDocs = () => [
-    { id: 1, title: 'Servo-U Service Manual', category: 'Ventilators', type: 'Service Manual', updated: '2023-01-10', fileSize: '12 MB' },
-    { id: 2, title: 'Magnetom Vida Troubleshooting', category: 'MRI', type: 'Guide', updated: '2022-11-05', fileSize: '4 MB' },
-    { id: 3, title: 'Electrical Safety Standard IEC 60601', category: 'Compliance', type: 'Standard', updated: '2021-06-20', fileSize: '2 MB' },
-    { id: 4, title: 'Infusion Pump Calibration Proc', category: 'Pumps', type: 'Procedure', updated: '2023-05-15', fileSize: '1.5 MB' },
-];
+export const getKnowledgeBaseDocs = () => kbDocs;
 
 // Mutators (Mock DB Actions)
 export const startWorkOrder = (woId: number) => {
