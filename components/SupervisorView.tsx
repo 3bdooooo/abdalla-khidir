@@ -564,7 +564,75 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </div>
                 )}
 
-                {/* Modals for User/Role would go here */}
+                {/* Role Editor Modal */}
+                {isRoleEditorOpen && editingRole && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95">
+                            <h3 className="text-xl font-bold mb-6">{editingRole.id ? t('manage_roles') : t('create_role')}</h3>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('role_name')}</label>
+                                    <input 
+                                        type="text" 
+                                        className="input-modern"
+                                        value={editingRole.name} 
+                                        onChange={e => setEditingRole({...editingRole, name: e.target.value})}
+                                        disabled={editingRole.is_system_role}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-1">{t('role_desc')}</label>
+                                    <input 
+                                        type="text" 
+                                        className="input-modern"
+                                        value={editingRole.description} 
+                                        onChange={e => setEditingRole({...editingRole, description: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="overflow-hidden border border-border rounded-xl mb-6">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-50 text-gray-700 font-bold border-b border-border">
+                                        <tr>
+                                            <th className="p-3 text-left">Resource</th>
+                                            <th className="p-3 text-center">View</th>
+                                            <th className="p-3 text-center">Create</th>
+                                            <th className="p-3 text-center">Edit</th>
+                                            <th className="p-3 text-center">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {['assets', 'work_orders', 'inventory', 'reports', 'users', 'settings'].map((res) => (
+                                            <tr key={res} className="hover:bg-gray-50">
+                                                <td className="p-3 font-medium capitalize">{t(`res_${res}` as any)}</td>
+                                                {['view', 'create', 'edit', 'delete'].map((action) => {
+                                                    const isActive = editingRole.permissions[res as Resource]?.includes(action as Action);
+                                                    return (
+                                                        <td key={action} className="p-3 text-center">
+                                                            <button 
+                                                                onClick={() => handlePermissionToggle(res as Resource, action as Action)}
+                                                                className={`w-6 h-6 rounded border flex items-center justify-center mx-auto transition-colors ${isActive ? 'bg-brand border-brand text-white' : 'bg-white border-gray-300 text-transparent'}`}
+                                                            >
+                                                                <Check size={14} />
+                                                            </button>
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setIsRoleEditorOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
+                                <button onClick={handleSaveRole} className="btn-primary">{t('btn_save')}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -1049,28 +1117,73 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     )}
 
-                    {/* 6.5 KNOWLEDGE BASE */}
+                    {/* 6.5 KNOWLEDGE BASE (Enhanced with AI) */}
                     {activeTab === 'tab_kb' && (
                         <div className="space-y-6">
-                            <div className="flex gap-4">
-                                <div className="flex-1 relative">
-                                    <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
-                                    <input type="text" placeholder="Search manuals..." className="input-modern pl-10" value={kbSearch} onChange={e=>setKbSearch(e.target.value)}/>
+                            {/* AI Search Section */}
+                            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-2xl border border-indigo-100 shadow-sm">
+                                <h4 className="font-bold text-indigo-900 text-lg mb-4 flex items-center gap-2">
+                                    <BrainCircuit size={20}/> {t('kb_ai_search')}
+                                </h4>
+                                <div className="flex gap-3 mb-6">
+                                    <input 
+                                        className="input-modern" 
+                                        placeholder={t('ai_search_placeholder')} 
+                                        value={aiQuery} 
+                                        onChange={e => setAiQuery(e.target.value)}
+                                    />
+                                    <button onClick={handleAiSearch} disabled={isAiSearching} className="btn-primary bg-indigo-600">
+                                        {isAiSearching ? (
+                                            <span className="flex items-center gap-2"><div className="w-4 h-4 border-2 border-white rounded-full animate-spin"></div> {t('analyzing')}</span>
+                                        ) : t('btn_analyze')}
+                                    </button>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {filteredKbDocs.map(doc => (
-                                    <div key={doc.id} className="p-4 border border-border rounded-xl hover:bg-gray-50 flex items-center justify-between group">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Book size={20}/></div>
-                                            <div>
-                                                <div className="font-bold text-sm text-gray-900">{doc.title}</div>
-                                                <div className="text-xs text-gray-500">{doc.category} • {doc.fileSize}</div>
+                                {/* AI Results Display */}
+                                {aiResult && (
+                                    <div className="bg-white p-6 rounded-xl border border-indigo-100 shadow-sm animate-in fade-in space-y-4">
+                                        <div>
+                                            <h5 className="font-bold text-indigo-800 text-sm mb-1">{t('ai_explanation')}</h5>
+                                            <p className="text-gray-700 text-sm leading-relaxed">{aiResult.explanation}</p>
+                                        </div>
+                                        <div>
+                                            <h5 className="font-bold text-indigo-800 text-sm mb-1">{t('ai_solution')}</h5>
+                                            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">{aiResult.solution}</p>
+                                        </div>
+                                        <div>
+                                            <h5 className="font-bold text-indigo-800 text-sm mb-1">{t('ai_ref_docs')}</h5>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {aiResult.relevantDocs.map((doc, i) => (
+                                                    <span key={i} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-100">{doc}</span>
+                                                ))}
                                             </div>
                                         </div>
-                                        <button className="text-gray-400 hover:text-brand group-hover:translate-x-1 transition-all"><ArrowRight size={18}/></button>
                                     </div>
-                                ))}
+                                )}
+                            </div>
+
+                            {/* Document Library */}
+                            <div>
+                                <h4 className="font-bold text-gray-700 text-sm uppercase mb-3 px-1">{t('kb_library')}</h4>
+                                <div className="flex gap-4 mb-4">
+                                    <div className="flex-1 relative">
+                                        <Search className="absolute left-3 top-3.5 text-gray-400" size={18}/>
+                                        <input type="text" placeholder="Search manuals..." className="input-modern pl-10" value={kbSearch} onChange={e=>setKbSearch(e.target.value)}/>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {filteredKbDocs.map(doc => (
+                                        <div key={doc.id} className="p-4 border border-border rounded-xl hover:bg-gray-50 flex items-center justify-between group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Book size={20}/></div>
+                                                <div>
+                                                    <div className="font-bold text-sm text-gray-900">{doc.title}</div>
+                                                    <div className="text-xs text-gray-500">{doc.category} • {doc.fileSize}</div>
+                                                </div>
+                                            </div>
+                                            <button className="text-gray-400 hover:text-brand group-hover:translate-x-1 transition-all"><ArrowRight size={18}/></button>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
