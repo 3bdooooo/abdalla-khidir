@@ -128,6 +128,8 @@ const AppContent: React.FC = () => {
         <TechnicianView 
           currentUser={user}
           userWorkOrders={workOrders.filter(wo => wo.assigned_to_id === user.user_id)} // Filter from live data
+          allWorkOrders={workOrders} // Pass all WOs for history lookup
+          users={users} // Pass users for history lookup
           inventory={inventory}
           refreshData={refreshData}
         />

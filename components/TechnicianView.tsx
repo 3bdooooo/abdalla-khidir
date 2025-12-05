@@ -5,17 +5,19 @@ import { analyzeRootCause, suggestDiagnosisAndParts } from '../services/geminiSe
 import { analyzeHistoricalPatterns, HistoricalInsight } from '../services/predictiveService';
 import { getAssets, getAssetDocuments, findRelevantDocuments } from '../services/mockDb';
 import * as api from '../services/api';
-import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit } from 'lucide-react';
+import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit, History, User as UserIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TechnicianProps {
   currentUser: User;
   userWorkOrders: WorkOrder[];
+  allWorkOrders: WorkOrder[]; // Full list for history
+  users: User[]; // Full list for names
   inventory: InventoryPart[];
   refreshData: () => void;
 }
 
-export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, inventory, refreshData }) => {
+export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, allWorkOrders, users, inventory, refreshData }) => {
     // State Management
     const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
     const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); // Explicitly typed
@@ -23,7 +25,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     const [filterPriority, setFilterPriority] = useState<string>('All');
     const [filterStatus, setFilterStatus] = useState<string>('All');
     const [filterType, setFilterType] = useState<string>('All');
-    const [activeDetailTab, setActiveDetailTab] = useState<'diagnosis' | 'parts' | 'visual' | 'finish'>('diagnosis');
+    const [activeDetailTab, setActiveDetailTab] = useState<'diagnosis' | 'parts' | 'visual' | 'history' | 'finish'>('diagnosis');
     const { t, dir } = useLanguage();
     
     // Detail View State
@@ -208,8 +210,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         }
 
         // 2. Historical Analysis (Smart Engineering Assistant)
-        const allWOs = await api.fetchWorkOrders(); // Using API to ensure we have broader context if possible
-        const history = analyzeHistoricalPatterns(model, symptoms, allWOs);
+        // Note: Using the passed 'allWorkOrders' for broader context
+        const history = analyzeHistoricalPatterns(model, symptoms, allWorkOrders);
         setHistoricalInsight(history);
 
         setIsAnalyzing(false); 
@@ -267,6 +269,13 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     });
     
     const filteredInventory = inventory.filter(p => p.part_name.toLowerCase().includes(partsSearch.toLowerCase()));
+
+    // Get asset history for selected WO
+    const assetHistory = selectedWO ? allWorkOrders.filter(wo => 
+        (wo.asset_id === selectedWO.asset_id || wo.asset_id === selectedWO.asset_id.replace('NFC-', 'AST-')) && 
+        wo.status === 'Closed' &&
+        wo.wo_id !== selectedWO.wo_id
+    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : [];
 
     // --- DASHBOARD RENDER ---
     if (!selectedWO) {
@@ -553,12 +562,13 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          {id: 'diagnosis', label: t('tab_diagnosis'), icon: Activity},
                          {id: 'parts', label: t('tab_parts'), icon: Box},
                          {id: 'visual', label: t('step_visual'), icon: Eye},
+                         {id: 'history', label: t('maintenance_history'), icon: History}, // Added History Tab
                          {id: 'finish', label: t('tab_finish'), icon: CheckCircle2}
                      ].map(tab => (
                          <button
                             key={tab.id}
                             onClick={() => setActiveDetailTab(tab.id as any)}
-                            className={`flex-1 min-w-[100px] py-3 text-sm font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${activeDetailTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                            className={`flex-1 min-w-[90px] py-3 text-sm font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${activeDetailTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                          >
                              <tab.icon size={18}/>
                              {tab.label}
@@ -772,8 +782,45 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                              </div>
                          </div>
                      )}
+
+                     {/* 4. HISTORY (NEW) */}
+                     {activeDetailTab === 'history' && (
+                         <div className="space-y-4 animate-in fade-in h-full overflow-y-auto max-h-[400px] pr-2">
+                             <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
+                                 <History size={18} className="text-brand"/> {t('maintenance_history')}
+                             </h4>
+                             {assetHistory.length > 0 ? (
+                                 <div className="space-y-3">
+                                     {assetHistory.map(wo => {
+                                         const tech = users.find(u => u.user_id === wo.assigned_to_id);
+                                         return (
+                                             <div key={wo.wo_id} className="p-3 bg-gray-50 rounded-xl border border-gray-200">
+                                                 <div className="flex justify-between items-start mb-1">
+                                                     <div className="font-bold text-sm text-gray-800">
+                                                         {wo.type} <span className="text-xs font-mono text-gray-500 font-normal">#{wo.wo_id}</span>
+                                                     </div>
+                                                     <div className="text-xs text-gray-500">
+                                                         {new Date(wo.created_at).toLocaleDateString()}
+                                                     </div>
+                                                 </div>
+                                                 <p className="text-xs text-gray-600 line-clamp-2 mb-2">{wo.description}</p>
+                                                 <div className="flex items-center gap-2 text-xs text-gray-500 bg-white p-1.5 rounded border border-gray-100 w-fit">
+                                                     <UserIcon size={12}/> {tech?.name || 'Unknown Tech'}
+                                                 </div>
+                                             </div>
+                                         )
+                                     })}
+                                 </div>
+                             ) : (
+                                 <div className="flex flex-col items-center justify-center h-48 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                                     <History size={32} className="mb-2 opacity-50"/>
+                                     <p className="text-sm font-medium">{t('no_history')}</p>
+                                 </div>
+                             )}
+                         </div>
+                     )}
                      
-                     {/* 4. FINISH */}
+                     {/* 5. FINISH */}
                      {activeDetailTab === 'finish' && (
                          <div className="space-y-6 animate-in fade-in">
                               <div>
@@ -823,7 +870,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          {activeDetailTab !== 'finish' ? (
                              <button 
                                 onClick={() => {
-                                    const tabs = ['diagnosis', 'parts', 'visual', 'finish'];
+                                    const tabs = ['diagnosis', 'parts', 'visual', 'history', 'finish'];
                                     const currIdx = tabs.indexOf(activeDetailTab);
                                     if (currIdx < tabs.length - 1) setActiveDetailTab(tabs[currIdx + 1] as any);
                                 }}
