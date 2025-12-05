@@ -156,4 +156,35 @@ export const suggestDiagnosisAndParts = async (
         console.error("AI Parts Suggestion Failed", e);
         return { rootCause: "Analysis Failed", recommendedPart: "Manual Check Required", probability: 0 };
     }
-}
+};
+
+// NEW FUNCTION: Image Generation
+export const generateAssetThumbnail = async (deviceModel: string): Promise<string | null> => {
+    try {
+        const ai = getAiClient();
+        const apiKey = import.meta.env?.VITE_API_KEY || '';
+        if (!apiKey) throw new Error("API Key Missing");
+
+        const prompt = `A hyper-realistic, high-resolution photograph of a ${deviceModel} in a clean, brightly lit, professional medical environment. The device should be the central focus, clearly visible with sharp details, and well-composed for a square or portrait crop. The background should be clean, slightly blurred, and non-distracting, ensuring the device stands out clearly. Lighting should be even and soft, showcasing the device's design and materials accurately, suitable for display as an icon or thumbnail within a mobile application. No text or overlays on the image itself. Clean edges, professional aesthetic.`;
+
+        const response = await ai.models.generateImages({
+            model: 'imagen-3.0-generate-001',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                aspectRatio: '1:1',
+                outputMimeType: 'image/jpeg'
+            }
+        });
+
+        const imageBytes = response.generatedImages?.[0]?.image?.imageBytes;
+        if (imageBytes) {
+            return `data:image/jpeg;base64,${imageBytes}`;
+        }
+        return null;
+
+    } catch (e) {
+        console.error("Image Generation Failed:", e);
+        return null;
+    }
+};

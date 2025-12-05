@@ -396,6 +396,11 @@ export const translations = {
     flyer_preview: "Flyer Preview",
     session_needed: "Session Needed",
     no_major_errors: "No major user errors detected. Keep up the good work!",
+
+    // AI Image
+    btn_gen_image: "Generate AI Image",
+    generating_image: "Creating...",
+    gen_image_success: "Image Generated!",
   },
   ar: {
     appName: "A2M MED",
@@ -787,6 +792,11 @@ export const translations = {
     flyer_preview: "معاينة النشرة",
     session_needed: "تدريب مطلوب",
     no_major_errors: "لم يتم اكتشاف أخطاء استخدام كبيرة. عمل جيد!",
+
+    // AI Image
+    btn_gen_image: "توليد صورة (AI)",
+    generating_image: "جاري التوليد...",
+    gen_image_success: "تم إنشاء الصورة!",
   }
 };
 

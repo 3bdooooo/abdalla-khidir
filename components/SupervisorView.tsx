@@ -4,10 +4,10 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, L
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
 import * as api from '../services/api';
-import { searchKnowledgeBase } from '../services/geminiService';
+import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -35,6 +35,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newAssetForm, setNewAssetForm] = useState({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     
     // Users & Roles State
     const [userMgmtTab, setUserMgmtTab] = useState<'users' | 'roles'>('users');
@@ -363,6 +364,21 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const triggerNotification = () => { setShowToast(true); setTimeout(() => setShowToast(false), 3000); };
     const handleAiSearch = async () => { if(!aiQuery) return; setIsAiSearching(true); setAiResult(null); const result = await searchKnowledgeBase(aiQuery, kbDocuments.map(d=>d.title), language); setAiResult(result); setIsAiSearching(false); };
     const handleAddSubmit = (e: React.FormEvent) => { e.preventDefault(); onAddAsset({...newAssetForm, location_id: Number(newAssetForm.location_id)} as any); setIsAddModalOpen(false); setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' }); };
+    
+    // AI IMAGE GENERATION HANDLER
+    const handleGenerateImage = async () => {
+        if (!newAssetForm.model) {
+            alert('Please enter a model name first.');
+            return;
+        }
+        setIsGeneratingImage(true);
+        const imageUrl = await generateAssetThumbnail(newAssetForm.model);
+        if (imageUrl) {
+            setNewAssetForm(prev => ({ ...prev, image: imageUrl }));
+        }
+        setIsGeneratingImage(false);
+    };
+
     const handleAddUserSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!onAddUser) return; onAddUser({...newUserForm, user_id: Date.now(), location_id: 101} as User); setIsAddUserModalOpen(false); refreshData(); setNewUserForm({ name: '', email: '', phone: '', password: '', role: 'Technician', department: '', signature: '' }); };
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (file) { const reader = new FileReader(); reader.onloadend = () => { setNewAssetForm(prev => ({ ...prev, image: reader.result as string })); }; reader.readAsDataURL(file); } };
     const initiateRestock = (part: InventoryPart) => { setSelectedPartForRestock(part); setRestockAmount(''); setRestockModalOpen(true); };
@@ -663,7 +679,21 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-1">{t('form_image')}</label>
-                                    <input type="file" accept="image/*" onChange={handleImageChange} className="input-modern p-2"/>
+                                    <div className="flex gap-2">
+                                        <input type="file" accept="image/*" onChange={handleImageChange} className="input-modern p-2 flex-1"/>
+                                        <button 
+                                            type="button" 
+                                            onClick={handleGenerateImage}
+                                            disabled={isGeneratingImage || !newAssetForm.model}
+                                            className="px-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1 shadow-md hover:shadow-lg disabled:opacity-50 transition-all"
+                                        >
+                                            {isGeneratingImage ? (
+                                                <><RefreshCw size={14} className="animate-spin"/> {t('generating_image')}</>
+                                            ) : (
+                                                <><Sparkles size={14}/> {t('btn_gen_image')}</>
+                                            )}
+                                        </button>
+                                    </div>
                                     {newAssetForm.image && <img src={newAssetForm.image} className="mt-2 h-20 w-20 object-cover rounded-lg border"/>}
                                 </div>
                                 <div className="flex gap-2 justify-end pt-4">
