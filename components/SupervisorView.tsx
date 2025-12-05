@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
 import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
@@ -108,16 +108,24 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     ]);
 
     // ZEBRA SCANNER INTEGRATION
-    const activeAuditRef = React.useRef(activeAudit);
+    // Use refs to access latest state inside the event listener callback
+    const activeAuditRef = useRef(activeAudit);
     useEffect(() => { activeAuditRef.current = activeAudit; }, [activeAudit]);
 
-    const rfidTabRef = React.useRef(rfidTab);
+    const rfidTabRef = useRef(rfidTab);
     useEffect(() => { rfidTabRef.current = rfidTab; }, [rfidTab]);
+
+    const assetsRef = useRef(assets);
+    useEffect(() => { assetsRef.current = assets; }, [assets]);
 
     const handleRealScan = useCallback((scannedId: string) => {
         const currentAudit = activeAuditRef.current;
         if (!currentAudit) return;
+        
         const cleanId = scannedId.trim();
+        
+        // Check if item is in missing list (meaning it's expected but not yet found)
+        // Also check if we found something unexpected (not in list)? For now, focus on expected.
         if (currentAudit.missing_assets.includes(cleanId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
@@ -125,12 +133,17 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 missing_assets: prev.missing_assets.filter(id => id !== cleanId),
                 found_assets: [...prev.found_assets, cleanId]
             } : null);
+        } else if (!currentAudit.found_assets.includes(cleanId)) {
+             // Optional: Handle unexpected assets found in this zone
+             // console.log("Found unexpected asset:", cleanId);
         }
     }, []);
 
     const handleGateScan = useCallback((scannedId: string, locationId: number) => {
         const cleanId = scannedId.trim();
-        const asset = assets.find(a => a.asset_id === cleanId || a.rfid_tag_id === cleanId);
+        const currentAssets = assetsRef.current;
+        const asset = currentAssets.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
+        
         if (asset) {
             setGateLogs(prev => [{
                 id: Date.now(),
@@ -139,9 +152,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 gate_location_id: locationId,
                 direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT',
                 timestamp: new Date().toISOString()
-            }, ...prev]);
+            }, ...prev.slice(0, 49)]); // Keep last 50 logs
         }
-    }, [assets]);
+    }, []);
 
     const handleScannerInput = useCallback((scannedTag: string) => {
         if (rfidTabRef.current === 'audit') {
@@ -189,6 +202,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (currentView !== 'rfid') setIsGateMonitoring(false);
     }, [currentView]);
 
+    // Dashboard Map Simulation
     useEffect(() => { 
         let interval: NodeJS.Timeout; 
         if (isSimulationActive && currentView === 'dashboard') { 
@@ -209,6 +223,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
 
+    // Gate Monitoring Simulation
     useEffect(() => {
         let interval: NodeJS.Timeout;
         if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
@@ -220,7 +235,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 const newLog: RfidGateLog = {
                     id: Date.now(),
                     asset_id: randomAsset.asset_id,
-                    rfid_tag: randomAsset.rfid_tag_id || randomAsset.asset_id,
+                    rfid_tag: randomAsset.nfc_tag_id || randomAsset.asset_id,
                     gate_location_id: randomReader.id,
                     direction: direction,
                     timestamp: new Date().toISOString()
@@ -361,7 +376,16 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const handleUpdateCalibration = async (e: React.FormEvent) => { e.preventDefault(); if (assetToCalibrate) { const nextCal = new Date(newCalibrationDate); nextCal.setFullYear(nextCal.getFullYear() + 1); await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]); refreshData(); setUpdateCalibrationModalOpen(false); setAssetToCalibrate(null); } };
     const handleFindJobReport = async () => { if (reportType === 'PPM') { const report = await api.fetchPMReport(jobOrderSearchId || '5002'); if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.'); } else { if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]); else alert('Job Order Report not found. Try 2236.'); } };
     const startAudit = () => { if(!selectedAuditDept) return alert("Select a department"); const expected = getAssetsInZone(selectedAuditDept); setActiveAudit({ id: Date.now(), date: new Date().toISOString(), department: selectedAuditDept, total_expected: expected.length, total_scanned: 0, missing_assets: expected.map(a => a.asset_id), found_assets: [], status: 'In Progress' }); };
-    const handleSimulateAuditScan = () => { if(activeAudit && activeAudit.missing_assets.length > 0) { const randomId = activeAudit.missing_assets[Math.floor(Math.random() * activeAudit.missing_assets.length)]; handleRealScan(randomId); }};
+    const handleSimulateAuditScan = () => { 
+        if(activeAudit && activeAudit.missing_assets.length > 0) { 
+            const randomId = activeAudit.missing_assets[Math.floor(Math.random() * activeAudit.missing_assets.length)]; 
+            handleRealScan(randomId); 
+        } else if (activeAudit) {
+            // If none missing, simulate finding an already found one just for UI feedback
+            const randomFound = activeAudit.found_assets[0];
+            if(randomFound) handleRealScan(randomFound);
+        }
+    };
 
     // ROLE MANAGEMENT
     const handleOpenRoleEditor = (role?: RoleDefinition) => {

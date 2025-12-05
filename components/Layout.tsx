@@ -30,16 +30,20 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
 
   // Logo Component
   const BrandLogo = ({ compact = false }: { compact?: boolean }) => (
-      <div className="flex items-center gap-3">
-        <div className="w-9 h-9 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 shrink-0">
-            <Activity size={20} />
+      <div className="flex items-center gap-3 select-none">
+        <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-dark rounded-xl flex items-center justify-center text-white shadow-lg shadow-brand/20 shrink-0 border border-white/10 relative overflow-hidden">
+            <div className="absolute inset-0 bg-white/10 rotate-45 transform translate-y-1/2 translate-x-1/2"></div>
+            <Activity size={22} strokeWidth={2.5} className="relative z-10"/>
         </div>
         {!compact && (
-            <div>
-                <h1 className="text-xl font-black text-gray-900 leading-none tracking-tight">
+            <div className="flex flex-col">
+                <h1 className="text-2xl font-black text-gray-900 leading-none tracking-tight font-sans">
                     A2M <span className="text-brand">MED</span>
                 </h1>
-                <p className="text-[9px] uppercase tracking-widest text-text-muted font-bold mt-0.5">Enterprise</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                    <div className="h-0.5 w-3 bg-brand rounded-full opacity-50"></div>
+                    <p className="text-[9px] uppercase tracking-[0.25em] text-text-muted font-bold">Systems</p>
+                </div>
             </div>
         )}
       </div>
@@ -58,7 +62,7 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
       <div className="min-h-screen bg-background text-text-main font-sans pb-24 md:pb-0">
         {/* Top Header (Mobile) */}
         <header className="bg-white/90 backdrop-blur-md border-b border-border h-16 px-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-          <BrandLogo />
+          <BrandLogo compact={false} />
           <div className="flex items-center gap-2">
             <LangToggle />
             <button onClick={onLogout} className="p-2 text-text-muted hover:text-danger transition-colors">
@@ -173,52 +177,68 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
             })}
         </nav>
 
-        {/* User Profile Footer */}
-        <div className="p-4 border-t border-border/50 bg-gray-50/50">
-          <div className="flex items-center justify-between mb-4 px-2">
-             <LangToggle />
-             <div className="relative">
-                 <button 
-                    onClick={() => setIsNotifOpen(!isNotifOpen)}
-                    className="p-2 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-gray-100 relative"
-                 >
-                     <Bell size={18} />
-                     {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>}
-                 </button>
-                 
-                 {/* Notification Dropdown */}
-                 {isNotifOpen && (
-                     <div className="absolute bottom-full mb-2 start-0 w-64 bg-white rounded-xl shadow-xl border border-border p-2 animate-in slide-in-from-bottom-2 z-50">
-                         <div className="flex justify-between items-center px-2 py-1 mb-2 border-b border-gray-100">
-                             <span className="text-xs font-bold text-gray-700">Notifications</span>
-                             <button onClick={() => setIsNotifOpen(false)}><X size={14} className="text-gray-400 hover:text-gray-600"/></button>
-                         </div>
-                         <div className="space-y-1 max-h-48 overflow-y-auto">
-                             {notifications.map(n => (
-                                 <div key={n.id} className="p-2 rounded-lg hover:bg-gray-50 flex gap-2 items-start">
-                                     <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${n.type === 'critical' ? 'bg-danger' : n.type === 'warning' ? 'bg-warning' : 'bg-success'}`}></div>
-                                     <div>
-                                         <p className="text-xs text-gray-800 leading-tight">{n.msg}</p>
-                                         <p className="text-[10px] text-gray-400 mt-1">{n.time}</p>
-                                     </div>
-                                 </div>
-                             ))}
-                         </div>
-                     </div>
-                 )}
-             </div>
+        {/* Footer: Partner Logo & User Profile */}
+        <div className="border-t border-border/50 bg-gray-50/50 flex flex-col">
+          
+          {/* Secondary Logo (Tabuk Cluster) */}
+          <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3 opacity-60 hover:opacity-100 transition-opacity duration-300">
+               <img 
+                  src="https://upload.wikimedia.org/wikipedia/en/thumb/e/e3/Ministry_of_Health_Saudi_Arabia_Logo.svg/1200px-Ministry_of_Health_Saudi_Arabia_Logo.svg.png" 
+                  className="h-8 w-auto object-contain grayscale" 
+                  alt="MOH Logo"
+                  onError={(e) => e.currentTarget.style.display = 'none'}
+               />
+               <div className="text-[9px] font-bold text-gray-400 leading-tight uppercase tracking-wide">
+                   Tabuk Health<br/>Cluster
+               </div>
           </div>
-          <div className="flex items-center gap-3 p-3 bg-white border border-border rounded-xl shadow-sm">
-             <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm">
-                {user.name[0]}
-             </div>
-             <div className="flex-1 min-w-0 text-start">
-                <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
-                <p className="text-xs text-text-muted truncate">{user.role}</p>
-             </div>
-             <button onClick={onLogout} className="text-text-muted hover:text-danger p-1">
-                 <LogOut size={18} className="rtl:rotate-180" />
-             </button>
+
+          <div className="p-4">
+            <div className="flex items-center justify-between mb-4 px-2">
+               <LangToggle />
+               <div className="relative">
+                   <button 
+                      onClick={() => setIsNotifOpen(!isNotifOpen)}
+                      className="p-2 text-text-muted hover:text-brand transition-colors rounded-lg hover:bg-gray-100 relative"
+                   >
+                       <Bell size={18} />
+                       {notifications.length > 0 && <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-white"></span>}
+                   </button>
+                   
+                   {/* Notification Dropdown */}
+                   {isNotifOpen && (
+                       <div className="absolute bottom-full mb-2 start-0 w-64 bg-white rounded-xl shadow-xl border border-border p-2 animate-in slide-in-from-bottom-2 z-50">
+                           <div className="flex justify-between items-center px-2 py-1 mb-2 border-b border-gray-100">
+                               <span className="text-xs font-bold text-gray-700">Notifications</span>
+                               <button onClick={() => setIsNotifOpen(false)}><X size={14} className="text-gray-400 hover:text-gray-600"/></button>
+                           </div>
+                           <div className="space-y-1 max-h-48 overflow-y-auto">
+                               {notifications.map(n => (
+                                   <div key={n.id} className="p-2 rounded-lg hover:bg-gray-50 flex gap-2 items-start">
+                                       <div className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${n.type === 'critical' ? 'bg-danger' : n.type === 'warning' ? 'bg-warning' : 'bg-success'}`}></div>
+                                       <div>
+                                           <p className="text-xs text-gray-800 leading-tight">{n.msg}</p>
+                                           <p className="text-[10px] text-gray-400 mt-1">{n.time}</p>
+                                       </div>
+                                   </div>
+                               ))}
+                           </div>
+                       </div>
+                   )}
+               </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-white border border-border rounded-xl shadow-sm">
+               <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm">
+                  {user.name[0]}
+               </div>
+               <div className="flex-1 min-w-0 text-start">
+                  <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
+                  <p className="text-xs text-text-muted truncate">{user.role}</p>
+               </div>
+               <button onClick={onLogout} className="text-text-muted hover:text-danger p-1">
+                   <LogOut size={18} className="rtl:rotate-180" />
+               </button>
+            </div>
           </div>
         </div>
       </aside>
