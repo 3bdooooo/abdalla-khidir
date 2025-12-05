@@ -1,57 +1,70 @@
+
 import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, RoleDefinition, Resource, Action } from '../types';
 
-// DEVICE IMAGES MAPPING
+// DEVICE IMAGES MAPPING (High Resolution, Realistic Medical Equipment)
 export const DEVICE_IMAGES: Record<string, string> = {
-    // Exact Models
-    'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // MRI
-    'Somatom Force': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // CT (Radiology)
-    'Servo-U': 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ventilator
-    'Alaris System': 'https://plus.unsplash.com/premium_photo-1661281397737-9b5d75b52beb?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Pump
-    'IntelliVue MX40': 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Monitor
-    'Drager Fabius': 'https://images.unsplash.com/photo-1516574187841-693083f0498c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Anesthesia
-    'LifePak 15': 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Defib
-    'Voluson E10': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Ultrasound
-    'Mobilett Elara': 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Mobile X-Ray
-    '4008S Classix': 'https://images.unsplash.com/photo-1579165466741-7f35a4755657?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Dialysis
-    'Isolette 8000': 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Incubator
-    'MAC 2000': 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // ECG
-    'OEC Elite': 'https://plus.unsplash.com/premium_photo-1661281350976-59b9514e5364?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // C-Arm
-    'Evis X1': 'https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Endoscope
-    'Steris AMSCO': 'https://images.unsplash.com/photo-1581093588401-fbb07366f955?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Autoclave
-    'XN-1000': 'https://images.unsplash.com/photo-1579165466741-7f35a4755657?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Analyzer
-    'A-dec 500': 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Dental
-    'Avalon FM30': 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Fetal Monitor
+    // MRI & Imaging
+    'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?auto=format&fit=crop&w=800&q=80', // MRI Tunnel
+    'Somatom Force': 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&w=800&q=80', // CT Scanner
+    'Mobilett Elara': 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=800&q=80', // Portable X-Ray
+    'OEC Elite': 'https://images.unsplash.com/photo-1612268615927-4a0fb773323a?auto=format&fit=crop&w=800&q=80', // C-Arm (Surgical)
+    'Voluson E10': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80', // Ultrasound Console
+
+    // Life Support & Anesthesia
+    'Servo-U': 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?auto=format&fit=crop&w=800&q=80', // Ventilator
+    'Drager Fabius': 'https://images.unsplash.com/photo-1516574187841-693083f0498c?auto=format&fit=crop&w=800&q=80', // Anesthesia Workstation
+    'Isolette 8000': 'https://plus.unsplash.com/premium_photo-1661573537877-33a57df35649?auto=format&fit=crop&w=800&q=80', // Incubator
+
+    // Monitoring & Defib
+    'IntelliVue MX40': 'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=800&q=80', // Patient Monitor
+    'LifePak 15': 'https://plus.unsplash.com/premium_photo-1681487814233-a3df46932473?auto=format&fit=crop&w=800&q=80', // Defibrillator
+    'MAC 2000': 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?auto=format&fit=crop&w=800&q=80', // ECG Machine
+    'Avalon FM30': 'https://images.unsplash.com/photo-1583912268237-7756f772ba63?auto=format&fit=crop&w=800&q=80', // Fetal Monitor
+
+    // Pumps & Dialysis
+    'Alaris System': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=800&q=80', // Infusion Pump Stack
+    '4008S Classix': 'https://images.unsplash.com/photo-1579165466741-7f35a4755657?auto=format&fit=crop&w=800&q=80', // Dialysis Machine
+
+    // Lab & Sterilization
+    'XN-1000': 'https://images.unsplash.com/photo-1579154204628-245fc0fb6612?auto=format&fit=crop&w=800&q=80', // Lab Analyzer
+    'Steris AMSCO': 'https://images.unsplash.com/photo-1581093588401-fbb07366f955?auto=format&fit=crop&w=800&q=80', // Autoclave/Sterilizer
+    
+    // Other
+    'A-dec 500': 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=800&q=80', // Dental Chair
+    'Evis X1': 'https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?auto=format&fit=crop&w=800&q=80', // Endoscopy Tower
 
     // Fallbacks
-    'MRI': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    'Ventilator': 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    'Monitor': 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
-    'Generic': 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80'
+    'Generic': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80' // Modern Med Background
 };
 
 export const getModelImage = (model: string): string => {
     if (!model) return DEVICE_IMAGES['Generic'];
     const m = model.trim();
+    
+    // Direct Match
     if (DEVICE_IMAGES[m]) return DEVICE_IMAGES[m];
+    
+    // Partial Match Logic
     const lowerM = m.toLowerCase();
     
     if (lowerM.includes('magnetom') || lowerM.includes('mri')) return DEVICE_IMAGES['Magnetom Vida'];
     if (lowerM.includes('somatom') || lowerM.includes('ct ')) return DEVICE_IMAGES['Somatom Force'];
     if (lowerM.includes('servo') || lowerM.includes('ventilator')) return DEVICE_IMAGES['Servo-U'];
-    if (lowerM.includes('alaris') || lowerM.includes('pump')) return DEVICE_IMAGES['Alaris System'];
+    if (lowerM.includes('alaris') || lowerM.includes('pump') || lowerM.includes('infusion')) return DEVICE_IMAGES['Alaris System'];
     if (lowerM.includes('mx40') || lowerM.includes('intellivue') || lowerM.includes('monitor')) return DEVICE_IMAGES['IntelliVue MX40'];
     if (lowerM.includes('drager') || lowerM.includes('fabius') || lowerM.includes('anesthesia')) return DEVICE_IMAGES['Drager Fabius'];
     if (lowerM.includes('lifepak') || lowerM.includes('defib')) return DEVICE_IMAGES['LifePak 15'];
-    if (lowerM.includes('voluson') || lowerM.includes('ultrasound')) return DEVICE_IMAGES['Voluson E10'];
+    if (lowerM.includes('voluson') || lowerM.includes('ultrasound') || lowerM.includes('echo')) return DEVICE_IMAGES['Voluson E10'];
     if (lowerM.includes('mobilett') || lowerM.includes('x-ray')) return DEVICE_IMAGES['Mobilett Elara'];
     if (lowerM.includes('4008') || lowerM.includes('dialysis')) return DEVICE_IMAGES['4008S Classix'];
-    if (lowerM.includes('isolette') || lowerM.includes('incubator')) return DEVICE_IMAGES['Isolette 8000'];
-    if (lowerM.includes('mac 2000') || lowerM.includes('ecg')) return DEVICE_IMAGES['MAC 2000'];
-    if (lowerM.includes('oec') || lowerM.includes('c-arm')) return DEVICE_IMAGES['OEC Elite'];
+    if (lowerM.includes('isolette') || lowerM.includes('incubator') || lowerM.includes('warmer')) return DEVICE_IMAGES['Isolette 8000'];
+    if (lowerM.includes('mac') || lowerM.includes('ecg') || lowerM.includes('ekg')) return DEVICE_IMAGES['MAC 2000'];
+    if (lowerM.includes('oec') || lowerM.includes('c-arm') || lowerM.includes('fluoroscopy')) return DEVICE_IMAGES['OEC Elite'];
     if (lowerM.includes('evis') || lowerM.includes('endoscop')) return DEVICE_IMAGES['Evis X1'];
-    if (lowerM.includes('steris') || lowerM.includes('autoclave')) return DEVICE_IMAGES['Steris AMSCO'];
-    if (lowerM.includes('xn-1000') || lowerM.includes('hematology') || lowerM.includes('analyzer')) return DEVICE_IMAGES['XN-1000'];
-    if (lowerM.includes('a-dec') || lowerM.includes('dental')) return DEVICE_IMAGES['A-dec 500'];
+    if (lowerM.includes('steris') || lowerM.includes('autoclave') || lowerM.includes('sterilizer')) return DEVICE_IMAGES['Steris AMSCO'];
+    if (lowerM.includes('xn') || lowerM.includes('hematology') || lowerM.includes('analyzer')) return DEVICE_IMAGES['XN-1000'];
+    if (lowerM.includes('dec') || lowerM.includes('dental')) return DEVICE_IMAGES['A-dec 500'];
+    if (lowerM.includes('avalon') || lowerM.includes('fetal')) return DEVICE_IMAGES['Avalon FM30'];
     
     return DEVICE_IMAGES['Generic'];
 };
@@ -171,7 +184,7 @@ const VENDORS = [
 let assets: Asset[] = [];
 // Generate 500 Assets
 for (let i = 1; i <= 500; i++) {
-    const type = Object.keys(DEVICE_IMAGES)[i % Object.keys(DEVICE_IMAGES).length];
+    const type = Object.keys(DEVICE_IMAGES)[i % (Object.keys(DEVICE_IMAGES).length - 1)]; // Skip 'Generic'
     const model = type; 
     const loc = LOCATIONS[i % LOCATIONS.length];
     const purchaseYear = 2015 + (i % 9); // 2015-2023
@@ -186,7 +199,7 @@ for (let i = 1; i <= 500; i++) {
     assets.push({
         asset_id: `AST-${1000 + i}`,
         nfc_tag_id: `NFC-${1000 + i}`,
-        name: type.includes('Scanner') ? type : `${type} System`,
+        name: type.includes('Scanner') ? type : `${type}`,
         model: model,
         manufacturer: vendor,
         serial_number: `SN-${10000 + i}`,
