@@ -7,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon, CalendarDays, Factory, Hourglass, ShieldCheck as ShieldCheckIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -34,9 +34,15 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     
     // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [newAssetForm, setNewAssetForm] = useState({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' });
+    const [newAssetForm, setNewAssetForm] = useState({ 
+        name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], 
+        manufacturing_date: '', installation_date: '', image: '' 
+    });
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     
+    // Asset Detail Tab State
+    const [assetDetailTab, setAssetDetailTab] = useState<'overview' | 'history' | 'docs'>('overview');
+
     // Users & Roles State
     const [userMgmtTab, setUserMgmtTab] = useState<'users' | 'roles'>('users');
     const [roles, setRoles] = useState<RoleDefinition[]>([]);
@@ -125,9 +131,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const handleRealScan = useCallback((scannedId: string) => {
         const currentAudit = activeAuditRef.current;
         if (!currentAudit) return;
-        
         const cleanId = scannedId.trim();
-        
         if (currentAudit.missing_assets.includes(cleanId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
@@ -142,7 +146,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const cleanId = scannedId.trim();
         const currentAssets = assetsRef.current;
         const asset = currentAssets.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
-        
         if (asset) {
             setGateLogs(prev => [{
                 id: Date.now(),
@@ -195,13 +198,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         setSelectedAsset(null); 
         setSelectedCMReport(null); 
         setSelectedPMReport(null);
-        
-        // Reset simulations on view change
         if (currentView !== 'dashboard') setIsSimulationActive(false); 
         if (currentView !== 'rfid') setIsGateMonitoring(false);
     }, [currentView]);
 
-    // Dashboard Map Simulation
     useEffect(() => { 
         let interval: ReturnType<typeof setInterval>; 
         if (isSimulationActive && currentView === 'dashboard') { 
@@ -222,7 +222,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
 
-    // Gate Monitoring Simulation
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
         if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
@@ -248,7 +247,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return () => clearInterval(interval);
     }, [isGateMonitoring, currentView, rfidTab, assets]);
 
-
     // Analytics Calculations
     const analyticsData = useMemo(() => {
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
@@ -261,48 +259,29 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             mttrByMonth[month].count += 1; 
         });
         const mttrTrend = Object.keys(mttrByMonth).map(m => ({ month: m, hours: parseFloat((mttrByMonth[m].total / mttrByMonth[m].count / (1000 * 60 * 60)).toFixed(1)) })).slice(0, 6);
-        
         const statusData = [ { name: 'Running', value: assets.filter(a => a.status === AssetStatus.RUNNING).length, color: '#10B981' }, { name: 'Down', value: assets.filter(a => a.status === AssetStatus.DOWN).length, color: '#EF4444' }, { name: 'Maint.', value: assets.filter(a => a.status === AssetStatus.UNDER_MAINT).length, color: '#F59E0B' } ];
         const riskData = [...assets].sort((a,b) => b.risk_score - a.risk_score).slice(0, 10);
-        
         const tcoData = [...assets].filter(a => a.purchase_cost).sort((a,b) => (b.accumulated_maintenance_cost || 0) - (a.accumulated_maintenance_cost || 0)).slice(0, 5);
-
         const financialAnalysis = assets.map(a => {
             const woCount = workOrders.filter(w => w.asset_id === a.asset_id || w.asset_id === a.nfc_tag_id).length;
             const maintCost = a.accumulated_maintenance_cost || 0;
             const purchase = a.purchase_cost || 1; 
-            return {
-                id: a.asset_id, name: a.name, model: a.model, purchase: purchase, maintCost: maintCost, woCount: woCount, ratio: parseFloat((maintCost / purchase).toFixed(2))
-            };
+            return { id: a.asset_id, name: a.name, model: a.model, purchase: purchase, maintCost: maintCost, woCount: woCount, ratio: parseFloat((maintCost / purchase).toFixed(2)) };
         }).sort((a,b) => b.ratio - a.ratio);
-
         const departments = Array.from(new Set(getLocations().map(l => l.department)));
         const deptScores = departments.map(dept => {
-            const deptAssets = assets.filter(a => {
-                const loc = getLocations().find(l => l.location_id === a.location_id);
-                return loc?.department === dept;
-            });
+            const deptAssets = assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === dept; });
             const assetIds = deptAssets.map(a => a.asset_id);
             const deptWOs = workOrders.filter(wo => assetIds.includes(wo.asset_id) || assetIds.includes(wo.asset_id.replace('NFC-', 'AST-')));
-            const totalWOs = deptWOs.length;
-            if (totalWOs === 0) return { name: dept, score: 100, totalWOs: 0, userErrors: 0 };
             const userErrors = deptWOs.filter(wo => wo.failure_type === 'UserError').length;
             const techFaults = deptWOs.filter(wo => wo.failure_type === 'Technical').length;
             let score = 100 - (userErrors * 15) - (techFaults * 2);
-            if (score < 0) score = 0;
-            if (score > 100) score = 100;
-            return { name: dept, score, totalWOs, userErrors };
+            if (score < 0) score = 0; if (score > 100) score = 100;
+            return { name: dept, score, totalWOs: deptWOs.length, userErrors };
         });
-
         const topDepts = [...deptScores].sort((a, b) => b.score - a.score).slice(0, 5);
         const lowRepDepts = [...deptScores].sort((a, b) => a.score - b.score).slice(0, 5);
-
-        const assetReputation = assets.map(a => {
-             const wos = workOrders.filter(w => w.asset_id === a.asset_id);
-             const userErrors = wos.filter(w => w.failure_type === 'UserError').length;
-             return { ...a, userErrors };
-        }).sort((a, b) => b.userErrors - a.userErrors).slice(0, 10);
-
+        const assetReputation = assets.map(a => { const wos = workOrders.filter(w => w.asset_id === a.asset_id); const userErrors = wos.filter(w => w.failure_type === 'UserError').length; return { ...a, userErrors }; }).sort((a, b) => b.userErrors - a.userErrors).slice(0, 10);
         const manufacturers = Array.from(new Set(assets.map(a => a.manufacturer || 'Generic')));
         const vendorStats = manufacturers.map(mfg => {
             const mfgAssets = assets.filter(a => (a.manufacturer || 'Generic') === mfg);
@@ -311,72 +290,53 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             const correctiveWOs = mfgWOs.filter(wo => wo.type === WorkOrderType.CORRECTIVE).length;
             const failureRatio = mfgAssets.length > 0 ? correctiveWOs / mfgAssets.length : 0;
             const reliabilityScore = Math.max(0, 100 - (failureRatio * 20));
-            let totalHours = 0;
-            let countClosed = 0;
-            mfgWOs.forEach(wo => {
-                if (wo.status === 'Closed' && wo.start_time && wo.close_time) {
-                    const diff = new Date(wo.close_time).getTime() - new Date(wo.start_time).getTime();
-                    totalHours += diff / (1000 * 60 * 60);
-                    countClosed++;
-                }
-            });
+            let totalHours = 0; let countClosed = 0;
+            mfgWOs.forEach(wo => { if (wo.status === 'Closed' && wo.start_time && wo.close_time) { const diff = new Date(wo.close_time).getTime() - new Date(wo.start_time).getTime(); totalHours += diff / (1000 * 60 * 60); countClosed++; } });
             const avgMTTR = countClosed > 0 ? totalHours / countClosed : 0;
             const supportScore = Math.max(0, 100 - (avgMTTR * 2));
             const finalScore = Math.round((reliabilityScore * 0.6) + (supportScore * 0.4));
             return { name: mfg, assetCount: mfgAssets.length, woCount: correctiveWOs, avgMTTR: avgMTTR.toFixed(1), score: finalScore };
         }).sort((a, b) => b.score - a.score);
-
         return { mttrTrend, statusData, riskData, tcoData, financialAnalysis, topDepts, lowRepDepts, assetReputation, vendorStats };
     }, [assets, workOrders, users]);
 
-    // TRAINING DATA CALCULATIONS
+    // Training Data Calc
     const trainingData = useMemo(() => {
         if (!selectedTrainingDept) return null;
-        const deptAssets = assets.filter(a => {
-            const loc = getLocations().find(l => l.location_id === a.location_id);
-            return loc?.department === selectedTrainingDept;
-        });
+        const deptAssets = assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === selectedTrainingDept; });
         const deptAssetIds = deptAssets.map(a => a.asset_id);
-        const userErrorWOs = workOrders.filter(wo => 
-            (deptAssetIds.includes(wo.asset_id) || deptAssetIds.includes(wo.asset_id.replace('NFC-', 'AST-')))
-        );
+        const userErrorWOs = workOrders.filter(wo => (deptAssetIds.includes(wo.asset_id) || deptAssetIds.includes(wo.asset_id.replace('NFC-', 'AST-'))));
         const errorCounts: Record<string, number> = {};
-        userErrorWOs.forEach(wo => {
-            let errorKey = "General Misuse";
-            const desc = wo.description.toLowerCase();
-            if (desc.includes('cable') || desc.includes('cord')) errorKey = "Cable Damage / Yanking";
-            else if (desc.includes('drop') || desc.includes('fell')) errorKey = "Physical Drop / Impact";
-            else if (desc.includes('battery') || desc.includes('charge')) errorKey = "Battery Mgmt Failure";
-            else if (desc.includes('clean') || desc.includes('fluid')) errorKey = "Improper Cleaning";
-            else if (desc.includes('setting') || desc.includes('config')) errorKey = "Wrong Settings";
-            errorCounts[errorKey] = (errorCounts[errorKey] || 0) + 1;
-        });
-        const topErrors = Object.entries(errorCounts)
-            .map(([error, count]) => ({ error, count }))
-            .sort((a, b) => b.count - a.count)
-            .slice(0, 5);
-        const totalErrors = userErrorWOs.length;
-        const needsSession = totalErrors > 3;
-        return { topErrors, totalErrors, needsSession };
+        userErrorWOs.forEach(wo => { let errorKey = "General Misuse"; const desc = wo.description.toLowerCase(); if (desc.includes('cable') || desc.includes('cord')) errorKey = "Cable Damage / Yanking"; else if (desc.includes('drop') || desc.includes('fell')) errorKey = "Physical Drop / Impact"; else if (desc.includes('battery') || desc.includes('charge')) errorKey = "Battery Mgmt Failure"; else if (desc.includes('clean') || desc.includes('fluid')) errorKey = "Improper Cleaning"; else if (desc.includes('setting') || desc.includes('config')) errorKey = "Wrong Settings"; errorCounts[errorKey] = (errorCounts[errorKey] || 0) + 1; });
+        const topErrors = Object.entries(errorCounts).map(([error, count]) => ({ error, count })).sort((a, b) => b.count - a.count).slice(0, 5);
+        return { topErrors, totalErrors: userErrorWOs.length, needsSession: userErrorWOs.length > 3 };
     }, [selectedTrainingDept, assets, workOrders]);
 
     // --- HANDLERS ---
     const triggerNotification = () => { setShowToast(true); setTimeout(() => setShowToast(false), 3000); };
     const handleAiSearch = async () => { if(!aiQuery) return; setIsAiSearching(true); setAiResult(null); const result = await searchKnowledgeBase(aiQuery, kbDocuments.map(d=>d.title), language); setAiResult(result); setIsAiSearching(false); };
-    const handleAddSubmit = (e: React.FormEvent) => { e.preventDefault(); onAddAsset({...newAssetForm, location_id: Number(newAssetForm.location_id)} as any); setIsAddModalOpen(false); setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], image: '' }); };
+    const handleAddSubmit = (e: React.FormEvent) => { e.preventDefault(); onAddAsset({...newAssetForm, location_id: Number(newAssetForm.location_id)} as any); setIsAddModalOpen(false); setNewAssetForm({ name: '', model: '', asset_id: '', location_id: 101, purchase_date: new Date().toISOString().split('T')[0], manufacturing_date: '', installation_date: '', image: '' }); };
     
     // AI IMAGE GENERATION HANDLER
     const handleGenerateImage = async () => {
-        if (!newAssetForm.model) {
-            alert('Please enter a model name first.');
-            return;
-        }
+        if (!newAssetForm.model) { alert('Please enter a model name first.'); return; }
         setIsGeneratingImage(true);
         const imageUrl = await generateAssetThumbnail(newAssetForm.model);
-        if (imageUrl) {
-            setNewAssetForm(prev => ({ ...prev, image: imageUrl }));
-        }
+        if (imageUrl) { setNewAssetForm(prev => ({ ...prev, image: imageUrl })); }
         setIsGeneratingImage(false);
+    };
+
+    const handleDownloadManual = (title: string, assetModel: string) => {
+        const content = `OFFICIAL SERVICE MANUAL\nDevice Model: ${assetModel}\nDocument: ${title}\nDate Generated: ${new Date().toLocaleDateString()}\n[Simulation]`;
+        const blob = new Blob([content], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title.replace(/\s+/g, '_')}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
     const handleAddUserSubmit = (e: React.FormEvent) => { e.preventDefault(); if (!onAddUser) return; onAddUser({...newUserForm, user_id: Date.now(), location_id: 101} as User); setIsAddUserModalOpen(false); refreshData(); setNewUserForm({ name: '', email: '', phone: '', password: '', role: 'Technician', department: '', signature: '' }); };
@@ -390,23 +350,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const handleUpdateCalibration = async (e: React.FormEvent) => { e.preventDefault(); if (assetToCalibrate) { const nextCal = new Date(newCalibrationDate); nextCal.setFullYear(nextCal.getFullYear() + 1); await api.updateAssetCalibration(assetToCalibrate.asset_id, newCalibrationDate, nextCal.toISOString().split('T')[0]); refreshData(); setUpdateCalibrationModalOpen(false); setAssetToCalibrate(null); } };
     const handleFindJobReport = async () => { if (reportType === 'PPM') { const report = await api.fetchPMReport(jobOrderSearchId || '5002'); if (report) setSelectedPMReport(report); else alert('PM Report Not Found. Try 5002.'); } else { if (jobOrderSearchId === '2236' || jobOrderSearchId === '') setSelectedCMReport(getDetailedReports()[0]); else alert('Job Order Report not found. Try 2236.'); } };
     const startAudit = () => { if(!selectedAuditDept) return alert("Select a department"); const expected = getAssetsInZone(selectedAuditDept); setActiveAudit({ id: Date.now(), date: new Date().toISOString(), department: selectedAuditDept, total_expected: expected.length, total_scanned: 0, missing_assets: expected.map(a => a.asset_id), found_assets: [], status: 'In Progress' }); };
-    const handleSimulateAuditScan = () => { 
-        if(activeAudit && activeAudit.missing_assets.length > 0) { 
-            const randomId = activeAudit.missing_assets[Math.floor(Math.random() * activeAudit.missing_assets.length)]; 
-            handleRealScan(randomId); 
-        } else if (activeAudit) {
-            // If none missing, simulate finding an already found one just for UI feedback
-            const randomFound = activeAudit.found_assets[0];
-            if(randomFound) handleRealScan(randomFound);
-        }
-    };
+    const handleSimulateAuditScan = () => { if(activeAudit && activeAudit.missing_assets.length > 0) { const randomId = activeAudit.missing_assets[Math.floor(Math.random() * activeAudit.missing_assets.length)]; handleRealScan(randomId); } else if (activeAudit) { const randomFound = activeAudit.found_assets[0]; if(randomFound) handleRealScan(randomFound); } };
 
     // ROLE MANAGEMENT
-    const handleOpenRoleEditor = (role?: RoleDefinition) => {
-        if (role) { setEditingRole({ ...role, permissions: JSON.parse(JSON.stringify(role.permissions)) }); } 
-        else { setEditingRole({ id: Date.now().toString(), name: '', description: '', is_system_role: false, permissions: { assets: [], work_orders: [], inventory: [], reports: [], users: [], settings: [] } }); }
-        setIsRoleEditorOpen(true);
-    };
+    const handleOpenRoleEditor = (role?: RoleDefinition) => { if (role) { setEditingRole({ ...role, permissions: JSON.parse(JSON.stringify(role.permissions)) }); } else { setEditingRole({ id: Date.now().toString(), name: '', description: '', is_system_role: false, permissions: { assets: [], work_orders: [], inventory: [], reports: [], users: [], settings: [] } }); } setIsRoleEditorOpen(true); };
     const handlePermissionToggle = (resource: Resource, action: Action) => { if (!editingRole) return; const currentPerms = editingRole.permissions[resource] || []; const hasPerm = currentPerms.includes(action); setEditingRole({ ...editingRole, permissions: { ...editingRole.permissions, [resource]: hasPerm ? currentPerms.filter(a => a !== action) : [...currentPerms, action] } }); };
     const handleSaveRole = async () => { if (!editingRole || !editingRole.name) return; await api.saveRole(editingRole); const data = await api.fetchRoles(); setRoles(data); setIsRoleEditorOpen(false); setEditingRole(null); };
     
@@ -415,194 +362,235 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const getAssetsInZone = (deptId: string) => assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === deptId || (loc?.department && loc.department.includes(deptId)); });
 
     // ============================================
-    // 1. DASHBOARD VIEW
+    // 2. ASSETS VIEW (Enhanced)
     // ============================================
-    if (currentView === 'dashboard') {
-        const { mttrTrend, statusData } = analyticsData;
-        return (
-            <div className="space-y-6 animate-in fade-in">
-                {/* Header Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                        <div className="p-3 bg-brand/10 text-brand rounded-xl"><Package size={24}/></div>
-                        <div><p className="text-xs font-bold text-text-muted uppercase tracking-wider">{t('total_assets')}</p><h3 className="text-2xl font-black text-gray-900">{assets.length}</h3></div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                        <div className="p-3 bg-warning/10 text-warning rounded-xl"><AlertTriangle size={24}/></div>
-                        <div><p className="text-xs font-bold text-text-muted uppercase tracking-wider">{t('open_tickets')}</p><h3 className="text-2xl font-black text-gray-900">{workOrders.filter(w=>w.status!=='Closed').length}</h3></div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                        <div className="p-3 bg-danger/10 text-danger rounded-xl"><AlertCircle size={24}/></div>
-                        <div><p className="text-xs font-bold text-text-muted uppercase tracking-wider">{t('inventory_alerts')}</p><h3 className="text-2xl font-black text-gray-900">{inventory.filter(i=>i.current_stock <= i.min_reorder_level).length}</h3></div>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                        <div className="p-3 bg-purple-100 text-purple-600 rounded-xl"><Activity size={24}/></div>
-                        <div><p className="text-xs font-bold text-text-muted uppercase tracking-wider">{t('kpi_availability')}</p><h3 className="text-2xl font-black text-gray-900">98.2%</h3></div>
-                    </div>
-                </div>
+    if (currentView === 'assets') {
+        if (selectedAsset) {
+            const assetWOs = workOrders.filter(w => w.asset_id === selectedAsset.asset_id || w.asset_id === selectedAsset.nfc_tag_id);
+            const calHistory = assetWOs.filter(w => w.type === WorkOrderType.CALIBRATION);
+            const maintHistory = assetWOs.filter(w => w.type !== WorkOrderType.CALIBRATION);
+            const docs = getAssetDocuments(selectedAsset.asset_id);
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Map Section */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft overflow-hidden flex flex-col h-[500px]">
-                        <div className="p-4 border-b border-border flex justify-between items-center bg-gray-50/50">
-                            <h3 className="font-bold text-gray-900 flex items-center gap-2"><MapPin size={18} className="text-brand"/> {t('dept_map')}</h3>
-                            <button onClick={() => setIsSimulationActive(!isSimulationActive)} className={`text-xs px-3 py-1.5 rounded-lg border font-bold transition-all ${isSimulationActive ? 'bg-green-100 text-green-700 border-green-200' : 'bg-white text-gray-500 border-gray-200'}`}>
-                                {isSimulationActive ? 'Simulation ON' : 'Start Sim'}
-                            </button>
-                        </div>
-                        <div className="flex-1 relative bg-gray-100 perspective-1000 overflow-hidden group">
-                            <div className="absolute inset-0 transform rotate-x-60 scale-90 transition-transform duration-700 group-hover:rotate-x-45 group-hover:scale-100">
-                                {departmentZones.map(zone => {
-                                    const assetsInZone = getAssetsInZone(zone.name);
-                                    const hasIssue = assetsInZone.some(a => a.status === AssetStatus.DOWN);
-                                    const hasMaint = assetsInZone.some(a => a.status === AssetStatus.UNDER_MAINT);
-                                    
-                                    // Dynamic Color based on status
-                                    let zoneColor = 'bg-emerald-100 border-emerald-300';
-                                    if (hasIssue) zoneColor = 'bg-red-100 border-red-300 animate-pulse';
-                                    else if (hasMaint) zoneColor = 'bg-amber-100 border-amber-300';
-
-                                    return (
-                                        <div 
-                                            key={zone.id}
-                                            onClick={() => setSelectedMapZone(zone.id)}
-                                            className={`absolute ${zoneColor} border-2 opacity-90 rounded-lg shadow-xl cursor-pointer hover:translate-y-[-10px] transition-all duration-300 flex flex-col items-center justify-center`}
-                                            style={{ left: `${zone.x}%`, top: `${zone.y}%`, width: `${zone.width}%`, height: `${zone.height}%` }}
-                                        >
-                                            <span className="font-black text-gray-700 text-xs uppercase tracking-wider">{zone.name}</span>
-                                            <div className="flex gap-1 mt-1">
-                                                {hasIssue && <span className="w-2 h-2 rounded-full bg-red-500"></span>}
-                                                {hasMaint && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
-                                                {!hasIssue && !hasMaint && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            
-                            {/* Slide-over Asset Panel */}
-                            {selectedMapZone && (
-                                <div className="absolute top-0 right-0 bottom-0 w-80 bg-white/95 backdrop-blur shadow-2xl border-l border-border p-4 animate-in slide-in-from-right overflow-y-auto">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h4 className="font-bold text-lg">{selectedMapZone} Assets</h4>
-                                        <button onClick={() => setSelectedMapZone(null)}><X size={18}/></button>
+            return (
+                <div className="space-y-6 animate-in slide-in-from-right-4 font-sans">
+                    <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold mb-2 transition-colors">
+                        <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
+                    </button>
+                    
+                    {/* ASSET HEADER CARD */}
+                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <div className="flex flex-col md:flex-row">
+                            {/* Image Section */}
+                            <div className="md:w-1/3 bg-gray-50 p-6 flex flex-col justify-center items-center border-b md:border-b-0 md:border-r border-border relative group">
+                                <div className="w-full aspect-square rounded-xl overflow-hidden bg-white shadow-sm mb-4 relative">
+                                    {selectedAsset.image ? (
+                                        <img src={selectedAsset.image} className="w-full h-full object-contain p-2 hover:scale-105 transition-transform duration-500"/>
+                                    ) : (
+                                        <Box className="w-full h-full text-gray-300 p-12"/>
+                                    )}
+                                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/70 text-white text-[10px] font-bold rounded backdrop-blur-sm uppercase">
+                                        ID: {selectedAsset.asset_id}
                                     </div>
-                                    <div className="space-y-2">
-                                        {getAssetsInZone(selectedMapZone).map(a => (
-                                            <div key={a.asset_id} className="p-3 bg-white rounded-lg border border-gray-200 shadow-sm text-sm">
-                                                <div className="font-bold">{a.name}</div>
-                                                <div className="flex justify-between mt-1">
-                                                    <span className="text-xs text-gray-500">{a.model}</span>
-                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${a.status === 'Running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{a.status}</span>
+                                </div>
+                                <div className="w-full flex gap-2">
+                                    <button className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold hover:bg-brand hover:text-white hover:border-brand transition-colors">
+                                        Edit Details
+                                    </button>
+                                    <button className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-xs font-bold hover:bg-red-500 hover:text-white hover:border-red-500 transition-colors">
+                                        Decommission
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Info Section */}
+                            <div className="md:w-2/3 p-6 flex flex-col">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div>
+                                        <h1 className="text-3xl font-black text-gray-900 tracking-tight">{selectedAsset.name}</h1>
+                                        <div className="flex items-center gap-3 mt-2 text-sm">
+                                            <span className="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">{selectedAsset.manufacturer}</span>
+                                            <span className="text-gray-400">•</span>
+                                            <span className="text-text-muted">{selectedAsset.model}</span>
+                                            <span className="text-gray-400">•</span>
+                                            <span className="font-mono text-gray-500">{selectedAsset.serial_number}</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className={`px-4 py-1.5 rounded-full text-sm font-bold uppercase tracking-wide flex items-center gap-2 ${selectedAsset.status === 'Running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            <div className={`w-2 h-2 rounded-full ${selectedAsset.status === 'Running' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                            {selectedAsset.status}
+                                        </div>
+                                        <div className="text-xs font-medium text-gray-400 flex items-center gap-1">
+                                            <MapPin size={12}/> {getLocationName(selectedAsset.location_id)}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Lifecycle Timeline */}
+                                <div className="mb-8">
+                                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                        <Hourglass size={14}/> {t('asset_timeline')}
+                                    </h3>
+                                    <div className="relative flex justify-between items-center px-2">
+                                        {/* Line */}
+                                        <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-gray-200 -z-10"></div>
+                                        
+                                        {[
+                                            { label: t('manuf_date'), date: selectedAsset.manufacturing_date, icon: Factory },
+                                            { label: t('purchase_date'), date: selectedAsset.purchase_date, icon: DollarSign },
+                                            { label: t('install_date'), date: selectedAsset.installation_date, icon: Wrench },
+                                            { label: t('warranty_exp'), date: selectedAsset.warranty_expiration, icon: ShieldCheckIcon }
+                                        ].map((milestone, idx) => (
+                                            <div key={idx} className="flex flex-col items-center bg-white px-2">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-2 ${new Date(milestone.date) < new Date() ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-gray-50 border-gray-300 text-gray-400'}`}>
+                                                    <milestone.icon size={14}/>
                                                 </div>
+                                                <div className="text-[10px] font-bold text-gray-500 uppercase">{milestone.label}</div>
+                                                <div className="text-xs font-bold text-gray-900">{milestone.date || 'N/A'}</div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Detailed Specs Grid */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-auto border-t border-gray-100 pt-6">
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Expected Lifespan</div>
+                                        <div className="font-bold text-gray-900">{selectedAsset.expected_lifespan} Years</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Operating Hours</div>
+                                        <div className="font-bold text-gray-900">{selectedAsset.operating_hours.toLocaleString()} hrs</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Purchase Cost</div>
+                                        <div className="font-bold text-gray-900">${selectedAsset.purchase_cost?.toLocaleString()}</div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Risk Score</div>
+                                        <div className={`font-bold ${selectedAsset.risk_score > 70 ? 'text-red-600' : 'text-green-600'}`}>{selectedAsset.risk_score}/100</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Tabs Navigation */}
+                        <div className="bg-gray-50 border-t border-border px-6 flex gap-6">
+                            {[
+                                { id: 'overview', label: t('tab_overview'), icon: Activity },
+                                { id: 'history', label: t('tab_history'), icon: History },
+                                { id: 'docs', label: t('tab_docs'), icon: Book }
+                            ].map(tab => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => setAssetDetailTab(tab.id as any)}
+                                    className={`py-4 text-sm font-bold flex items-center gap-2 border-b-2 transition-colors ${assetDetailTab === tab.id ? 'border-brand text-brand' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+                                >
+                                    <tab.icon size={16}/> {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Tab Content */}
+                        <div className="p-6 bg-white min-h-[300px]">
+                            {assetDetailTab === 'overview' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-4">{t('live_readings')}</h4>
+                                        <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 h-48 flex items-center justify-center text-gray-400 italic">
+                                            IoT Telemetry Visualization Placeholder
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-4">{t('asset_health')}</h4>
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center p-3 bg-green-50 border border-green-100 rounded-lg">
+                                                <span className="text-sm font-medium text-green-800">Calibration Status</span>
+                                                <span className="text-xs font-bold bg-white px-2 py-1 rounded text-green-600">Compliant</span>
+                                            </div>
+                                            <div className="flex justify-between items-center p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                                                <span className="text-sm font-medium text-blue-800">Uptime (YTD)</span>
+                                                <span className="text-xs font-bold bg-white px-2 py-1 rounded text-blue-600">99.4%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
-                        </div>
-                    </div>
 
-                    {/* Quick Stats Column */}
-                    <div className="space-y-6">
-                        <div className="bg-white p-5 rounded-2xl border border-border shadow-soft h-[240px]">
-                            <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">{t('chart_asset_status')}</h3>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={statusData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                                        {statusData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend verticalAlign="bottom" height={36}/>
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
-                        <div className="bg-white p-5 rounded-2xl border border-border shadow-soft h-[240px]">
-                            <h3 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">{t('chart_mttr_trend')}</h3>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={mttrTrend}>
-                                    <defs>
-                                        <linearGradient id="colorMttr" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#2563EB" stopOpacity={0.3}/>
-                                            <stop offset="95%" stopColor="#2563EB" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0"/>
-                                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 10}}/>
-                                    <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10}}/>
-                                    <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}/>
-                                    <Area type="monotone" dataKey="hours" stroke="#2563EB" strokeWidth={3} fillOpacity={1} fill="url(#colorMttr)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // ============================================
-    // 2. ASSETS VIEW
-    // ============================================
-    if (currentView === 'assets') {
-        if (selectedAsset) {
-            // Detail View
-            const assetWOs = workOrders.filter(w => w.asset_id === selectedAsset.asset_id || w.asset_id === selectedAsset.nfc_tag_id);
-            const calHistory = assetWOs.filter(w => w.type === WorkOrderType.CALIBRATION);
-            const maintHistory = assetWOs.filter(w => w.type !== WorkOrderType.CALIBRATION);
-
-            return (
-                <div className="space-y-6 animate-in slide-in-from-right-4">
-                    <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold mb-2">
-                        <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
-                    </button>
-                    
-                    <div className="bg-white rounded-2xl border border-border shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-border bg-gray-50 flex items-center gap-6">
-                            <div className="w-24 h-24 bg-white rounded-xl border border-gray-200 p-1">
-                                {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover rounded-lg"/> : <Box className="w-full h-full text-gray-300 p-4"/>}
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-black text-gray-900">{selectedAsset.name}</h1>
-                                <p className="text-text-muted font-medium">{selectedAsset.model} • {selectedAsset.serial_number}</p>
-                                <div className="flex gap-2 mt-2">
-                                    <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${selectedAsset.status === 'Running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{selectedAsset.status}</span>
-                                    <span className="px-2 py-0.5 text-xs font-bold rounded bg-gray-200 text-gray-700">{getLocationName(selectedAsset.location_id)}</span>
+                            {assetDetailTab === 'history' && (
+                                <div className="space-y-4">
+                                    <h4 className="font-bold text-gray-900 mb-2">{t('maintenance_history')}</h4>
+                                    {maintHistory.length > 0 ? (
+                                        <div className="border border-gray-200 rounded-xl overflow-hidden">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase">
+                                                    <tr>
+                                                        <th className="p-3">{t('date')}</th>
+                                                        <th className="p-3">{t('wo_id')}</th>
+                                                        <th className="p-3">{t('type')}</th>
+                                                        <th className="p-3">{t('wo_description')}</th>
+                                                        <th className="p-3 text-right">{t('status')}</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {maintHistory.map(wo => (
+                                                        <tr key={wo.wo_id} className="hover:bg-gray-50">
+                                                            <td className="p-3 font-mono text-gray-600">{new Date(wo.created_at).toLocaleDateString()}</td>
+                                                            <td className="p-3 font-bold">#{wo.wo_id}</td>
+                                                            <td className="p-3"><span className="px-2 py-0.5 rounded-full bg-gray-100 text-xs font-bold">{wo.type}</span></td>
+                                                            <td className="p-3 text-gray-600 max-w-xs truncate">{wo.description}</td>
+                                                            <td className="p-3 text-right"><span className="text-xs font-bold text-green-600">Closed</span></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-12 text-gray-400 italic">No maintenance history recorded.</div>
+                                    )}
                                 </div>
-                            </div>
-                        </div>
-                        
-                        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-gray-900 border-b pb-2">{t('specifications')}</h3>
-                                <div className="grid grid-cols-2 gap-4 text-sm">
-                                    <div className="text-text-muted">{t('manufacturer')}</div><div className="font-medium text-right">{selectedAsset.manufacturer}</div>
-                                    <div className="text-text-muted">{t('purchase_date')}</div><div className="font-medium text-right">{selectedAsset.purchase_date}</div>
-                                    <div className="text-text-muted">{t('warranty_exp')}</div><div className="font-medium text-right">{selectedAsset.warranty_expiration}</div>
-                                    <div className="text-text-muted">{t('op_hours')}</div><div className="font-medium text-right">{selectedAsset.operating_hours} hrs</div>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-4">
-                                <h3 className="font-bold text-gray-900 border-b pb-2">{t('maintenance_history')}</h3>
-                                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                    {maintHistory.length > 0 ? maintHistory.map(wo => {
-                                        const tech = users.find(u => u.user_id === wo.assigned_to_id);
-                                        return (
-                                            <div key={wo.wo_id} className="text-sm p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                                <div className="flex justify-between font-bold text-gray-800">
-                                                    <span>{wo.type} #{wo.wo_id}</span>
-                                                    <span className="text-xs text-gray-500">{new Date(wo.created_at).toLocaleDateString()}</span>
+                            )}
+
+                            {assetDetailTab === 'docs' && (
+                                <div>
+                                    <h4 className="font-bold text-gray-900 mb-4">{t('kb_library')}</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {docs.map(doc => (
+                                            <div key={doc.doc_id} className="p-4 border border-gray-200 rounded-xl hover:border-brand/50 hover:shadow-sm transition-all flex justify-between items-center group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-red-50 text-red-600 rounded-lg"><FileText size={24}/></div>
+                                                    <div>
+                                                        <div className="font-bold text-gray-900 group-hover:text-brand transition-colors">{doc.title}</div>
+                                                        <div className="text-xs text-gray-500">{doc.type} • {doc.date}</div>
+                                                    </div>
                                                 </div>
-                                                <p className="text-gray-600 text-xs mt-1 truncate">{wo.description}</p>
-                                                <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
-                                                    <UserIcon size={12}/> {tech?.name || 'Unknown Tech'}
+                                                <button 
+                                                    onClick={() => handleDownloadManual(doc.title, selectedAsset.model)}
+                                                    className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                                >
+                                                    <Download size={14}/> {t('download_manual')}
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {/* Auto-generated manuals based on Model */}
+                                        <div className="p-4 border border-gray-200 rounded-xl hover:border-brand/50 hover:shadow-sm transition-all flex justify-between items-center group">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-red-50 text-red-600 rounded-lg"><FileText size={24}/></div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900 group-hover:text-brand transition-colors">{selectedAsset.model} User Guide</div>
+                                                    <div className="text-xs text-gray-500">Manual • {selectedAsset.purchase_date}</div>
                                                 </div>
                                             </div>
-                                        );
-                                    }) : <div className="text-center text-gray-400 py-4 italic">No maintenance history</div>}
+                                            <button 
+                                                onClick={() => handleDownloadManual(`${selectedAsset.model} User Guide`, selectedAsset.model)}
+                                                className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors"
+                                            >
+                                                <Download size={14}/> {t('download_manual')}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -611,6 +599,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
         return (
             <div className="space-y-6 animate-in fade-in">
+                {/* ... (Existing List View remains same but ensures onRowClick sets selectedAsset) ... */}
                 <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
                     <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
                     <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
@@ -633,7 +622,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <tr key={asset.asset_id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => setSelectedAsset(asset)}>
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200">
+                                            <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden border border-gray-200 shrink-0">
                                                 {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Box size={20} className="m-auto text-gray-400"/>}
                                             </div>
                                             <div>
@@ -661,7 +650,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </table>
                 </div>
 
-                {/* Add Asset Modal */}
+                {/* Add Asset Modal (Updated with new fields) */}
                 {isAddModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95">
@@ -676,6 +665,16 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <select className="input-modern" value={newAssetForm.location_id} onChange={e=>setNewAssetForm({...newAssetForm, location_id: parseInt(e.target.value)})}>
                                         {getLocations().map(l => <option key={l.location_id} value={l.location_id}>{l.name}</option>)}
                                     </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs text-gray-500 font-bold uppercase mb-1 block">{t('purchase_date')}</label>
+                                        <input type="date" className="input-modern" value={newAssetForm.purchase_date} onChange={e=>setNewAssetForm({...newAssetForm, purchase_date: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-gray-500 font-bold uppercase mb-1 block">{t('manuf_date')}</label>
+                                        <input type="date" className="input-modern" value={newAssetForm.manufacturing_date} onChange={e=>setNewAssetForm({...newAssetForm, manufacturing_date: e.target.value})} />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-1">{t('form_image')}</label>
@@ -712,14 +711,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 3. MAINTENANCE VIEW
     // ============================================
     if (currentView === 'maintenance') {
-        // Filter Logic
         const filteredWOs = workOrders.filter(wo => {
             if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
             if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
             return true;
         });
-
-        // Kanban Columns
         const columns = {
             'Open': filteredWOs.filter(w => w.status === 'Open'),
             'Assigned': filteredWOs.filter(w => w.status === 'Assigned'),
@@ -747,7 +743,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_wo')}</button>
                     </div>
                 </div>
-
                 {maintenanceViewMode === 'kanban' ? (
                     <div className="flex-1 overflow-x-auto pb-4">
                         <div className="flex gap-6 min-w-[1200px] h-full">
@@ -771,20 +766,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                                         </div>
                                                         <div className="font-bold text-gray-900 text-sm mb-1">{asset?.name || 'Unknown Asset'}</div>
                                                         <p className="text-xs text-gray-500 line-clamp-2 mb-2">{wo.description}</p>
-                                                        
                                                         {wo.status === 'Open' && (
-                                                            <button 
-                                                                onClick={(e) => { e.stopPropagation(); setSelectedWOForAssignment(wo); handleSmartAssign(); setIsAssignModalOpen(true); }}
-                                                                className="w-full py-1.5 mt-2 bg-brand/10 text-brand hover:bg-brand hover:text-white rounded-lg text-xs font-bold transition-colors"
-                                                            >
-                                                                {t('assign_technician')}
-                                                            </button>
+                                                            <button onClick={(e) => { e.stopPropagation(); setSelectedWOForAssignment(wo); handleSmartAssign(); setIsAssignModalOpen(true); }} className="w-full py-1.5 mt-2 bg-brand/10 text-brand hover:bg-brand hover:text-white rounded-lg text-xs font-bold transition-colors">{t('assign_technician')}</button>
                                                         )}
                                                         {tech && (
-                                                            <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 bg-gray-50 p-1 rounded">
-                                                                <div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold">{tech.name[0]}</div>
-                                                                <span className="truncate">{tech.name}</span>
-                                                            </div>
+                                                            <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-500 bg-gray-50 p-1 rounded"><div className="w-5 h-5 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold">{tech.name[0]}</div><span className="truncate">{tech.name}</span></div>
                                                         )}
                                                     </div>
                                                 </div>
@@ -835,167 +821,168 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </table>
                     </div>
                 )}
-
-                {/* Modals for Maintenance */}
+                
+                {/* 1. Create WO Modal */}
                 {isCreateWOModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
-                            <h3 className="text-xl font-bold mb-4">{t('create_wo')}</h3>
+                            <h3 className="font-bold text-lg mb-4">{t('modal_create_wo')}</h3>
                             <form onSubmit={handleCreateWOSubmit} className="space-y-4">
-                                <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})} required>
-                                    <option value="">{t('wo_asset')}</option>
-                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name} ({a.asset_id})</option>)}
-                                </select>
-                                <select className="input-modern" value={newWOForm.priority} onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}>
-                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                                <textarea className="input-modern h-32" placeholder={t('wo_description')} value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})} required/>
-                                <div className="flex gap-2 justify-end pt-4">
-                                    <button type="button" onClick={() => setIsCreateWOModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                    <button type="submit" className="btn-primary">{t('btn_dispatch')}</button>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('wo_asset')}</label>
+                                    <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})} required>
+                                        <option value="">Select Asset...</option>
+                                        {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name} ({a.asset_id})</option>)}
+                                    </select>
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('type')}</label>
+                                        <select className="input-modern" value={newWOForm.type} onChange={e => setNewWOForm({...newWOForm, type: e.target.value as WorkOrderType})}>
+                                            <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
+                                            <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('priority')}</label>
+                                        <select className="input-modern" value={newWOForm.priority} onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}>
+                                            {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('wo_description')}</label>
+                                    <textarea className="input-modern" value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})} required/>
+                                </div>
+                                <div className="flex gap-2 pt-2">
+                                    <button type="button" onClick={() => setIsCreateWOModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button type="submit" className="flex-1 btn-primary">{t('btn_dispatch')}</button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 )}
 
-                {isAssignModalOpen && (
+                {/* 2. Assign Modal */}
+                {isAssignModalOpen && selectedWOForAssignment && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
-                            <h3 className="text-xl font-bold mb-4">{t('assign_technician')}</h3>
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('assign_technician')}</h3>
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+                                <div className="text-xs font-bold text-gray-500 uppercase mb-1">Task</div>
+                                <div className="font-bold text-gray-900">{selectedWOForAssignment.description}</div>
+                            </div>
                             
-                            {/* Smart Recommendations */}
-                            {recommendedTechs.length > 0 && (
-                                <div className="mb-4 space-y-2">
-                                    <div className="text-xs font-bold text-brand uppercase tracking-wider flex items-center gap-1"><Sparkles size={12}/> AI Recommendations</div>
-                                    {recommendedTechs.slice(0, 2).map((rec, i) => (
+                            <div className="space-y-4">
+                                <div className="max-h-60 overflow-y-auto space-y-2">
+                                    <h4 className="text-xs font-bold text-gray-500 uppercase">Recommended Technicians (AI)</h4>
+                                    {recommendedTechs.map(rec => (
                                         <div 
                                             key={rec.user.user_id} 
                                             onClick={() => setSelectedTechForAssignment(rec.user.user_id.toString())}
-                                            className={`p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center ${selectedTechForAssignment === rec.user.user_id.toString() ? 'bg-brand/10 border-brand' : 'bg-gray-50 border-gray-100 hover:border-brand/50'}`}
+                                            className={`p-3 rounded-xl border cursor-pointer flex justify-between items-center transition-all ${selectedTechForAssignment === rec.user.user_id.toString() ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'border-gray-200 hover:bg-gray-50'}`}
                                         >
-                                            <div>
-                                                <div className="font-bold text-sm text-gray-900">{rec.user.name}</div>
-                                                <div className="text-xs text-brand font-medium">{rec.reason}</div>
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-brand text-white flex items-center justify-center font-bold text-xs">{rec.user.name[0]}</div>
+                                                <div>
+                                                    <div className="font-bold text-sm text-gray-900">{rec.user.name}</div>
+                                                    <div className="text-[10px] text-gray-500 flex gap-1 items-center"><Star size={10} className="text-yellow-500 fill-yellow-500"/> {rec.reason}</div>
+                                                </div>
                                             </div>
-                                            <div className="text-xs font-bold bg-white px-2 py-1 rounded border shadow-sm">Score: {rec.score}</div>
+                                            <div className="text-xs font-bold text-green-600">{rec.score} pts</div>
                                         </div>
                                     ))}
+                                    {recommendedTechs.length === 0 && <div className="text-center text-gray-400 text-sm py-2">No smart recommendations available.</div>}
                                 </div>
-                            )}
+                                
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Manual Selection</label>
+                                    <select className="input-modern" value={selectedTechForAssignment} onChange={e => setSelectedTechForAssignment(e.target.value)}>
+                                        <option value="">Select Technician...</option>
+                                        {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
+                                            <option key={u.user_id} value={u.user_id}>{u.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
 
-                            <form onSubmit={handleAssignSubmit} className="space-y-4">
-                                <select className="input-modern" value={selectedTechForAssignment} onChange={e => setSelectedTechForAssignment(e.target.value)} required>
-                                    <option value="">{t('select_tech')}</option>
-                                    {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
-                                        <option key={u.user_id} value={u.user_id}>{u.name} ({u.role})</option>
-                                    ))}
-                                </select>
-                                <div className="flex gap-2 justify-end pt-4">
-                                    <button type="button" onClick={() => setIsAssignModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                    <button type="submit" className="btn-primary">{t('btn_assign_confirm')}</button>
-                                </div>
-                            </form>
+                            <div className="flex gap-2 pt-6">
+                                <button onClick={() => setIsAssignModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                <button onClick={handleAssignSubmit} className="flex-1 btn-primary">{t('btn_assign_confirm')}</button>
+                            </div>
                         </div>
                     </div>
                 )}
 
+                {/* 3. Details Modal */}
                 {isWorkOrderDetailsModalOpen && selectedWorkOrderForDetails && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                            <div className="flex justify-between items-start mb-6 border-b pb-4">
-                                <div>
-                                    <h3 className="text-xl font-bold text-gray-900">Work Order #{selectedWorkOrderForDetails.wo_id}</h3>
-                                    <span className="text-sm text-gray-500">{new Date(selectedWorkOrderForDetails.created_at).toLocaleString()}</span>
-                                </div>
-                                <button onClick={() => setIsWorkOrderDetailsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-2xl font-bold text-gray-900">Work Order Details</h3>
+                                <button onClick={() => setIsWorkOrderDetailsModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
                             </div>
                             
                             <div className="grid grid-cols-2 gap-6 mb-6">
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Asset Details</label>
-                                    <div className="font-bold text-gray-900 mt-1">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.name}</div>
-                                    <div className="text-xs text-text-muted">
-                                        Model: {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.model}<br/>
-                                        S/N: {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.serial_number}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Status</label>
+                                        <div className="mt-1"><span className="px-2 py-1 bg-gray-100 rounded text-sm font-bold">{selectedWorkOrderForDetails.status}</span></div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Assigned To</label>
+                                        <div className="font-bold text-gray-900 mt-1 flex items-center gap-2">
+                                            <UserIcon size={16}/> 
+                                            {users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                                        <div className="text-gray-700 text-sm mt-1">{selectedWorkOrderForDetails.description}</div>
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Assigned Technician</label>
-                                    <div className="font-bold text-gray-900 mt-1 flex items-center gap-2">
-                                        <UserIcon size={14} className="text-brand"/>
-                                        {users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Asset</label>
+                                        <div className="font-bold text-gray-900 mt-1">
+                                            {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id || a.nfc_tag_id === selectedWorkOrderForDetails.asset_id)?.name}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                            Model: {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id || a.nfc_tag_id === selectedWorkOrderForDetails.asset_id)?.model}
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="col-span-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Fault Description</label>
-                                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm mt-1">{selectedWorkOrderForDetails.description}</div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Timeline</label>
+                                        <div className="text-xs text-gray-600 mt-1">
+                                            <div>Created: {new Date(selectedWorkOrderForDetails.created_at).toLocaleString()}</div>
+                                            {selectedWorkOrderForDetails.start_time && <div>Started: {new Date(selectedWorkOrderForDetails.start_time).toLocaleString()}</div>}
+                                            {selectedWorkOrderForDetails.close_time && <div>Closed: {new Date(selectedWorkOrderForDetails.close_time).toLocaleString()}</div>}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Parts Used Section */}
-                            <div className="mb-6">
-                                <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2"><Box size={16}/> Spare Parts Consumed</h4>
-                                {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 ? (
-                                    <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
-                                        <thead className="bg-gray-50">
-                                            <tr><th className="p-2 text-left">Part Name</th><th className="p-2 text-right">Cost</th><th className="p-2 text-center">Qty</th><th className="p-2 text-right">Total</th></tr>
+                            {/* Parts Used Table */}
+                            {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 && (
+                                <div className="border-t border-gray-100 pt-4">
+                                    <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2"><Box size={16}/> Parts Consumed</h4>
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                                            <tr><th className="p-2">Part Name</th><th className="p-2">Qty</th><th className="p-2">Cost</th></tr>
                                         </thead>
                                         <tbody>
                                             {selectedWorkOrderForDetails.parts_used.map((part, idx) => {
-                                                const pDetails = inventory.find(i => i.part_id === part.part_id);
-                                                const cost = pDetails?.cost || 0;
+                                                const inventoryPart = inventory.find(p => p.part_id === part.part_id);
                                                 return (
-                                                    <tr key={idx} className="border-t border-gray-100">
-                                                        <td className="p-2 font-medium">{pDetails?.part_name || `Part #${part.part_id}`}</td>
-                                                        <td className="p-2 text-right text-gray-500">${cost}</td>
-                                                        <td className="p-2 text-center font-bold bg-gray-50">{part.quantity}</td>
-                                                        <td className="p-2 text-right font-mono">${cost * part.quantity}</td>
+                                                    <tr key={idx} className="border-b border-gray-50">
+                                                        <td className="p-2">{inventoryPart?.part_name || `Part #${part.part_id}`}</td>
+                                                        <td className="p-2">{part.quantity}</td>
+                                                        <td className="p-2">${((inventoryPart?.cost || 0) * part.quantity).toFixed(2)}</td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
-                                        <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
-                                            <tr>
-                                                <td colSpan={3} className="p-2 text-right">Total Parts Cost:</td>
-                                                <td className="p-2 text-right font-mono">
-                                                    ${selectedWorkOrderForDetails.parts_used.reduce((acc, p) => {
-                                                        const cost = inventory.find(i => i.part_id === p.part_id)?.cost || 0;
-                                                        return acc + (cost * p.quantity);
-                                                    }, 0)}
-                                                </td>
-                                            </tr>
-                                        </tfoot>
                                     </table>
-                                ) : (
-                                    <div className="text-gray-400 text-sm italic p-4 border border-dashed rounded-lg text-center bg-gray-50">
-                                        No spare parts recorded for this job.
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Approval Workflow */}
-                            {['Awaiting Approval', 'Manager Approved', 'Awaiting Final Acceptance'].includes(selectedWorkOrderForDetails.status) && (
-                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-in slide-in-from-bottom-2">
-                                    <h4 className="font-bold text-amber-900 mb-2 flex items-center gap-2"><FileSignature size={18}/> {t('approval_workflow')}</h4>
-                                    <div className="flex gap-2 mt-4">
-                                        {(selectedWorkOrderForDetails.status === 'Awaiting Approval' && currentUser.role === UserRole.ADMIN) && (
-                                            <button 
-                                                onClick={() => { api.submitManagerApproval(selectedWorkOrderForDetails.wo_id, currentUser.user_id, "DigitalSig"); setIsWorkOrderDetailsModalOpen(false); refreshData(); triggerNotification(); }}
-                                                className="btn-primary w-full bg-amber-600 hover:bg-amber-700"
-                                            >
-                                                {t('manager_review')} (Approve)
-                                            </button>
-                                        )}
-                                        {(selectedWorkOrderForDetails.status === 'Manager Approved' && (currentUser.role === UserRole.SUPERVISOR || currentUser.role === UserRole.ADMIN)) && (
-                                            <button 
-                                                onClick={() => { api.submitSupervisorApproval(selectedWorkOrderForDetails.wo_id, currentUser.user_id, "DigitalSig"); setIsWorkOrderDetailsModalOpen(false); refreshData(); triggerNotification(); }}
-                                                className="btn-primary w-full bg-green-600 hover:bg-green-700"
-                                            >
-                                                {t('supervisor_review')} (Approve)
-                                            </button>
-                                        )}
-                                    </div>
                                 </div>
                             )}
                         </div>
@@ -1011,109 +998,29 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     if (currentView === 'inventory') {
         return (
             <div className="space-y-6 animate-in fade-in">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="font-bold text-gray-900">{t('tab_stock')}</h3>
-                                <p className="text-text-muted text-sm">Real-time level monitoring</p>
-                            </div>
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Package size={24}/></div>
-                        </div>
-                        <h2 className="text-4xl font-black text-gray-900">{inventory.reduce((acc, i) => acc + i.current_stock, 0)} <span className="text-sm font-medium text-gray-400">units</span></h2>
-                    </div>
-                    <div className="bg-white p-5 rounded-2xl border border-border shadow-soft">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="font-bold text-gray-900">{t('tab_alerts')}</h3>
-                                <p className="text-text-muted text-sm">Items below min level</p>
-                            </div>
-                            <div className="p-2 bg-red-50 text-red-600 rounded-lg"><AlertTriangle size={24}/></div>
-                        </div>
-                        <h2 className="text-4xl font-black text-danger">{inventory.filter(i => i.current_stock <= i.min_reorder_level).length} <span className="text-sm font-medium text-gray-400">items</span></h2>
-                    </div>
-                </div>
-
-                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                <div className="bg-white p-5 rounded-2xl border border-border shadow-soft">
+                    <h3 className="font-bold text-gray-900 mb-4">{t('tab_stock')}</h3>
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                            <tr>
-                                <th className="p-4">{t('part_name')}</th>
-                                <th className="p-4">{t('stock_level')}</th>
-                                <th className="p-4">{t('unit_cost')}</th>
-                                <th className="p-4 text-center">{t('status')}</th>
-                                <th className="p-4 text-right">{t('actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                            {inventory.map(part => {
-                                const isLow = part.current_stock <= part.min_reorder_level;
-                                return (
-                                    <tr key={part.part_id} className="hover:bg-gray-50 text-sm">
-                                        <td className="p-4 font-bold text-gray-900">{part.part_name}</td>
-                                        <td className="p-4 font-mono">{part.current_stock} / {part.min_reorder_level}</td>
-                                        <td className="p-4 text-gray-600">${part.cost}</td>
-                                        <td className="p-4 text-center">
-                                            {isLow ? (
-                                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">Low Stock</span>
-                                            ) : (
-                                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">OK</span>
-                                            )}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <button 
-                                                onClick={() => initiateRestock(part)}
-                                                className="text-brand hover:bg-brand/10 px-3 py-1.5 rounded-lg font-bold text-xs transition-colors"
-                                            >
-                                                {t('btn_restock')}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase"><tr><th className="p-4">Part</th><th className="p-4">Stock</th><th className="p-4">Status</th><th className="p-4">Action</th></tr></thead>
+                        <tbody>
+                            {inventory.map(part => (
+                                <tr key={part.part_id} className="border-t">
+                                    <td className="p-4 font-bold">{part.part_name}</td>
+                                    <td className="p-4">{part.current_stock} / {part.min_reorder_level}</td>
+                                    <td className="p-4">{part.current_stock <= part.min_reorder_level ? <span className="text-red-600 font-bold">Low</span> : <span className="text-green-600">OK</span>}</td>
+                                    <td className="p-4"><button onClick={() => initiateRestock(part)} className="text-brand font-bold text-xs">Restock</button></td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
-
-                {/* Restock Modal */}
+                {/* Restock Modal Logic */}
                 {restockModalOpen && selectedPartForRestock && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
-                            <h3 className="text-xl font-bold mb-2">{t('restock_modal_title')}</h3>
-                            <p className="text-sm text-gray-500 mb-6">Adding inventory for <strong>{selectedPartForRestock.part_name}</strong></p>
-                            
-                            <div className="mb-6">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('restock_qty')}</label>
-                                <input 
-                                    type="number" 
-                                    className="input-modern text-lg font-mono" 
-                                    value={restockAmount} 
-                                    onChange={(e) => setRestockAmount(e.target.value)} 
-                                    autoFocus
-                                />
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button onClick={() => setRestockModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
-                                <button onClick={handleRestockPreCheck} className="flex-1 btn-primary">{t('restock_btn')}</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Confirmation for Large Restock */}
-                {confirmRestockOpen && (
-                    <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95 border-2 border-red-100">
-                            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4 mx-auto"><AlertTriangle size={24}/></div>
-                            <h3 className="text-xl font-bold text-center mb-2">{t('confirm_large_restock_title')}</h3>
-                            <p className="text-center text-gray-600 mb-6 text-sm">
-                                {t('confirm_large_restock_msg').replace('{qty}', restockAmount)}
-                            </p>
-                            <div className="flex gap-2">
-                                <button onClick={() => setConfirmRestockOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
-                                <button onClick={submitRestock} className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl">{t('btn_confirm')}</button>
-                            </div>
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                            <h3 className="text-xl font-bold mb-4">{t('restock_modal_title')}</h3>
+                            <input type="number" className="input-modern mb-4" value={restockAmount} onChange={e => setRestockAmount(e.target.value)} />
+                            <div className="flex gap-2"><button onClick={() => setRestockModalOpen(false)} className="btn-secondary flex-1">Cancel</button><button onClick={handleRestockPreCheck} className="btn-primary flex-1">Add</button></div>
                         </div>
                     </div>
                 )}
@@ -1125,94 +1032,33 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 5. CALIBRATION VIEW
     // ============================================
     if (currentView === 'calibration') {
-        const complianceRate = Math.round((assets.filter(a => !a.next_calibration_date || new Date(a.next_calibration_date) > new Date()).length / assets.length) * 100);
-        
         return (
             <div className="space-y-6 animate-in fade-in">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                        <div className="p-4 bg-purple-100 text-purple-600 rounded-full"><Award size={32}/></div>
-                        <div>
-                            <h3 className="text-3xl font-black text-gray-900">{complianceRate}%</h3>
-                            <p className="text-sm text-text-muted font-bold uppercase">{t('cal_compliant')}</p>
-                        </div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                        <h4 className="font-bold text-gray-700 mb-2">{t('cal_overdue')}</h4>
-                        <div className="text-2xl font-black text-red-500">{assets.filter(a => a.next_calibration_date && new Date(a.next_calibration_date) < new Date()).length} <span className="text-sm text-gray-400 font-medium">Assets</span></div>
-                    </div>
-                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                        <h4 className="font-bold text-gray-700 mb-2">{t('cal_due_soon')}</h4>
-                        <div className="text-2xl font-black text-amber-500">{assets.filter(a => {
-                            if (!a.next_calibration_date) return false;
-                            const due = new Date(a.next_calibration_date);
-                            const now = new Date();
-                            const diff = due.getTime() - now.getTime();
-                            const days = diff / (1000 * 3600 * 24);
-                            return days > 0 && days < 30;
-                        }).length} <span className="text-sm text-gray-400 font-medium">Assets</span></div>
-                    </div>
-                </div>
-
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                            <tr>
-                                <th className="p-4">{t('asset_info')}</th>
-                                <th className="p-4">{t('last_cal')}</th>
-                                <th className="p-4">{t('next_due')}</th>
-                                <th className="p-4 text-center">{t('status')}</th>
-                                <th className="p-4 text-right">{t('actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
+                        <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase"><tr><th className="p-4">Asset</th><th className="p-4">Last Cal</th><th className="p-4">Next Due</th><th className="p-4">Status</th><th className="p-4">Action</th></tr></thead>
+                        <tbody>
                             {assets.map(asset => {
                                 const isOverdue = asset.next_calibration_date && new Date(asset.next_calibration_date) < new Date();
-                                const isDueSoon = asset.next_calibration_date && new Date(asset.next_calibration_date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) && !isOverdue;
-                                
                                 return (
-                                    <tr key={asset.asset_id} className="hover:bg-gray-50 text-sm">
-                                        <td className="p-4 font-bold">{asset.name} <span className="text-gray-400 font-normal text-xs ml-1">({asset.asset_id})</span></td>
-                                        <td className="p-4 text-gray-600">{asset.last_calibration_date}</td>
-                                        <td className={`p-4 font-mono font-bold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-amber-600' : 'text-green-600'}`}>
-                                            {asset.next_calibration_date}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            {isOverdue ? <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold">OVERDUE</span> : 
-                                             isDueSoon ? <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-bold">Due Soon</span> :
-                                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">Compliant</span>}
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            <button 
-                                                onClick={() => { setAssetToCalibrate(asset); setUpdateCalibrationModalOpen(true); }}
-                                                className="text-brand hover:underline font-bold text-xs"
-                                            >
-                                                {t('btn_update_cal')}
-                                            </button>
-                                        </td>
+                                    <tr key={asset.asset_id} className="border-t hover:bg-gray-50">
+                                        <td className="p-4 font-bold">{asset.name}</td>
+                                        <td className="p-4">{asset.last_calibration_date}</td>
+                                        <td className={`p-4 font-bold ${isOverdue ? 'text-red-600' : 'text-green-600'}`}>{asset.next_calibration_date}</td>
+                                        <td className="p-4">{isOverdue ? 'Overdue' : 'Compliant'}</td>
+                                        <td className="p-4"><button className="text-brand font-bold text-xs" onClick={() => { setAssetToCalibrate(asset); setUpdateCalibrationModalOpen(true); }}>Update</button></td>
                                     </tr>
                                 );
                             })}
                         </tbody>
                     </table>
                 </div>
-
-                {/* Update Calibration Modal */}
-                {updateCalibrationModalOpen && assetToCalibrate && (
+                {updateCalibrationModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
                             <h3 className="text-xl font-bold mb-4">{t('update_cal_title')}</h3>
-                            <p className="text-sm text-gray-600 mb-6">Updating records for <strong>{assetToCalibrate.name}</strong></p>
-                            
-                            <div className="mb-6">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">{t('new_cal_date')}</label>
-                                <input type="date" className="input-modern" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} />
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button onClick={() => setUpdateCalibrationModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
-                                <button onClick={handleUpdateCalibration} className="flex-1 btn-primary">{t('btn_record')}</button>
-                            </div>
+                            <input type="date" className="input-modern mb-4" value={newCalibrationDate} onChange={e => setNewCalibrationDate(e.target.value)} />
+                            <div className="flex gap-2"><button onClick={() => setUpdateCalibrationModalOpen(false)} className="btn-secondary flex-1">Cancel</button><button onClick={handleUpdateCalibration} className="btn-primary flex-1">Record</button></div>
                         </div>
                     </div>
                 )}
@@ -1221,110 +1067,88 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }
 
     // ============================================
-    // 6. ANALYSIS VIEW (Reports, KB, Analytics)
+    // 6. ANALYSIS VIEW (Reports, AI, Financial)
     // ============================================
     if (currentView === 'analysis') {
-        const { financialAnalysis, topDepts, lowRepDepts, vendorStats } = analyticsData;
         const subTabs = [
             { id: 'tab_analytics', label: t('tab_analytics'), icon: BarChart2 },
             { id: 'tab_financial', label: t('tab_financial'), icon: DollarSign },
-            { id: 'tab_gen_report', label: t('tab_gen_report'), icon: Printer },
-            { id: 'tab_kb', label: t('tab_kb'), icon: Library },
-            { id: 'tab_vendor', label: t('tab_vendor'), icon: Briefcase },
+            { id: 'tab_gen_report', label: t('tab_gen_report'), icon: FileText },
+            { id: 'tab_vendor', label: t('tab_vendor'), icon: Award },
             { id: 'tab_training', label: t('tab_training'), icon: GraduationCap },
+            { id: 'tab_kb', label: t('tab_kb'), icon: BookOpen }
         ];
 
         return (
             <div className="space-y-6 animate-in fade-in">
-                {/* Sub Navigation */}
-                <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto mb-6">
+                <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto">
                     {subTabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-text-muted hover:bg-gray-50 hover:text-gray-900'}`}
-                        >
-                            <tab.icon size={16}/> {tab.label}
+                        <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 min-w-[120px] py-3 text-sm font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${activeTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>
+                            <tab.icon size={18} />{tab.label}
                         </button>
                     ))}
                 </div>
 
-                {/* --- 6.1 STRATEGIC ANALYTICS --- */}
                 {activeTab === 'tab_analytics' && (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[350px]">
-                                <h3 className="font-bold text-gray-900 mb-4">{t('reputation_score')}</h3>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={topDepts} layout="vertical" margin={{top: 5, right: 30, left: 40, bottom: 5}}>
-                                        <XAxis type="number" hide/>
-                                        <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 11}}/>
-                                        <Tooltip cursor={{fill: 'transparent'}}/>
-                                        <Bar dataKey="score" fill="#10B981" barSize={20} radius={[0, 4, 4, 0]} name="Score" />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-white p-4 rounded-2xl border border-border shadow-sm"><div className="text-sm text-gray-500 font-bold mb-1">{t('kpi_mtbf')}</div><div className="text-2xl font-black text-gray-900">4,200h</div></div>
+                            <div className="bg-white p-4 rounded-2xl border border-border shadow-sm"><div className="text-sm text-gray-500 font-bold mb-1">{t('kpi_mttr')}</div><div className="text-2xl font-black text-gray-900">3.5h</div></div>
+                            <div className="bg-white p-4 rounded-2xl border border-border shadow-sm"><div className="text-sm text-gray-500 font-bold mb-1">{t('kpi_availability')}</div><div className="text-2xl font-black text-green-600">98.2%</div></div>
+                            <div className="bg-white p-4 rounded-2xl border border-border shadow-sm"><div className="text-sm text-gray-500 font-bold mb-1">{t('total_assets')}</div><div className="text-2xl font-black text-blue-600">{assets.length}</div></div>
+                        </div>
+                        {/* Charts Area */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-white p-5 rounded-2xl border border-border shadow-soft h-[350px]">
+                                <h3 className="font-bold text-gray-900 mb-4">{t('chart_mttr_trend')}</h3>
+                                <ResponsiveContainer width="100%" height="90%"><LineChart data={analyticsData.mttrTrend}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month"/><YAxis/><Tooltip/><Line type="monotone" dataKey="hours" stroke="#2563EB" strokeWidth={3} dot={{r: 4}}/></LineChart></ResponsiveContainer>
                             </div>
-                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[350px]">
-                                <h3 className="font-bold text-gray-900 mb-4 text-danger">{t('high_misuse_depts')}</h3>
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={lowRepDepts} layout="vertical" margin={{top: 5, right: 30, left: 40, bottom: 5}}>
-                                        <XAxis type="number" hide/>
-                                        <YAxis dataKey="name" type="category" width={80} tick={{fontSize: 11}}/>
-                                        <Tooltip cursor={{fill: 'transparent'}}/>
-                                        <Bar dataKey="score" fill="#EF4444" barSize={20} radius={[0, 4, 4, 0]} name="Score" />
-                                    </BarChart>
-                                </ResponsiveContainer>
+                            <div className="bg-white p-5 rounded-2xl border border-border shadow-soft h-[350px]">
+                                <h3 className="font-bold text-gray-900 mb-4">{t('chart_asset_status')}</h3>
+                                <ResponsiveContainer width="100%" height="90%"><PieChart><Pie data={analyticsData.statusData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"><Cell fill="#10B981"/><Cell fill="#EF4444"/><Cell fill="#F59E0B"/></Pie><Tooltip/><Legend/></PieChart></ResponsiveContainer>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {/* --- 6.2 FINANCIAL ANALYSIS --- */}
                 {activeTab === 'tab_financial' && (
-                    <div className="space-y-6">
-                        {/* CHART: TCO COMPARISON */}
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[350px] mb-6">
-                            <h3 className="font-bold text-xl text-gray-900 mb-4 flex items-center gap-2"><TrendingUp size={20}/> Cost vs. Value (Top Expensive Assets)</h3>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={financialAnalysis.slice(0, 7)} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[400px]">
+                            <h3 className="font-bold text-gray-900 mb-6">{t('chart_cost_vs_value')}</h3>
+                            <ResponsiveContainer width="100%" height="90%">
+                                <BarChart data={analyticsData.tcoData} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false}/>
-                                    <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-15} textAnchor="end" height={60}/>
-                                    <YAxis tickFormatter={(val) => `$${val/1000}k`}/>
-                                    <Tooltip formatter={(val: number) => `$${val.toLocaleString()}`} />
+                                    <XAxis dataKey="model" tick={{fontSize: 10}}/>
+                                    <YAxis />
+                                    <Tooltip cursor={{fill: 'transparent'}}/>
                                     <Legend />
-                                    <Bar dataKey="purchase" name="Purchase Price" fill="#10B981" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="maintCost" name="Maintenance Cost" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="purchase_cost" name="Purchase Price" fill="#2563EB" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="accumulated_maintenance_cost" name="Maintenance Cost" fill="#EF4444" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
-
-                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <div className="p-6 border-b border-border">
-                                <h3 className="font-bold text-xl text-gray-900">{t('asset_health')} (Detailed Report)</h3>
-                                <p className="text-text-muted text-sm">Assets where maintenance cost exceeds 40% of purchase price.</p>
-                            </div>
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                            <h3 className="font-bold text-gray-900 mb-4">{t('table_financial_report')}</h3>
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold">
                                     <tr>
-                                        <th className="p-4">{t('asset_info')}</th>
-                                        <th className="p-4 text-right">{t('purchase_price')}</th>
-                                        <th className="p-4 text-right">{t('maint_cost')}</th>
-                                        <th className="p-4 text-right">{t('cost_ratio')}</th>
-                                        <th className="p-4 text-center">{t('recommendation')}</th>
+                                        <th className="p-3">Asset</th>
+                                        <th className="p-3">Purchase</th>
+                                        <th className="p-3">Maint. Cost</th>
+                                        <th className="p-3">Ratio</th>
+                                        <th className="p-3">Action</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-border">
-                                    {financialAnalysis.slice(0, 10).map(a => (
-                                        <tr key={a.id} className="hover:bg-gray-50 text-sm">
-                                            <td className="p-4 font-bold">{a.name} <span className="text-gray-400 font-normal">({a.model})</span></td>
-                                            <td className="p-4 text-right font-mono">${a.purchase.toLocaleString()}</td>
-                                            <td className="p-4 text-right font-mono">${a.maintCost.toLocaleString()}</td>
-                                            <td className={`p-4 text-right font-bold ${a.ratio > 0.4 ? 'text-red-500' : 'text-green-500'}`}>{(a.ratio * 100).toFixed(1)}%</td>
-                                            <td className="p-4 text-center">
-                                                {a.ratio > 0.4 ? 
-                                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold uppercase">{t('replace')}</span> : 
-                                                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold uppercase">{t('repair')}</span>
-                                                }
+                                <tbody className="divide-y divide-gray-100">
+                                    {analyticsData.financialAnalysis.slice(0, 5).map(item => (
+                                        <tr key={item.id} className="hover:bg-gray-50">
+                                            <td className="p-3 font-bold">{item.name}</td>
+                                            <td className="p-3">${item.purchase.toLocaleString()}</td>
+                                            <td className="p-3 text-red-600">${item.maintCost.toLocaleString()}</td>
+                                            <td className="p-3 font-bold">{(item.ratio * 100).toFixed(0)}%</td>
+                                            <td className="p-3">
+                                                {item.ratio > 0.4 ? <span className="text-red-600 font-bold text-xs bg-red-50 px-2 py-1 rounded">Recommend Replace</span> : <span className="text-green-600 font-bold text-xs">Keep</span>}
                                             </td>
                                         </tr>
                                     ))}
@@ -1334,586 +1158,206 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </div>
                 )}
 
-                {/* --- 6.3 REPORT GENERATOR --- */}
                 {activeTab === 'tab_gen_report' && (
-                    <div className="bg-white rounded-2xl border border-border shadow-soft p-8 max-w-2xl mx-auto">
-                        <div className="text-center mb-8">
-                            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4"><Printer size={32}/></div>
-                            <h2 className="text-2xl font-bold text-gray-900">{t('gen_report')}</h2>
-                            <p className="text-gray-500">Generate PDF reports for compliance and auditing.</p>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-gray-700 mb-2">{t('report_type')}</label>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button onClick={() => setReportType('CM')} className={`p-4 rounded-xl border-2 text-left transition-all ${reportType === 'CM' ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-brand/50'}`}>
-                                        <span className="font-bold block text-gray-900">{t('cm_report')}</span>
-                                        <span className="text-xs text-gray-500">Breakdown & Repair History</span>
-                                    </button>
-                                    <button onClick={() => setReportType('PPM')} className={`p-4 rounded-xl border-2 text-left transition-all ${reportType === 'PPM' ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-brand/50'}`}>
-                                        <span className="font-bold block text-gray-900">{t('ppm_report')}</span>
-                                        <span className="text-xs text-gray-500">Scheduled Maintenance Logs</span>
-                                    </button>
-                                </div>
+                    <div className="bg-white p-8 rounded-2xl border border-border shadow-soft min-h-[500px]">
+                        <div className="max-w-2xl mx-auto text-center space-y-6">
+                            <div className="p-4 bg-blue-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto text-brand mb-6"><FileText size={40}/></div>
+                            <h2 className="text-3xl font-black text-gray-900">{t('gen_report')}</h2>
+                            <p className="text-gray-500">Select report type and parameters to generate official PDF documents.</p>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => setReportType('CM')} className={`p-4 border rounded-xl font-bold transition-all ${reportType === 'CM' ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20' : 'border-gray-200 hover:border-gray-300'}`}>{t('cm_report')}</button>
+                                <button onClick={() => setReportType('PPM')} className={`p-4 border rounded-xl font-bold transition-all ${reportType === 'PPM' ? 'border-brand bg-brand/5 text-brand ring-2 ring-brand/20' : 'border-gray-200 hover:border-gray-300'}`}>{t('ppm_report')}</button>
                             </div>
 
-                            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 flex gap-4 items-end">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Job Order No / Asset ID</label>
-                                    <input 
-                                        className="input-modern" 
-                                        placeholder="e.g. 2236" 
-                                        value={jobOrderSearchId} 
-                                        onChange={(e) => setJobOrderSearchId(e.target.value)}
-                                    />
-                                </div>
-                                <button onClick={handleFindJobReport} className="btn-primary">
-                                    <Search size={18}/> Find
-                                </button>
+                            <div className="flex gap-2">
+                                <input className="input-modern" placeholder="Enter Job Order No. (e.g. 2236)" value={jobOrderSearchId} onChange={e => setJobOrderSearchId(e.target.value)} />
+                                <button onClick={handleFindJobReport} className="btn-primary w-32">Search</button>
                             </div>
 
-                            {selectedCMReport && (
-                                <div className="mt-4 p-4 border border-green-200 bg-green-50 rounded-xl flex justify-between items-center animate-in fade-in">
-                                    <div>
-                                        <div className="font-bold text-green-800">Report Ready: #{selectedCMReport.job_order_no}</div>
-                                        <div className="text-xs text-green-700">{selectedCMReport.asset.name}</div>
+                            {selectedCMReport && reportType === 'CM' && (
+                                <div className="mt-8 p-6 border-2 border-gray-100 rounded-xl bg-gray-50 text-left animate-in slide-in-from-bottom-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h4 className="font-bold text-gray-900">Report Preview: {selectedCMReport.report_id}</h4>
+                                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Ready</span>
                                     </div>
-                                    <button className="text-sm font-bold text-green-700 hover:underline flex items-center gap-1">
-                                        <Download size={16}/> {t('download_pdf')}
-                                    </button>
+                                    <div className="space-y-2 text-sm text-gray-600 mb-6">
+                                        <p><strong>Asset:</strong> {selectedCMReport.asset.name}</p>
+                                        <p><strong>Fault:</strong> {selectedCMReport.fault_details.fault_description}</p>
+                                        <p><strong>Technician:</strong> {selectedCMReport.fault_details.technician_name}</p>
+                                    </div>
+                                    <button className="w-full btn-primary"><Download size={18}/> Download PDF</button>
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
 
-                {/* --- 6.4 KNOWLEDGE BASE (AI) --- */}
-                {activeTab === 'tab_kb' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-                        {/* Search & List */}
-                        <div className="lg:col-span-1 flex flex-col bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <div className="p-4 border-b border-border bg-gray-50">
-                                <h3 className="font-bold text-gray-900 mb-2">{t('kb_library')}</h3>
-                                <div className="relative">
-                                    <Search className="absolute left-3 top-3 text-gray-400" size={16}/>
-                                    <input 
-                                        className="input-modern pl-9 py-2 text-sm" 
-                                        placeholder="Search manuals..." 
-                                        value={kbSearch} 
-                                        onChange={(e) => setKbSearch(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                                {filteredKbDocs.map(doc => (
-                                    <div key={doc.id} className="p-3 hover:bg-gray-50 rounded-lg cursor-pointer group border border-transparent hover:border-gray-100 transition-colors">
-                                        <div className="font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-brand">{doc.title}</div>
-                                        <div className="flex justify-between mt-1 text-xs text-text-muted">
-                                            <span>{doc.category}</span>
-                                            <span>{doc.fileSize}</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* AI Smart Search */}
-                        <div className="lg:col-span-2 flex flex-col bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <div className="p-6 bg-gradient-to-r from-indigo-50 to-white border-b border-indigo-100">
-                                <h3 className="font-bold text-indigo-900 flex items-center gap-2 text-lg mb-4">
-                                    <Sparkles size={20} className="text-indigo-600"/> {t('kb_ai_search')}
-                                </h3>
-                                <div className="flex gap-2">
-                                    <input 
-                                        className="input-modern border-indigo-200 focus:ring-indigo-100" 
-                                        placeholder={t('ai_search_placeholder')}
-                                        value={aiQuery}
-                                        onChange={(e) => setAiQuery(e.target.value)}
-                                    />
-                                    <button 
-                                        onClick={handleAiSearch} 
-                                        disabled={isAiSearching}
-                                        className="px-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-indigo-200 transition-all flex items-center gap-2 disabled:opacity-70"
-                                    >
-                                        {isAiSearching ? <RefreshCw size={18} className="animate-spin"/> : <Search size={18}/>}
-                                        {t('btn_analyze')}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div className="flex-1 p-6 overflow-y-auto bg-gray-50/50">
-                                {aiResult ? (
-                                    <div className="space-y-6 animate-in slide-in-from-bottom-4">
-                                        <div className="bg-white p-5 rounded-xl border border-indigo-100 shadow-sm">
-                                            <h4 className="font-bold text-indigo-900 mb-2 flex items-center gap-2"><Info size={18}/> {t('ai_explanation')}</h4>
-                                            <p className="text-gray-700 leading-relaxed">{aiResult.explanation}</p>
-                                        </div>
-                                        
-                                        <div className="bg-white p-5 rounded-xl border border-green-100 shadow-sm">
-                                            <h4 className="font-bold text-green-800 mb-2 flex items-center gap-2"><CheckCircle2 size={18}/> {t('ai_solution')}</h4>
-                                            <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">{aiResult.solution}</div>
-                                        </div>
-
-                                        <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-100">
-                                            <h4 className="font-bold text-indigo-800 mb-3 flex items-center gap-2"><Book size={18}/> {t('ai_ref_docs')}</h4>
-                                            <div className="space-y-2">
-                                                {aiResult.relevantDocs.map((doc, i) => (
-                                                    <div key={i} className="flex items-center gap-3 bg-white p-3 rounded-lg border border-indigo-100 hover:shadow-md transition-shadow cursor-pointer">
-                                                        <FileText size={18} className="text-indigo-500"/>
-                                                        <span className="text-sm font-medium text-gray-800">{doc}</span>
-                                                        <ArrowRight size={14} className="ml-auto text-gray-400"/>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-gray-400 opacity-60">
-                                        <BrainCircuit size={64} className="mb-4 text-indigo-200"/>
-                                        <p>Enter a fault code to get AI-powered diagnostics</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- 6.5 VENDOR RATING --- */}
                 {activeTab === 'tab_vendor' && (
-                    <div className="space-y-6">
-                        {/* CHART: VENDOR PERFORMANCE */}
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[320px] mb-6">
-                            <h3 className="font-bold text-xl text-gray-900 mb-4 flex items-center gap-2"><Star size={20} className="text-amber-500"/> Vendor Performance Landscape</h3>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ScatterChart margin={{top: 20, right: 30, bottom: 10, left: 10}}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis type="number" dataKey="score" name="Total Score" domain={[50, 100]} label={{ value: 'Total Score', position: 'bottom', offset: 0 }} />
-                                    <YAxis type="number" dataKey="woCount" name="Issues" label={{ value: 'Reported Issues', angle: -90, position: 'left' }} />
-                                    <ZAxis type="number" dataKey="assetCount" range={[50, 400]} name="Volume" />
-                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
-                                    <Scatter name="Vendors" data={vendorStats} fill="#2563EB">
-                                        {vendorStats.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.score > 85 ? '#10B981' : entry.score > 70 ? '#F59E0B' : '#EF4444'} />
-                                        ))}
-                                    </Scatter>
-                                </ScatterChart>
-                            </ResponsiveContainer>
-                        </div>
-
-                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                                    <tr>
-                                        <th className="p-4">{t('manufacturer')}</th>
-                                        <th className="p-4 text-center">{t('total_units')}</th>
-                                        <th className="p-4 text-center">{t('failure_rate')}</th>
-                                        <th className="p-4 text-center">{t('support_speed')}</th>
-                                        <th className="p-4 text-center">{t('vendor_score')}</th>
-                                        <th className="p-4 text-right">{t('recommendation')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {vendorStats.map((v, i) => (
-                                        <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedVendorForDetails(v.name); setIsVendorModalOpen(true); }}>
-                                            <td className="p-4 font-bold text-gray-900">{v.name}</td>
-                                            <td className="p-4 text-center font-mono">{v.assetCount}</td>
-                                            <td className="p-4 text-center font-mono">{(v.woCount / (v.assetCount || 1) * 100).toFixed(1)}%</td>
-                                            <td className="p-4 text-center font-mono">{v.avgMTTR}h</td>
-                                            <td className="p-4 text-center">
-                                                <div className="inline-flex items-center gap-1 font-bold">
-                                                    <span className={v.score >= 80 ? 'text-green-600' : v.score >= 60 ? 'text-amber-600' : 'text-red-600'}>{v.score}</span>
-                                                    <span className="text-gray-400 text-xs">/100</span>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 text-right">
-                                                {v.score >= 80 ? 
-                                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsUp size={12}/> {t('rec_buy')}</span> :
-                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsDown size={12}/> {t('rec_avoid')}</span>
-                                                }
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* VENDOR DETAIL MODAL */}
-                        {isVendorModalOpen && selectedVendorForDetails && (
-                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                                <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-in zoom-in-95 max-h-[80vh] overflow-y-auto">
-                                    <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                        <h3 className="text-xl font-bold text-gray-900">{selectedVendorForDetails} - Asset Portfolio</h3>
-                                        <button onClick={() => setIsVendorModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20}/></button>
-                                    </div>
-                                    <div className="space-y-4">
-                                        {assets.filter(a => (a.manufacturer || 'Generic') === selectedVendorForDetails).map(asset => {
-                                            const wos = workOrders.filter(w => w.asset_id === asset.asset_id || w.asset_id === asset.nfc_tag_id);
-                                            const recentIssues = wos.filter(w => w.type === 'Corrective').length;
-                                            return (
-                                                <div key={asset.asset_id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
-                                                    <div>
-                                                        <div className="font-bold text-gray-800">{asset.name}</div>
-                                                        <div className="text-xs text-gray-500">{asset.model} • {asset.serial_number}</div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <div className="text-xs font-bold text-gray-500">Issues (6mo)</div>
-                                                        <div className={`font-bold ${recentIssues > 2 ? 'text-red-600' : 'text-green-600'}`}>{recentIssues}</div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                        {assets.filter(a => (a.manufacturer || 'Generic') === selectedVendorForDetails).length === 0 && (
-                                            <div className="text-center text-gray-400 py-8">No assets found for this vendor.</div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* --- 6.6 TRAINING DASHBOARD --- */}
-                {activeTab === 'tab_training' && (
-                    <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center gap-4">
-                            <GraduationCap size={32} className="text-brand"/>
-                            <div>
-                                <h3 className="font-bold text-lg">{t('training_dashboard')}</h3>
-                                <p className="text-sm text-text-muted">Targeted education based on actual misuse data.</p>
-                            </div>
-                            <div className="ml-auto">
-                                <select className="input-modern w-64" value={selectedTrainingDept} onChange={e => setSelectedTrainingDept(e.target.value)}>
-                                    <option value="">{t('select_dept_training')}</option>
-                                    {getLocations().map(l => l.department).filter((v, i, a) => a.indexOf(v) === i).map(dept => (
-                                        <option key={dept} value={dept}>{dept}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
-                        {selectedTrainingDept && trainingData && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-bottom-2">
-                                <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                                    <h4 className="font-bold text-gray-900 mb-4">{t('top_user_errors')}</h4>
-                                    <div className="space-y-4">
-                                        {trainingData.topErrors.map((err, i) => (
-                                            <div key={i} className="flex justify-between items-center p-3 bg-red-50 rounded-lg border border-red-100">
-                                                <span className="font-medium text-red-900">{err.error}</span>
-                                                <span className="font-bold bg-white px-2 py-1 rounded text-red-600 shadow-sm">{err.count} incidents</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex flex-col justify-between">
-                                    <div>
-                                        <h4 className="font-bold text-gray-900 mb-4">{t('educator_recommendation')}</h4>
-                                        {trainingData.needsSession ? (
-                                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
-                                                <div className="flex items-center gap-2 font-bold text-amber-800 mb-2"><AlertTriangle size={18}/> {t('session_needed')}</div>
-                                                <p className="text-sm text-amber-900">{t('schedule_session_msg')}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="p-4 bg-green-50 border border-green-200 rounded-xl mb-4">
-                                                <div className="flex items-center gap-2 font-bold text-green-800 mb-2"><CheckCircle2 size={18}/> Great Performance</div>
-                                                <p className="text-sm text-green-900">{t('no_major_errors')}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button className="w-full btn-primary bg-indigo-600 hover:bg-indigo-700">
-                                        <Printer size={18}/> {t('print_flyer')}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    // ============================================
-    // 7. USER MANAGEMENT
-    // ============================================
-    if (currentView === 'users') {
-        return (
-            <div className="space-y-6 animate-in fade-in">
-                <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm w-fit mb-6">
-                    <button onClick={() => setUserMgmtTab('users')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-colors ${userMgmtTab === 'users' ? 'bg-brand text-white shadow' : 'text-gray-500 hover:text-gray-800'}`}>{t('res_users')}</button>
-                    <button onClick={() => setUserMgmtTab('roles')} className={`px-6 py-2 rounded-lg font-bold text-sm transition-colors ${userMgmtTab === 'roles' ? 'bg-brand text-white shadow' : 'text-gray-500 hover:text-gray-800'}`}>{t('tab_roles')}</button>
-                </div>
-
-                {userMgmtTab === 'users' ? (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
-                            <h2 className="text-2xl font-bold text-gray-900">{t('users_title')}</h2>
-                            <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><UserPlus size={16}/> {t('add_user')}</button>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-border">
-                                    <tr>
-                                        <th className="p-4">{t('user_name')}</th>
-                                        <th className="p-4">{t('user_role')}</th>
-                                        <th className="p-4">{t('user_dept')}</th>
-                                        <th className="p-4">{t('user_email')}</th>
-                                        <th className="p-4 text-right">{t('actions')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {users.map(u => (
-                                        <tr key={u.user_id} className="hover:bg-gray-50 text-sm">
-                                            <td className="p-4 font-bold">{u.name}</td>
-                                            <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{u.role}</span></td>
-                                            <td className="p-4 text-gray-600">{u.department}</td>
-                                            <td className="p-4 font-mono text-gray-500">{u.email}</td>
-                                            <td className="p-4 text-right"><button className="text-brand font-bold text-xs hover:underline">Edit</button></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
-                            <h2 className="text-2xl font-bold text-gray-900">{t('manage_roles')}</h2>
-                            <button onClick={() => handleOpenRoleEditor()} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_role')}</button>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {roles.map(role => (
-                                <div key={role.id} className="bg-white p-5 rounded-2xl border border-border shadow-soft hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-lg text-gray-900">{role.name}</h3>
-                                        {role.is_system_role && <span title="System Role"><Lock size={16} className="text-gray-400" /></span>}
-                                    </div>
-                                    <p className="text-sm text-gray-500 mb-4 h-10 line-clamp-2">{role.description}</p>
-                                    <div className="flex gap-2">
-                                        <button onClick={() => handleOpenRoleEditor(role)} className="flex-1 py-2 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs font-bold text-gray-700 border border-gray-200">Edit Permissions</button>
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {analyticsData.vendorStats.slice(0, 3).map((v, i) => (
+                                <div key={v.name} className="bg-white p-6 rounded-2xl border border-border shadow-soft relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-6xl text-gray-400">#{i+1}</div>
+                                    <h3 className="text-xl font-bold text-gray-900 mb-1">{v.name}</h3>
+                                    <div className="text-4xl font-black text-brand mb-4">{v.score}<span className="text-lg font-medium text-gray-400">/100</span></div>
+                                    <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between"><span>Reliability</span><span className="font-bold text-gray-700">{(100 - (v.woCount/v.assetCount)*20).toFixed(0)}%</span></div>
+                                        <div className="flex justify-between"><span>Speed (MTTR)</span><span className="font-bold text-gray-700">{v.avgMTTR}h</span></div>
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
-
-                {/* Add User Modal */}
-                {isAddUserModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
-                            <h3 className="text-xl font-bold mb-4">{t('modal_add_user')}</h3>
-                            <form onSubmit={handleAddUserSubmit} className="space-y-4">
-                                <input placeholder={t('user_name')} className="input-modern" value={newUserForm.name} onChange={e=>setNewUserForm({...newUserForm, name: e.target.value})} required/>
-                                <input placeholder={t('user_email')} className="input-modern" type="email" value={newUserForm.email} onChange={e=>setNewUserForm({...newUserForm, email: e.target.value})} required/>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <select className="input-modern" value={newUserForm.role} onChange={e=>setNewUserForm({...newUserForm, role: e.target.value})}>
-                                        {roles.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
-                                    </select>
-                                    <select className="input-modern" value={newUserForm.department} onChange={e=>setNewUserForm({...newUserForm, department: e.target.value})}>
-                                        <option value="">Dept...</option>
-                                        {getLocations().map(l => l.department).filter((v,i,a)=>a.indexOf(v)===i).map(d => <option key={d} value={d}>{d}</option>)}
-                                    </select>
-                                </div>
-                                <input placeholder={t('user_password')} className="input-modern" type="password" value={newUserForm.password} onChange={e=>setNewUserForm({...newUserForm, password: e.target.value})} required/>
-                                <div className="flex gap-2 justify-end pt-4">
-                                    <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                    <button type="submit" className="btn-primary">{t('btn_create_user')}</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {/* Role Editor Modal */}
-                {isRoleEditorOpen && editingRole && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-3xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                            <h3 className="text-xl font-bold mb-4">{t('manage_roles')} - {editingRole.name || 'New Role'}</h3>
-                            <div className="grid grid-cols-2 gap-4 mb-6">
-                                <input 
-                                    className="input-modern" 
-                                    placeholder={t('role_name')} 
-                                    value={editingRole.name} 
-                                    onChange={e => setEditingRole({...editingRole, name: e.target.value})}
-                                    disabled={editingRole.is_system_role}
-                                />
-                                <input 
-                                    className="input-modern" 
-                                    placeholder={t('role_desc')} 
-                                    value={editingRole.description} 
-                                    onChange={e => setEditingRole({...editingRole, description: e.target.value})}
-                                />
-                            </div>
-                            
-                            <div className="border border-border rounded-xl overflow-hidden">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                                        <tr>
-                                            <th className="p-3">Resource</th>
-                                            <th className="p-3 text-center">View</th>
-                                            <th className="p-3 text-center">Create</th>
-                                            <th className="p-3 text-center">Edit</th>
-                                            <th className="p-3 text-center">Delete</th>
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                                    <tr><th className="p-4">Vendor</th><th className="p-4">Assets</th><th className="p-4">Failures</th><th className="p-4">Avg Repair Time</th><th className="p-4">Score</th><th className="p-4">Verdict</th></tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {analyticsData.vendorStats.map(v => (
+                                        <tr key={v.name} className="hover:bg-gray-50">
+                                            <td className="p-4 font-bold">{v.name}</td>
+                                            <td className="p-4">{v.assetCount}</td>
+                                            <td className="p-4">{v.woCount}</td>
+                                            <td className="p-4">{v.avgMTTR}h</td>
+                                            <td className="p-4 font-bold">{v.score}</td>
+                                            <td className="p-4">
+                                                {v.score > 85 ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">Recommended</span> : 
+                                                 v.score < 60 ? <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Avoid</span> : 
+                                                 <span className="bg-yellow-100 text-yellow-700 px-2 py-1 rounded text-xs font-bold">Average</span>}
+                                            </td>
                                         </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {(['assets', 'work_orders', 'inventory', 'reports', 'users', 'settings'] as Resource[]).map(res => (
-                                            <tr key={res} className="hover:bg-gray-50">
-                                                <td className="p-3 font-bold capitalize">{t(`res_${res}` as any)}</td>
-                                                {(['view', 'create', 'edit', 'delete'] as Action[]).map(act => (
-                                                    <td key={act} className="p-3 text-center">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            className="w-4 h-4 rounded text-brand focus:ring-brand"
-                                                            checked={editingRole.permissions[res]?.includes(act) || false}
-                                                            onChange={() => handlePermissionToggle(res, act)}
-                                                        />
-                                                    </td>
-                                                ))}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="flex gap-2 justify-end pt-6">
-                                <button onClick={() => setIsRoleEditorOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                <button onClick={handleSaveRole} className="btn-primary">{t('btn_save')}</button>
-                            </div>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
-            </div>
-        );
-    }
 
-    // ============================================
-    // 7. RFID VIEW (Updated with Zebra Status)
-    // ============================================
-    if (currentView === 'rfid') {
-        return (
-            <div className="space-y-6 animate-in fade-in">
-                <div className="flex justify-between items-center mb-6">
-                    <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm w-fit">
-                        <button onClick={() => setRfidTab('audit')} className={`px-6 py-2 rounded-lg font-bold text-sm ${rfidTab === 'audit' ? 'bg-brand text-white shadow' : 'text-gray-500'}`}>{t('rfid_audit')}</button>
-                        <button onClick={() => setRfidTab('gate')} className={`px-6 py-2 rounded-lg font-bold text-sm ${rfidTab === 'gate' ? 'bg-brand text-white shadow' : 'text-gray-500'}`}>{t('rfid_gate_monitor')}</button>
-                    </div>
-                    {/* ZEBRA STATUS INDICATOR */}
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full border ${zebraStatus === 'listening' || zebraStatus === 'processing' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                        <Bluetooth size={16} className={zebraStatus === 'listening' ? 'animate-pulse' : ''} />
-                        <span className="text-xs font-bold">{zebraStatus === 'listening' || zebraStatus === 'processing' ? t('zebra_connected') : t('connect_zebra')}</span>
-                    </div>
-                </div>
-
-                {rfidTab === 'audit' ? (
-                    <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center justify-between">
-                            <div>
-                                <h3 className="font-bold text-lg text-gray-900 mb-1">{t('start_audit')}</h3>
-                                <p className="text-sm text-text-muted">Select a department to begin rapid inventory scan.</p>
-                            </div>
-                            <div className="flex gap-3">
-                                <select className="input-modern w-48" value={selectedAuditDept} onChange={e => setSelectedAuditDept(e.target.value)}>
-                                    <option value="">Select Dept...</option>
-                                    {getLocations().map(l => <option key={l.location_id} value={l.department}>{l.department}</option>)}
-                                </select>
-                                <button onClick={startAudit} className="btn-primary" disabled={!!activeAudit}>{t('btn_record')}</button>
+                {activeTab === 'tab_training' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex flex-col">
+                            <h3 className="font-bold text-gray-900 mb-6">{t('select_dept_training')}</h3>
+                            <div className="space-y-2 flex-1 overflow-y-auto">
+                                {analyticsData.topDepts.concat(analyticsData.lowRepDepts).map(d => (
+                                    <button 
+                                        key={d.name} 
+                                        onClick={() => setSelectedTrainingDept(d.name)}
+                                        className={`w-full p-4 rounded-xl border text-left transition-all flex justify-between items-center ${selectedTrainingDept === d.name ? 'border-brand bg-brand/5 ring-1 ring-brand' : 'border-gray-200 hover:bg-gray-50'}`}
+                                    >
+                                        <span className="font-bold text-gray-800">{d.name}</span>
+                                        <span className={`text-xs font-bold px-2 py-1 rounded ${d.score > 80 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{d.score}% Score</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
-                        
-                        {activeAudit && (
-                            <div className="space-y-6 animate-in slide-in-from-bottom-2">
-                                <div className="bg-white p-6 rounded-2xl border border-brand border-2 shadow-lg animate-pulse">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-xl text-brand">{t('audit_in_progress')}</h3>
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-mono text-2xl font-bold">{activeAudit.total_scanned} / {activeAudit.total_expected}</span>
-                                            {/* SIMULATION BUTTON FOR TESTING */}
-                                            <button 
-                                                onClick={handleSimulateAuditScan}
-                                                className="bg-gray-100 hover:bg-gray-200 text-xs font-bold px-3 py-1 rounded-lg border border-gray-300"
-                                            >
-                                                {t('simulate_scan')}
-                                            </button>
+                        <div className="lg:col-span-2 bg-white p-8 rounded-2xl border border-border shadow-soft">
+                            {trainingData ? (
+                                <div className="space-y-8 animate-in fade-in">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h2 className="text-2xl font-black text-gray-900">{selectedTrainingDept} Analysis</h2>
+                                            <p className="text-gray-500">User Error Report & Training Needs</p>
                                         </div>
+                                        {trainingData.needsSession ? (
+                                            <div className="bg-red-50 text-red-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2"><AlertTriangle size={20}/> Session Recommended</div>
+                                        ) : (
+                                            <div className="bg-green-50 text-green-700 px-4 py-2 rounded-xl font-bold flex items-center gap-2"><CheckCircle2 size={20}/> Performance Good</div>
+                                        )}
                                     </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-4">
-                                        <div className="bg-brand h-4 rounded-full transition-all duration-300" style={{ width: `${(activeAudit.total_scanned / (activeAudit.total_expected || 1)) * 100}%` }}></div>
-                                    </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* FOUND LIST */}
-                                    <div className="bg-green-50 border border-green-100 rounded-2xl p-4 max-h-[400px] overflow-y-auto">
-                                        <h4 className="font-bold text-green-800 mb-3 flex items-center gap-2 sticky top-0 bg-green-50 pb-2 border-b border-green-200">
-                                            <CheckCircle2 size={18} /> {t('scanned_assets')} ({activeAudit.found_assets.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {activeAudit.found_assets.map(id => {
-                                                const asset = assets.find(a => a.asset_id === id);
-                                                return (
-                                                    <div key={id} className="bg-white p-3 rounded-lg border border-green-100 flex justify-between items-center shadow-sm">
-                                                        <div>
-                                                            <div className="font-bold text-sm text-gray-800">{asset?.name || 'Unknown Asset'}</div>
-                                                            <div className="text-xs text-gray-500">{asset?.model}</div>
-                                                        </div>
-                                                        <div className="text-xs font-mono bg-green-100 text-green-700 px-2 py-1 rounded">{id}</div>
-                                                    </div>
-                                                );
-                                            })}
-                                            {activeAudit.found_assets.length === 0 && <div className="text-center text-green-800/50 py-4 text-sm italic">Waiting for scans...</div>}
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-4">Top Recurring Mistakes</h4>
+                                        <div className="space-y-3">
+                                            {trainingData.topErrors.map((err, i) => (
+                                                <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                                    <div className="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold">{i+1}</div>
+                                                    <div className="flex-1 font-bold text-gray-800">{err.error}</div>
+                                                    <div className="text-sm font-mono text-gray-500">{err.count} incidents</div>
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    {/* MISSING LIST */}
-                                    <div className="bg-red-50 border border-red-100 rounded-2xl p-4 max-h-[400px] overflow-y-auto">
-                                        <h4 className="font-bold text-red-800 mb-3 flex items-center gap-2 sticky top-0 bg-red-50 pb-2 border-b border-red-200">
-                                            <XCircle size={18} /> {t('missing_assets')} ({activeAudit.missing_assets.length})
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {activeAudit.missing_assets.map(id => {
-                                                const asset = assets.find(a => a.asset_id === id);
-                                                return (
-                                                    <div key={id} className="bg-white p-3 rounded-lg border border-red-100 flex justify-between items-center shadow-sm opacity-80">
-                                                        <div>
-                                                            <div className="font-bold text-sm text-gray-800">{asset?.name || 'Unknown Asset'}</div>
-                                                            <div className="text-xs text-gray-500">{asset?.model}</div>
-                                                        </div>
-                                                        <div className="text-xs font-mono bg-red-100 text-red-700 px-2 py-1 rounded">{id}</div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
+                                    <div className="bg-blue-50 p-6 rounded-xl border border-blue-100 text-center">
+                                        <h4 className="font-bold text-blue-900 mb-2">Training Material Generator</h4>
+                                        <p className="text-sm text-blue-700 mb-4">Generate a 1-page PDF flyer with specific tips to avoid these errors.</p>
+                                        <button className="btn-primary bg-blue-600 hover:bg-blue-700 mx-auto"><Printer size={18}/> Generate Flyer</button>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                    <GraduationCap size={64} className="mb-4 opacity-20"/>
+                                    <p>Select a department to view training insights.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                ) : (
-                    <div className="space-y-6">
-                        <div className="flex gap-4 items-center">
-                            <button onClick={() => setIsGateMonitoring(!isGateMonitoring)} className={`btn-primary ${isGateMonitoring ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}>
-                                {isGateMonitoring ? t('deactivate_gates') : t('activate_gates')}
-                            </button>
-                            <div className="flex gap-2">
-                                {gateReaders.map(r => (
-                                    <div key={r.id} className={`px-3 py-1 rounded-full text-xs font-bold border ${r.status === 'online' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-200 text-gray-400'}`}>
-                                        {r.name}: {r.status}
+                )}
+
+                {activeTab === 'tab_kb' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
+                        {/* Search & AI Pane */}
+                        <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-border shadow-soft flex flex-col">
+                            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><BrainCircuit className="text-brand"/> {t('kb_ai_search')}</h3>
+                            <div className="bg-indigo-50 p-4 rounded-xl mb-4 border border-indigo-100">
+                                <label className="text-xs font-bold text-indigo-800 uppercase mb-2 block">{t('ai_search_title')}</label>
+                                <textarea className="input-modern min-h-[100px] mb-3" placeholder={t('ai_search_placeholder')} value={aiQuery} onChange={(e) => setAiQuery(e.target.value)} />
+                                <button onClick={handleAiSearch} disabled={isAiSearching} className="w-full btn-primary bg-indigo-600 hover:bg-indigo-700 text-sm">
+                                    {isAiSearching ? t('analyzing') : <><Sparkles size={16}/> {t('btn_analyze')}</>}
+                                </button>
+                            </div>
+                            {/* Manual Search */}
+                            <div className="relative mb-4">
+                                <Search className="absolute left-3 top-3 text-gray-400" size={18} />
+                                <input type="text" placeholder="Search manuals..." className="input-modern pl-10" value={kbSearch} onChange={(e) => setKbSearch(e.target.value)} />
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                                {filteredKbDocs.slice(0, 10).map(doc => (
+                                    <div key={doc.id} className="p-3 border border-gray-100 rounded-xl hover:bg-gray-50 flex items-center gap-3 cursor-pointer group">
+                                        <div className="p-2 bg-red-50 text-red-600 rounded-lg"><FileText size={18}/></div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-bold text-gray-800 truncate group-hover:text-brand">{doc.title}</div>
+                                            <div className="text-[10px] text-gray-500">{doc.category} • {doc.fileSize}</div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <div className="bg-black rounded-2xl p-6 h-[400px] overflow-y-auto font-mono text-sm text-green-400 shadow-inner">
-                            {gateLogs.length === 0 ? <div className="opacity-50 text-center mt-32">-- NO GATE ACTIVITY --</div> : 
-                                gateLogs.map(log => (
-                                    <div key={log.id} className="mb-2 border-b border-green-900/30 pb-1 flex justify-between">
-                                        <span>[{new Date(log.timestamp).toLocaleTimeString()}] GATE-{log.gate_location_id}</span>
-                                        <span>ASSET: {log.asset_id}</span>
-                                        <span className={log.direction === 'ENTER' ? 'text-blue-400' : 'text-orange-400'}>{log.direction} &gt;&gt;</span>
+                        {/* Results Pane */}
+                        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-border shadow-soft overflow-y-auto">
+                            {aiResult ? (
+                                <div className="space-y-6 animate-in fade-in">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center"><Lightbulb size={20}/></div>
+                                        <h2 className="text-xl font-bold text-gray-900">Analysis Result</h2>
                                     </div>
-                                ))
-                            }
+                                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                        <h4 className="font-bold text-gray-900 mb-2">{t('ai_explanation')}</h4>
+                                        <p className="text-gray-700 leading-relaxed">{aiResult.explanation}</p>
+                                    </div>
+                                    <div className="bg-green-50 p-4 rounded-xl border border-green-200">
+                                        <h4 className="font-bold text-green-900 mb-2">{t('ai_solution')}</h4>
+                                        <div className="text-green-800 leading-relaxed whitespace-pre-wrap">{aiResult.solution}</div>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-gray-900 mb-3">{t('ai_ref_docs')}</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            {aiResult.relevantDocs.map((doc, idx) => (
+                                                <div key={idx} className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg hover:border-brand cursor-pointer">
+                                                    <BookOpen size={18} className="text-brand"/>
+                                                    <span className="text-sm font-medium">{doc}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                    <Library size={64} className="mb-4 opacity-20"/>
+                                    <p>Select a document or use AI Search</p>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1921,5 +1365,394 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         );
     }
 
-    return null; // Fallback
+    // ============================================
+    // 7. USERS VIEW (List & Roles)
+    // ============================================
+    if (currentView === 'users') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                <div className="bg-white p-1 rounded-xl border border-border shadow-sm inline-flex mb-4">
+                    <button onClick={() => setUserMgmtTab('users')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'users' ? 'bg-brand text-white' : 'text-gray-500'}`}>Users List</button>
+                    <button onClick={() => setUserMgmtTab('roles')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'roles' ? 'bg-brand text-white' : 'text-gray-500'}`}>Roles & Permissions</button>
+                </div>
+
+                {userMgmtTab === 'users' ? (
+                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <div className="p-4 border-b border-border flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-gray-900">{t('users_title')}</h3>
+                            <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><UserPlus size={16}/> {t('add_user')}</button>
+                        </div>
+                        <table className="w-full text-left">
+                            <thead className="text-xs font-bold text-gray-500 uppercase bg-gray-50"><tr><th className="p-4">Name</th><th className="p-4">Role</th><th className="p-4">Email</th><th className="p-4">Actions</th></tr></thead>
+                            <tbody className="divide-y divide-border">
+                                {users.map(u => (
+                                    <tr key={u.user_id} className="hover:bg-gray-50">
+                                        <td className="p-4 font-bold flex items-center gap-2"><div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">{u.name[0]}</div>{u.name}</td>
+                                        <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold">{u.role}</span></td>
+                                        <td className="p-4 text-gray-600 text-sm">{u.email}</td>
+                                        <td className="p-4"><button className="text-gray-400 hover:text-brand"><Wrench size={16}/></button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {roles.map(role => (
+                            <div key={role.id} className="bg-white p-5 rounded-2xl border border-border shadow-soft relative group hover:border-brand/50 transition-colors">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div>
+                                        <h3 className="font-bold text-lg text-gray-900">{role.name}</h3>
+                                        <p className="text-xs text-gray-500">{role.description}</p>
+                                    </div>
+                                    {role.is_system_role && <Lock size={16} className="text-gray-400" />}
+                                </div>
+                                <div className="space-y-2 mb-4">
+                                    {Object.entries(role.permissions).slice(0, 3).map(([res, acts]) => (
+                                        <div key={res} className="flex justify-between text-xs">
+                                            <span className="capitalize text-gray-600">{res}</span>
+                                            <span className="font-mono text-gray-400">{acts.length > 0 ? acts.length + ' rights' : 'None'}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => handleOpenRoleEditor(role)} className="w-full py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg text-xs font-bold transition-colors">Edit Permissions</button>
+                            </div>
+                        ))}
+                        <button onClick={() => handleOpenRoleEditor()} className="border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center p-6 text-gray-400 hover:text-brand hover:border-brand transition-colors h-full min-h-[200px]">
+                            <Plus size={32} className="mb-2"/>
+                            <span className="font-bold">Create Custom Role</span>
+                        </button>
+                    </div>
+                )}
+                
+                {/* Role Editor Modal */}
+                {isRoleEditorOpen && editingRole && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl w-full max-w-2xl h-[80vh] flex flex-col animate-in zoom-in-95">
+                            <div className="p-6 border-b border-border flex justify-between items-center">
+                                <h3 className="text-xl font-bold">{editingRole.id ? 'Edit Role' : 'Create Role'}</h3>
+                                <button onClick={() => setIsRoleEditorOpen(false)}><X size={24}/></button>
+                            </div>
+                            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role Name</label>
+                                    <input className="input-modern" value={editingRole.name} onChange={e => setEditingRole({...editingRole, name: e.target.value})} disabled={editingRole.is_system_role} />
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-gray-900 mb-3">Permissions Matrix</h4>
+                                    <div className="border border-border rounded-xl overflow-hidden">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-gray-50 text-xs uppercase font-bold text-gray-500">
+                                                <tr><th className="p-3">Resource</th><th className="p-3 text-center">View</th><th className="p-3 text-center">Create</th><th className="p-3 text-center">Edit</th><th className="p-3 text-center">Delete</th></tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border">
+                                                {(['assets', 'work_orders', 'inventory', 'reports', 'users', 'settings'] as Resource[]).map(res => (
+                                                    <tr key={res}>
+                                                        <td className="p-3 font-medium capitalize">{res.replace('_', ' ')}</td>
+                                                        {(['view', 'create', 'edit', 'delete'] as Action[]).map(act => (
+                                                            <td key={act} className="p-3 text-center">
+                                                                <input type="checkbox" checked={editingRole.permissions[res]?.includes(act)} onChange={() => handlePermissionToggle(res, act)} className="w-4 h-4 text-brand rounded focus:ring-brand" />
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-6 border-t border-border bg-gray-50 rounded-b-2xl flex justify-end gap-3">
+                                <button onClick={() => setIsRoleEditorOpen(false)} className="btn-secondary">Cancel</button>
+                                <button onClick={handleSaveRole} className="btn-primary">Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 8. RFID VIEW (Audit & Gate)
+    // ============================================
+    if (currentView === 'rfid') {
+        return (
+            <div className="space-y-6 animate-in fade-in h-full flex flex-col">
+                <div className="flex justify-between items-start">
+                    <div className="bg-white p-1 rounded-xl border border-border shadow-sm inline-flex">
+                        <button onClick={() => setRfidTab('audit')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${rfidTab === 'audit' ? 'bg-brand text-white' : 'text-gray-500'}`}><ClipboardCheck size={16}/> Inventory Audit</button>
+                        <button onClick={() => setRfidTab('gate')} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${rfidTab === 'gate' ? 'bg-brand text-white' : 'text-gray-500'}`}><DoorOpen size={16}/> Gate Monitor</button>
+                    </div>
+                    {/* Scanner Status Indicator */}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border ${zebraStatus === 'listening' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-100 border-gray-200 text-gray-500'}`}>
+                        <div className={`w-2 h-2 rounded-full ${zebraStatus === 'listening' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                        {zebraStatus === 'listening' ? 'Zebra Scanner Connected' : 'Scanner Disconnected'}
+                    </div>
+                </div>
+
+                {rfidTab === 'audit' ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
+                        {/* Control Panel */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex flex-col h-full">
+                            <h3 className="font-bold text-lg text-gray-900 mb-6">Audit Control</h3>
+                            {!activeAudit ? (
+                                <div className="space-y-4">
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Select Department</label>
+                                    <select className="input-modern" value={selectedAuditDept} onChange={e => setSelectedAuditDept(e.target.value)}>
+                                        <option value="">Choose Zone...</option>
+                                        {departmentZones.map(z => <option key={z.id} value={z.id}>{z.name}</option>)}
+                                    </select>
+                                    <button onClick={startAudit} disabled={!selectedAuditDept} className="w-full btn-primary py-4 text-base disabled:opacity-50">Start New Audit</button>
+                                </div>
+                            ) : (
+                                <div className="space-y-6 flex-1 flex flex-col">
+                                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                                        <div className="text-blue-800 font-bold text-lg mb-1">{activeAudit.department}</div>
+                                        <div className="text-blue-600 text-xs uppercase font-bold tracking-wider">Active Zone</div>
+                                    </div>
+                                    <div className="text-center py-4">
+                                        <div className="text-5xl font-black text-gray-900 mb-2">{Math.round((activeAudit.total_scanned / activeAudit.total_expected) * 100)}%</div>
+                                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                                            <div className="h-full bg-brand transition-all duration-500" style={{ width: `${(activeAudit.total_scanned / activeAudit.total_expected) * 100}%` }}></div>
+                                        </div>
+                                        <div className="flex justify-between mt-2 text-xs font-bold text-gray-500">
+                                            <span>0%</span>
+                                            <span>{activeAudit.total_scanned} / {activeAudit.total_expected} Assets</span>
+                                            <span>100%</span>
+                                        </div>
+                                    </div>
+                                    <button onClick={handleSimulateAuditScan} className="w-full py-3 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-brand hover:text-brand font-bold transition-all mt-auto">Simulate Scan (Test)</button>
+                                    <button onClick={() => setActiveAudit(null)} className="w-full btn-secondary text-danger border-danger/20 hover:bg-red-50">Stop Audit</button>
+                                </div>
+                            )}
+                        </div>
+                        {/* Results Panel */}
+                        <div className="lg:col-span-2 bg-white rounded-2xl border border-border shadow-soft flex flex-col overflow-hidden h-full">
+                            <div className="flex border-b border-border">
+                                <div className="flex-1 p-4 text-center border-r border-border bg-green-50/50">
+                                    <div className="text-xs font-bold text-green-600 uppercase mb-1">Found</div>
+                                    <div className="text-2xl font-black text-green-700">{activeAudit?.found_assets.length || 0}</div>
+                                </div>
+                                <div className="flex-1 p-4 text-center bg-red-50/50">
+                                    <div className="text-xs font-bold text-red-600 uppercase mb-1">Missing</div>
+                                    <div className="text-2xl font-black text-red-700">{activeAudit?.missing_assets.length || 0}</div>
+                                </div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Scanned Assets</h4>
+                                    {activeAudit?.found_assets.map(id => (
+                                        <div key={id} className="p-3 bg-white border border-green-200 rounded-lg shadow-sm flex items-center gap-3 animate-in slide-in-from-left-2">
+                                            <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                                            <span className="font-mono text-sm font-bold">{id}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-xs font-bold text-gray-400 uppercase mb-2">Missing Assets</h4>
+                                    {activeAudit?.missing_assets.map(id => (
+                                        <div key={id} className="p-3 bg-white border border-red-100 rounded-lg opacity-60 flex items-center gap-3">
+                                            <div className="w-2 h-2 rounded-full bg-red-300"></div>
+                                            <span className="font-mono text-sm text-gray-500">{id}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+                        {/* Gate Status Cards */}
+                        <div className="lg:col-span-1 space-y-4">
+                            <button 
+                                onClick={() => setIsGateMonitoring(!isGateMonitoring)} 
+                                className={`w-full py-4 rounded-xl font-bold shadow-lg transition-all flex flex-col items-center gap-2 ${isGateMonitoring ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                                <Radio size={24} className={isGateMonitoring ? 'animate-pulse' : ''}/>
+                                {isGateMonitoring ? 'Stop Monitoring' : 'Activate Gate Network'}
+                            </button>
+                            {gateReaders.map(reader => (
+                                <div key={reader.id} className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-gray-900 text-sm">{reader.name}</div>
+                                        <div className="text-[10px] text-gray-400">ID: {reader.id}</div>
+                                    </div>
+                                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold uppercase ${reader.status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${reader.status === 'online' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                        {reader.status}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Live Feed */}
+                        <div className="lg:col-span-3 bg-black rounded-2xl border border-gray-800 shadow-lg p-6 flex flex-col overflow-hidden relative">
+                            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-50"></div>
+                            <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+                                <h3 className="text-green-500 font-mono font-bold flex items-center gap-2"><Activity size={18}/> LIVE GATE TRAFFIC</h3>
+                                <div className="text-gray-500 font-mono text-xs">{new Date().toLocaleTimeString()}</div>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-2 font-mono">
+                                {gateLogs.map(log => {
+                                    const asset = assets.find(a => a.asset_id === log.asset_id);
+                                    const reader = gateReaders.find(r => r.id === log.gate_location_id);
+                                    return (
+                                        <div key={log.id} className="flex items-center gap-4 text-sm p-2 hover:bg-white/5 rounded border-b border-white/5 animate-in slide-in-from-right-2">
+                                            <span className="text-gray-500 w-20">{new Date(log.timestamp).toLocaleTimeString([], {hour12:false, hour:'2-digit', minute:'2-digit', second:'2-digit'})}</span>
+                                            <span className={`font-bold w-16 ${log.direction === 'ENTER' ? 'text-green-400' : 'text-orange-400'}`}>{log.direction}</span>
+                                            <span className="text-white flex-1">{asset?.name || 'Unknown Asset'} <span className="text-gray-600 text-xs">({log.asset_id})</span></span>
+                                            <span className="text-gray-400 text-xs">@ {reader?.name}</span>
+                                        </div>
+                                    )
+                                })}
+                                {gateLogs.length === 0 && <div className="text-gray-600 text-center py-12">Waiting for signal...</div>}
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // ============================================
+    // 1. DASHBOARD VIEW (Default)
+    // ============================================
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{t('kpi_mtbf')}</p>
+                        <h3 className="text-2xl font-black text-gray-900 group-hover:text-brand transition-colors">4,250h</h3>
+                        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded flex items-center w-fit gap-1 mt-1"><TrendingUp size={10}/> +12%</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-brand/5 text-brand flex items-center justify-center"><Activity size={24}/></div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{t('kpi_mttr')}</p>
+                        <h3 className="text-2xl font-black text-gray-900">3.2h</h3>
+                        <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded flex items-center w-fit gap-1 mt-1"><TrendingUp size={10}/> -5%</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center"><Clock size={24}/></div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Availability</p>
+                        <h3 className="text-2xl font-black text-gray-900">98.5%</h3>
+                        <span className="text-[10px] text-text-muted mt-1 block">Target: 99.0%</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-green-50 text-green-500 flex items-center justify-center"><CheckCircle2 size={24}/></div>
+                </div>
+                <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                    <div>
+                        <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Open WOs</p>
+                        <h3 className="text-2xl font-black text-gray-900">{workOrders.filter(w => w.status === 'Open').length}</h3>
+                        <span className="text-[10px] text-red-500 font-bold bg-red-50 px-1.5 py-0.5 rounded mt-1 block w-fit">Needs Attention</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center"><AlertCircle size={24}/></div>
+                </div>
+            </div>
+
+            {/* 3D Map Section */}
+            <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden flex flex-col lg:flex-row h-[600px]">
+                <div className="flex-1 relative bg-gray-50 overflow-hidden">
+                    <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur p-2 rounded-xl shadow-sm border border-gray-200">
+                        <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2"><MapPin size={16} className="text-brand"/> {t('dept_map')}</h3>
+                        <div className="flex items-center gap-2 mt-2">
+                            <span className="w-2 h-2 rounded-full bg-green-500"></span><span className="text-[10px] font-bold text-gray-500">Normal</span>
+                            <span className="w-2 h-2 rounded-full bg-red-500"></span><span className="text-[10px] font-bold text-gray-500">Issues</span>
+                        </div>
+                    </div>
+                    <div className="absolute bottom-4 left-4 z-10">
+                        <button onClick={() => setIsSimulationActive(!isSimulationActive)} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-md transition-all flex items-center gap-2 ${isSimulationActive ? 'bg-brand text-white' : 'bg-white text-gray-700'}`}>
+                            <Zap size={14} className={isSimulationActive ? 'text-yellow-300' : ''}/> {isSimulationActive ? 'Simulating Live Traffic' : 'Start Simulation'}
+                        </button>
+                    </div>
+                    
+                    {/* Isometric Map Container */}
+                    <div className="w-full h-full flex items-center justify-center perspective-[1000px] overflow-auto p-10">
+                        <div className="relative w-[600px] h-[600px] transform rotate-x-60 rotate-z-45 transition-transform duration-500" style={{transformStyle: 'preserve-3d'}}>
+                            {departmentZones.map(zone => {
+                                const zoneAssets = getAssetsInZone(zone.id);
+                                const hasIssues = zoneAssets.some(a => a.status === AssetStatus.DOWN);
+                                const issueCount = zoneAssets.filter(a => a.status === AssetStatus.DOWN).length;
+                                const isSelected = selectedMapZone === zone.id;
+                                
+                                return (
+                                    <div 
+                                        key={zone.id}
+                                        onClick={() => setSelectedMapZone(zone.id)}
+                                        className={`absolute transition-all duration-300 cursor-pointer shadow-xl border-2 hover:-translate-y-2 group
+                                            ${isSelected ? 'border-brand z-50 translate-y-[-10px]' : hasIssues ? 'border-red-400' : 'border-white'}
+                                            ${hasIssues ? 'bg-red-50' : zone.color}
+                                        `}
+                                        style={{
+                                            left: `${zone.x}%`,
+                                            top: `${zone.y}%`,
+                                            width: `${zone.width}%`,
+                                            height: `${zone.height}%`,
+                                            transformStyle: 'preserve-3d'
+                                        }}
+                                    >
+                                        {/* Zone Label */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span className={`text-xs font-black uppercase tracking-wider transform -rotate-45 ${hasIssues ? 'text-red-700' : 'text-gray-400 group-hover:text-gray-800'}`}>{zone.name}</span>
+                                        </div>
+                                        {/* Issue Bubble */}
+                                        {issueCount > 0 && (
+                                            <div className="absolute -top-3 -right-3 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-md animate-bounce z-20 transform -rotate-45">
+                                                {issueCount}
+                                            </div>
+                                        )}
+                                        {/* Asset Dots (Simulated) */}
+                                        <div className="absolute inset-0 p-1 flex flex-wrap content-start gap-0.5 opacity-50">
+                                            {zoneAssets.slice(0, 12).map((a, i) => (
+                                                <div key={i} className={`w-1.5 h-1.5 rounded-full ${a.status === AssetStatus.DOWN ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Sidebar Details Panel */}
+                <div className={`w-full lg:w-80 bg-white border-l border-border flex flex-col transition-all duration-300 ${selectedMapZone ? 'translate-x-0' : 'translate-x-full hidden lg:flex'}`}>
+                    {selectedMapZone ? (
+                        <div className="flex flex-col h-full">
+                            <div className="p-4 border-b border-border flex justify-between items-center bg-gray-50">
+                                <h3 className="font-bold text-gray-900">{departmentZones.find(z => z.id === selectedMapZone)?.name} Details</h3>
+                                <button onClick={() => setSelectedMapZone(null)}><X size={18} className="text-gray-400 hover:text-gray-600"/></button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                {getAssetsInZone(selectedMapZone).map(asset => (
+                                    <div key={asset.asset_id} className="p-3 bg-white border border-border rounded-xl shadow-sm hover:border-brand transition-colors cursor-pointer" onClick={() => { setSelectedAsset(asset); onNavigate('assets'); }}>
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{asset.status}</span>
+                                            <span className="text-[10px] text-gray-400 font-mono">{asset.asset_id}</span>
+                                        </div>
+                                        <div className="font-bold text-sm text-gray-900">{asset.name}</div>
+                                        <div className="text-xs text-gray-500">{asset.model}</div>
+                                    </div>
+                                ))}
+                                {getAssetsInZone(selectedMapZone).length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No assets in this zone.</div>}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
+                            <MapPin size={48} className="mb-4 opacity-20"/>
+                            <p className="text-sm font-medium">Select a zone on the map to view asset details.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
 };
+
+// Simple Icon wrapper for map usage if needed
+const DoorOpen = ({ size, className }: { size: number, className?: string }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M13 4h3a2 2 0 0 1 2 2v14"/><path d="M2 20h3"/><path d="M13 20h9"/><path d="M10 12v.01"/><path d="M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561Z"/></svg>
+);

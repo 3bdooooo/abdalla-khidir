@@ -40,11 +40,7 @@ export const DEVICE_IMAGES: Record<string, string> = {
 export const getModelImage = (model: string): string => {
     if (!model) return DEVICE_IMAGES['Generic'];
     const m = model.trim();
-    
-    // Direct Match
     if (DEVICE_IMAGES[m]) return DEVICE_IMAGES[m];
-    
-    // Partial Match Logic
     const lowerM = m.toLowerCase();
     
     if (lowerM.includes('magnetom') || lowerM.includes('mri')) return DEVICE_IMAGES['Magnetom Vida'];
@@ -187,8 +183,18 @@ for (let i = 1; i <= 500; i++) {
     const type = Object.keys(DEVICE_IMAGES)[i % (Object.keys(DEVICE_IMAGES).length - 1)]; // Skip 'Generic'
     const model = type; 
     const loc = LOCATIONS[i % LOCATIONS.length];
-    const purchaseYear = 2015 + (i % 9); // 2015-2023
     
+    // Realistic Dates
+    const currentYear = new Date().getFullYear();
+    const manufactureYear = currentYear - (i % 10) - 1; // 1-10 years old
+    const purchaseYear = manufactureYear + (Math.random() > 0.5 ? 0 : 1);
+    const installYear = purchaseYear;
+    
+    const manufDate = `${manufactureYear}-${(i % 12) + 1}-15`;
+    const purchDate = `${purchaseYear}-${(i % 12) + 1}-20`;
+    const instDate = `${installYear}-${(i % 12) + 1}-25`;
+    const warrantyExp = `${installYear + 3}-${(i % 12) + 1}-25`; // 3 Year Warranty default
+
     // Assign Vendor based on Model or Randomly distributed
     let vendor = VENDORS[i % VENDORS.length].name;
     if (model.includes('Magnetom') || model.includes('Somatom')) vendor = 'Siemens Healthineers';
@@ -205,12 +211,18 @@ for (let i = 1; i <= 500; i++) {
         serial_number: `SN-${10000 + i}`,
         location_id: loc.location_id,
         status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
-        purchase_date: `${purchaseYear}-01-15`,
-        warranty_expiration: `${purchaseYear + 5}-01-15`,
+        
+        // NEW DATE FIELDS
+        manufacturing_date: manufDate,
+        purchase_date: purchDate,
+        installation_date: instDate,
+        warranty_expiration: warrantyExp,
+        expected_lifespan: 10,
+
         operating_hours: Math.floor(Math.random() * 20000),
         risk_score: Math.floor(Math.random() * 100),
-        last_calibration_date: '2023-05-01',
-        next_calibration_date: '2024-05-01',
+        last_calibration_date: `${currentYear}-05-01`,
+        next_calibration_date: `${currentYear+1}-05-01`,
         image: getModelImage(model),
         purchase_cost: 5000 + (Math.random() * 50000),
         accumulated_maintenance_cost: 500 + (Math.random() * 5000)
@@ -241,8 +253,6 @@ for (let i = 1; i <= 200; i++) {
     let type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
     
     // VENDOR BIAS LOGIC
-    // High reliability vendors should have fewer Corrective WOs in simulation
-    // We can simulate this by flipping some Corrective to Preventive if reliability is high
     const vendorProfile = VENDORS.find(v => v.name === asset.manufacturer);
     if (vendorProfile && type === WorkOrderType.CORRECTIVE) {
         if (Math.random() > vendorProfile.reliability) { 
@@ -253,8 +263,6 @@ for (let i = 1; i <= 200; i++) {
         }
     }
 
-    // Repair Time Simulation
-    // Speed factor: >1 means faster repair (shorter duration)
     const baseDurationHours = 4;
     const speedFactor = vendorProfile ? vendorProfile.speed : 1.0;
     const actualDuration = baseDurationHours / speedFactor + (Math.random() * 2);
@@ -325,8 +333,10 @@ export const getTechnicianWorkOrders = (userId: number) => {
 };
 
 export const getAssetDocuments = (assetId: string): AssetDocument[] => {
+  const asset = assets.find(a => a.asset_id === assetId);
+  const model = asset?.model || 'Generic';
   return [
-    { doc_id: 1, asset_id: assetId, title: 'Service Manual v2.0', type: 'Manual', url: '#', date: '2021-01-01' },
+    { doc_id: 1, asset_id: assetId, title: `${model} Service Manual v2.0`, type: 'Manual', url: '#', date: '2021-01-01' },
     { doc_id: 2, asset_id: assetId, title: 'Calibration Cert 2023', type: 'Certificate', url: '#', date: '2023-01-15' },
     { doc_id: 3, asset_id: assetId, title: 'Maintenance Log 2023', type: 'Report', url: '#', date: '2023-12-01' },
   ];

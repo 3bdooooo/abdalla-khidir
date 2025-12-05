@@ -401,6 +401,20 @@ export const translations = {
     btn_gen_image: "Generate AI Image",
     generating_image: "Creating...",
     gen_image_success: "Image Generated!",
+
+    // New Asset Details
+    manuf_date: "Manufacturing Date",
+    install_date: "Installation Date",
+    lifespan: "Expected Lifespan",
+    years: "Years",
+    tab_history: "History",
+    download_manual: "Download PDF",
+    manual_unavailable: "Manual Unavailable",
+    doc_type: "Document Type",
+    file_size: "Size",
+    asset_timeline: "Lifecycle Timeline",
+    event: "Event",
+    date: "Date"
   },
   ar: {
     appName: "A2M MED",
@@ -777,8 +791,6 @@ export const translations = {
     vendor_table: "التحليل التفصيلي للموردين",
     total_units: "إجمالي الوحدات",
     failure_rate: "معدل الفشل",
-
-    // Training Dashboard
     training_dashboard: "لوحة تدريب التمريض",
     top_user_errors: "أكثر ٥ أخطاء استخدام",
     training_flyer: "نشرة تدريبية",
@@ -792,11 +804,23 @@ export const translations = {
     flyer_preview: "معاينة النشرة",
     session_needed: "تدريب مطلوب",
     no_major_errors: "لم يتم اكتشاف أخطاء استخدام كبيرة. عمل جيد!",
-
-    // AI Image
     btn_gen_image: "توليد صورة (AI)",
     generating_image: "جاري التوليد...",
     gen_image_success: "تم إنشاء الصورة!",
+    
+    // New Asset Details
+    manuf_date: "تاريخ التصنيع",
+    install_date: "تاريخ التركيب",
+    lifespan: "العمر الافتراضي",
+    years: "سنوات",
+    tab_history: "السجل",
+    download_manual: "تحميل PDF",
+    manual_unavailable: "الكتيب غير متاح",
+    doc_type: "نوع المستند",
+    file_size: "الحجم",
+    asset_timeline: "الجدول الزمني للأصل",
+    event: "حدث",
+    date: "التاريخ"
   }
 };
 

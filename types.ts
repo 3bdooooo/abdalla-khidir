@@ -80,8 +80,14 @@ export interface Asset {
   serial_number?: string;
   location_id: number; // FK to Location
   status: AssetStatus;
-  purchase_date: string; // Date string YYYY-MM-DD
-  warranty_expiration?: string; // Added field
+  
+  // LIFECYCLE DATES (Enhanced)
+  manufacturing_date: string; // YYYY-MM-DD
+  purchase_date: string; // YYYY-MM-DD
+  installation_date: string; // YYYY-MM-DD
+  warranty_expiration: string; // YYYY-MM-DD
+  expected_lifespan: number; // Years
+  
   operating_hours: number;
   risk_score: number; // 0-100
   last_calibration_date?: string;

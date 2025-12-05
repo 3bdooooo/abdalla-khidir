@@ -25,6 +25,13 @@ const mapAssetFromDB = (dbAsset: any): Asset => {
         location_id: locationId, 
         status: dbAsset.status as AssetStatus,
         purchase_date: dbAsset.purchase_date || '2022-01-01',
+        
+        // Added missing fields with defaults
+        manufacturing_date: dbAsset.manufacturing_date || '2021-01-01',
+        installation_date: dbAsset.installation_date || '2022-02-01',
+        warranty_expiration: dbAsset.warranty_expiration || '2025-01-01',
+        expected_lifespan: dbAsset.expected_lifespan || 10,
+
         operating_hours: 0, // Default
         risk_score: 0, // Default
         image: dbAsset.image || MockDb.getModelImage(dbAsset.model_number || ''),
@@ -349,3 +356,4 @@ export const seedDatabaseIfEmpty = async () => {
         console.log("Seeding Complete. Refreshing...");
     }
 }
+    
