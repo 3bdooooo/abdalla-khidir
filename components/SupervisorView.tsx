@@ -83,6 +83,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [selectedTechForAssignment, setSelectedTechForAssignment] = useState('');
     const [recommendedTechs, setRecommendedTechs] = useState<TechRecommendation[]>([]);
 
+    // Vendor Management State
+    const [selectedVendorForDetails, setSelectedVendorForDetails] = useState<string | null>(null);
+    const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+
     // Knowledge Base State
     const [kbSearch, setKbSearch] = useState('');
     const [aiQuery, setAiQuery] = useState('');
@@ -108,7 +112,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     ]);
 
     // ZEBRA SCANNER INTEGRATION
-    // Use refs to access latest state inside the event listener callback
     const activeAuditRef = useRef(activeAudit);
     useEffect(() => { activeAuditRef.current = activeAudit; }, [activeAudit]);
 
@@ -124,8 +127,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         
         const cleanId = scannedId.trim();
         
-        // Check if item is in missing list (meaning it's expected but not yet found)
-        // Also check if we found something unexpected (not in list)? For now, focus on expected.
         if (currentAudit.missing_assets.includes(cleanId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
@@ -133,9 +134,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 missing_assets: prev.missing_assets.filter(id => id !== cleanId),
                 found_assets: [...prev.found_assets, cleanId]
             } : null);
-        } else if (!currentAudit.found_assets.includes(cleanId)) {
-             // Optional: Handle unexpected assets found in this zone
-             // console.log("Found unexpected asset:", cleanId);
         }
     }, []);
 
@@ -152,7 +150,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 gate_location_id: locationId,
                 direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT',
                 timestamp: new Date().toISOString()
-            }, ...prev.slice(0, 49)]); // Keep last 50 logs
+            }, ...prev.slice(0, 49)]); 
         }
     }, []);
 
@@ -160,7 +158,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (rfidTabRef.current === 'audit') {
             handleRealScan(scannedTag);
         } else if (rfidTabRef.current === 'gate') {
-            handleGateScan(scannedTag, 101); // Default to main gate for demo
+            handleGateScan(scannedTag, 101);
         }
     }, [handleRealScan, handleGateScan]);
 
@@ -204,7 +202,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // Dashboard Map Simulation
     useEffect(() => { 
-        let interval: NodeJS.Timeout; 
+        let interval: ReturnType<typeof setInterval>; 
         if (isSimulationActive && currentView === 'dashboard') { 
             interval = setInterval(async () => { 
                 const randomIdx = Math.floor(Math.random() * assets.length); 
@@ -225,7 +223,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // Gate Monitoring Simulation
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
             setGateReaders(prev => prev.map(r => ({ ...r, status: 'online', lastPing: new Date().toLocaleTimeString() })));
             interval = setInterval(() => {
@@ -885,47 +883,70 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             
                             <div className="grid grid-cols-2 gap-6 mb-6">
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Asset</label>
-                                    <div className="font-medium text-gray-900">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.name}</div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Asset Details</label>
+                                    <div className="font-bold text-gray-900 mt-1">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.name}</div>
+                                    <div className="text-xs text-text-muted">
+                                        Model: {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.model}<br/>
+                                        S/N: {assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.serial_number}
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Technician</label>
-                                    <div className="font-medium text-gray-900">{users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}</div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Assigned Technician</label>
+                                    <div className="font-bold text-gray-900 mt-1 flex items-center gap-2">
+                                        <UserIcon size={14} className="text-brand"/>
+                                        {users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}
+                                    </div>
                                 </div>
                                 <div className="col-span-2">
-                                    <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Fault Description</label>
                                     <div className="p-3 bg-gray-50 rounded-xl border border-gray-200 text-sm mt-1">{selectedWorkOrderForDetails.description}</div>
                                 </div>
                             </div>
 
                             {/* Parts Used Section */}
                             <div className="mb-6">
-                                <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2"><Box size={16}/> Parts Consumed</h4>
+                                <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2"><Box size={16}/> Spare Parts Consumed</h4>
                                 {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 ? (
                                     <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
                                         <thead className="bg-gray-50">
-                                            <tr><th className="p-2 text-left">Part Name</th><th className="p-2 text-center">Qty</th></tr>
+                                            <tr><th className="p-2 text-left">Part Name</th><th className="p-2 text-right">Cost</th><th className="p-2 text-center">Qty</th><th className="p-2 text-right">Total</th></tr>
                                         </thead>
                                         <tbody>
                                             {selectedWorkOrderForDetails.parts_used.map((part, idx) => {
                                                 const pDetails = inventory.find(i => i.part_id === part.part_id);
+                                                const cost = pDetails?.cost || 0;
                                                 return (
                                                     <tr key={idx} className="border-t border-gray-100">
-                                                        <td className="p-2">{pDetails?.part_name || `Part #${part.part_id}`}</td>
-                                                        <td className="p-2 text-center font-bold">{part.quantity}</td>
+                                                        <td className="p-2 font-medium">{pDetails?.part_name || `Part #${part.part_id}`}</td>
+                                                        <td className="p-2 text-right text-gray-500">${cost}</td>
+                                                        <td className="p-2 text-center font-bold bg-gray-50">{part.quantity}</td>
+                                                        <td className="p-2 text-right font-mono">${cost * part.quantity}</td>
                                                     </tr>
                                                 );
                                             })}
                                         </tbody>
+                                        <tfoot className="bg-gray-50 font-bold border-t border-gray-200">
+                                            <tr>
+                                                <td colSpan={3} className="p-2 text-right">Total Parts Cost:</td>
+                                                <td className="p-2 text-right font-mono">
+                                                    ${selectedWorkOrderForDetails.parts_used.reduce((acc, p) => {
+                                                        const cost = inventory.find(i => i.part_id === p.part_id)?.cost || 0;
+                                                        return acc + (cost * p.quantity);
+                                                    }, 0)}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
                                     </table>
                                 ) : (
-                                    <div className="text-gray-400 text-sm italic p-2 border border-dashed rounded-lg text-center">No parts recorded</div>
+                                    <div className="text-gray-400 text-sm italic p-4 border border-dashed rounded-lg text-center bg-gray-50">
+                                        No spare parts recorded for this job.
+                                    </div>
                                 )}
                             </div>
 
                             {/* Approval Workflow */}
                             {['Awaiting Approval', 'Manager Approved', 'Awaiting Final Acceptance'].includes(selectedWorkOrderForDetails.status) && (
-                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 animate-in slide-in-from-bottom-2">
                                     <h4 className="font-bold text-amber-900 mb-2 flex items-center gap-2"><FileSignature size={18}/> {t('approval_workflow')}</h4>
                                     <div className="flex gap-2 mt-4">
                                         {(selectedWorkOrderForDetails.status === 'Awaiting Approval' && currentUser.role === UserRole.ADMIN) && (
@@ -1231,9 +1252,25 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 {/* --- 6.2 FINANCIAL ANALYSIS --- */}
                 {activeTab === 'tab_financial' && (
                     <div className="space-y-6">
+                        {/* CHART: TCO COMPARISON */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[350px] mb-6">
+                            <h3 className="font-bold text-xl text-gray-900 mb-4 flex items-center gap-2"><TrendingUp size={20}/> Cost vs. Value (Top Expensive Assets)</h3>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={financialAnalysis.slice(0, 7)} margin={{top: 20, right: 30, left: 20, bottom: 5}}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                                    <XAxis dataKey="name" tick={{fontSize: 10}} interval={0} angle={-15} textAnchor="end" height={60}/>
+                                    <YAxis tickFormatter={(val) => `$${val/1000}k`}/>
+                                    <Tooltip formatter={(val: number) => `$${val.toLocaleString()}`} />
+                                    <Legend />
+                                    <Bar dataKey="purchase" name="Purchase Price" fill="#10B981" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="maintCost" name="Maintenance Cost" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+
                         <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                             <div className="p-6 border-b border-border">
-                                <h3 className="font-bold text-xl text-gray-900">{t('asset_health')} (TCO)</h3>
+                                <h3 className="font-bold text-xl text-gray-900">{t('asset_health')} (Detailed Report)</h3>
                                 <p className="text-text-muted text-sm">Assets where maintenance cost exceeds 40% of purchase price.</p>
                             </div>
                             <table className="w-full text-left">
@@ -1414,41 +1451,95 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
                 {/* --- 6.5 VENDOR RATING --- */}
                 {activeTab === 'tab_vendor' && (
-                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
-                                <tr>
-                                    <th className="p-4">{t('manufacturer')}</th>
-                                    <th className="p-4 text-center">{t('total_units')}</th>
-                                    <th className="p-4 text-center">{t('failure_rate')}</th>
-                                    <th className="p-4 text-center">{t('support_speed')}</th>
-                                    <th className="p-4 text-center">{t('vendor_score')}</th>
-                                    <th className="p-4 text-right">{t('recommendation')}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {vendorStats.map((v, i) => (
-                                    <tr key={i} className="hover:bg-gray-50">
-                                        <td className="p-4 font-bold text-gray-900">{v.name}</td>
-                                        <td className="p-4 text-center font-mono">{v.assetCount}</td>
-                                        <td className="p-4 text-center font-mono">{(v.woCount / (v.assetCount || 1) * 100).toFixed(1)}%</td>
-                                        <td className="p-4 text-center font-mono">{v.avgMTTR}h</td>
-                                        <td className="p-4 text-center">
-                                            <div className="inline-flex items-center gap-1 font-bold">
-                                                <span className={v.score >= 80 ? 'text-green-600' : v.score >= 60 ? 'text-amber-600' : 'text-red-600'}>{v.score}</span>
-                                                <span className="text-gray-400 text-xs">/100</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-right">
-                                            {v.score >= 80 ? 
-                                                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsUp size={12}/> {t('rec_buy')}</span> :
-                                                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsDown size={12}/> {t('rec_avoid')}</span>
-                                            }
-                                        </td>
+                    <div className="space-y-6">
+                        {/* CHART: VENDOR PERFORMANCE */}
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[320px] mb-6">
+                            <h3 className="font-bold text-xl text-gray-900 mb-4 flex items-center gap-2"><Star size={20} className="text-amber-500"/> Vendor Performance Landscape</h3>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ScatterChart margin={{top: 20, right: 30, bottom: 10, left: 10}}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" dataKey="score" name="Total Score" domain={[50, 100]} label={{ value: 'Total Score', position: 'bottom', offset: 0 }} />
+                                    <YAxis type="number" dataKey="woCount" name="Issues" label={{ value: 'Reported Issues', angle: -90, position: 'left' }} />
+                                    <ZAxis type="number" dataKey="assetCount" range={[50, 400]} name="Volume" />
+                                    <Tooltip cursor={{ strokeDasharray: '3 3' }} />
+                                    <Scatter name="Vendors" data={vendorStats} fill="#2563EB">
+                                        {vendorStats.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.score > 85 ? '#10B981' : entry.score > 70 ? '#F59E0B' : '#EF4444'} />
+                                        ))}
+                                    </Scatter>
+                                </ScatterChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase">
+                                    <tr>
+                                        <th className="p-4">{t('manufacturer')}</th>
+                                        <th className="p-4 text-center">{t('total_units')}</th>
+                                        <th className="p-4 text-center">{t('failure_rate')}</th>
+                                        <th className="p-4 text-center">{t('support_speed')}</th>
+                                        <th className="p-4 text-center">{t('vendor_score')}</th>
+                                        <th className="p-4 text-right">{t('recommendation')}</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {vendorStats.map((v, i) => (
+                                        <tr key={i} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedVendorForDetails(v.name); setIsVendorModalOpen(true); }}>
+                                            <td className="p-4 font-bold text-gray-900">{v.name}</td>
+                                            <td className="p-4 text-center font-mono">{v.assetCount}</td>
+                                            <td className="p-4 text-center font-mono">{(v.woCount / (v.assetCount || 1) * 100).toFixed(1)}%</td>
+                                            <td className="p-4 text-center font-mono">{v.avgMTTR}h</td>
+                                            <td className="p-4 text-center">
+                                                <div className="inline-flex items-center gap-1 font-bold">
+                                                    <span className={v.score >= 80 ? 'text-green-600' : v.score >= 60 ? 'text-amber-600' : 'text-red-600'}>{v.score}</span>
+                                                    <span className="text-gray-400 text-xs">/100</span>
+                                                </div>
+                                            </td>
+                                            <td className="p-4 text-right">
+                                                {v.score >= 80 ? 
+                                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsUp size={12}/> {t('rec_buy')}</span> :
+                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-bold flex items-center gap-1 w-fit ml-auto"><ThumbsDown size={12}/> {t('rec_avoid')}</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* VENDOR DETAIL MODAL */}
+                        {isVendorModalOpen && selectedVendorForDetails && (
+                            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                                <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-in zoom-in-95 max-h-[80vh] overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                        <h3 className="text-xl font-bold text-gray-900">{selectedVendorForDetails} - Asset Portfolio</h3>
+                                        <button onClick={() => setIsVendorModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {assets.filter(a => (a.manufacturer || 'Generic') === selectedVendorForDetails).map(asset => {
+                                            const wos = workOrders.filter(w => w.asset_id === asset.asset_id || w.asset_id === asset.nfc_tag_id);
+                                            const recentIssues = wos.filter(w => w.type === 'Corrective').length;
+                                            return (
+                                                <div key={asset.asset_id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex justify-between items-center">
+                                                    <div>
+                                                        <div className="font-bold text-gray-800">{asset.name}</div>
+                                                        <div className="text-xs text-gray-500">{asset.model} • {asset.serial_number}</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-xs font-bold text-gray-500">Issues (6mo)</div>
+                                                        <div className={`font-bold ${recentIssues > 2 ? 'text-red-600' : 'text-green-600'}`}>{recentIssues}</div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {assets.filter(a => (a.manufacturer || 'Generic') === selectedVendorForDetails).length === 0 && (
+                                            <div className="text-center text-gray-400 py-8">No assets found for this vendor.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
