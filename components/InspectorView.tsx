@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Asset, WorkOrder, AssetDocument } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Search, FileText, CheckCircle2, AlertTriangle, Calendar, Clock, Download, ChevronLeft, ShieldCheck, History, ArrowRight } from 'lucide-react';
+import { Search, FileText, CheckCircle2, AlertTriangle, Calendar, Clock, Download, ChevronLeft, ShieldCheck, History, ArrowRight, Scan, Wifi } from 'lucide-react';
 import { getAssetDocuments, getLocationName, getUsers } from '../services/mockDb';
 
 interface InspectorViewProps {
@@ -15,6 +15,7 @@ export const InspectorView: React.FC<InspectorViewProps> = ({ assets, workOrders
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [activeTab, setActiveTab] = useState<'history' | 'compliance'>('history');
+  const [isScanning, setIsScanning] = useState(false);
 
   const filteredAssets = searchQuery 
     ? assets.filter(a => 
@@ -27,6 +28,19 @@ export const InspectorView: React.FC<InspectorViewProps> = ({ assets, workOrders
   const handleSelectAsset = (asset: Asset) => {
     setSelectedAsset(asset);
     setSearchQuery('');
+  };
+
+  const handleScan = () => {
+      setIsScanning(true);
+      // Simulate NFC Scan Delay
+      setTimeout(() => {
+          // For demo purposes, pick a random asset to simulate a "found" tag
+          const randomAsset = assets[Math.floor(Math.random() * assets.length)];
+          if (randomAsset) {
+              handleSelectAsset(randomAsset);
+          }
+          setIsScanning(false);
+      }, 2000);
   };
 
   const renderAssetFile = () => {
@@ -204,9 +218,10 @@ export const InspectorView: React.FC<InspectorViewProps> = ({ assets, workOrders
             Access secure compliance records, historical logs, and asset certificates.
         </p>
 
-        <div className="relative group">
+        <div className="flex gap-2 w-full max-w-2xl mx-auto relative group">
             <div className="absolute -inset-1 bg-gradient-to-r from-brand to-brand-light rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
-            <div className="relative">
+            
+            <div className="relative flex-1">
                 <Search className="absolute left-6 top-5 text-gray-400" size={24}/>
                 <input 
                     type="text" 
@@ -216,31 +231,50 @@ export const InspectorView: React.FC<InspectorViewProps> = ({ assets, workOrders
                     className="w-full pl-16 pr-6 py-5 rounded-2xl bg-white text-lg font-medium shadow-xl focus:outline-none focus:ring-2 focus:ring-brand/20 transition-all placeholder:text-gray-300"
                     autoFocus
                 />
-            </div>
-            
-            {searchQuery && filteredAssets.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
-                    {filteredAssets.map(asset => (
-                        <div 
-                            key={asset.asset_id}
-                            onClick={() => handleSelectAsset(asset)}
-                            className="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between border-b border-gray-50 last:border-0 group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
-                                    {asset.image ? <img src={asset.image} className="w-full h-full object-cover rounded-lg"/> : <FileText size={18}/>}
+                
+                {searchQuery && filteredAssets.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                        {filteredAssets.map(asset => (
+                            <div 
+                                key={asset.asset_id}
+                                onClick={() => handleSelectAsset(asset)}
+                                className="p-4 hover:bg-gray-50 cursor-pointer flex items-center justify-between border-b border-gray-50 last:border-0 group"
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center text-gray-400">
+                                        {asset.image ? <img src={asset.image} className="w-full h-full object-cover rounded-lg"/> : <FileText size={18}/>}
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="font-bold text-gray-900">{asset.name}</div>
+                                        <div className="text-xs text-gray-500 font-mono">{asset.asset_id} • {asset.serial_number}</div>
+                                    </div>
                                 </div>
-                                <div className="text-left">
-                                    <div className="font-bold text-gray-900">{asset.name}</div>
-                                    <div className="text-xs text-gray-500 font-mono">{asset.asset_id} • {asset.serial_number}</div>
-                                </div>
+                                <ArrowRight size={18} className="text-gray-300 group-hover:text-brand transition-colors"/>
                             </div>
-                            <ArrowRight size={18} className="text-gray-300 group-hover:text-brand transition-colors"/>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <button 
+                onClick={handleScan}
+                disabled={isScanning}
+                className="relative bg-brand text-white p-4 rounded-2xl shadow-xl hover:bg-brand-dark transition-all disabled:opacity-70 flex items-center justify-center min-w-[80px] z-10"
+                title={t('scan_nfc')}
+            >
+                {isScanning ? (
+                    <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                    <Scan size={24} />
+                )}
+            </button>
         </div>
+        
+        {isScanning && (
+            <div className="text-brand font-bold animate-pulse flex items-center justify-center gap-2">
+                <Wifi size={18} /> {t('identifying')}
+            </div>
+        )}
       </div>
     </div>
   );
