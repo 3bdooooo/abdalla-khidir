@@ -97,6 +97,7 @@ export const MOCK_USERS: User[] = [
   { user_id: 3, name: 'Mike Tech', role: UserRole.TECHNICIAN, email: 'tech@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0003' },
   { user_id: 4, name: 'Nurse Joy', role: UserRole.NURSE, email: 'nurse@hospital.com', password: 'password', location_id: 101, department: 'ICU', phone_number: '555-0004' },
   { user_id: 5, name: 'Vendor Rep', role: UserRole.VENDOR, email: 'vendor@hospital.com', password: 'password', location_id: 101, department: 'External', phone_number: '555-0005' },
+  { user_id: 6, name: 'Inspector Gadget', role: UserRole.INSPECTOR, email: 'audit@hospital.com', password: 'password', location_id: 101, department: 'Quality & Compliance', phone_number: '555-0006' },
 ];
 
 // GENERATE 45 MORE USERS
@@ -104,7 +105,7 @@ const extraRoles = [UserRole.NURSE, UserRole.TECHNICIAN, UserRole.SUPERVISOR, Us
 const firstNames = ["Ahmed", "Mohamed", "Fatima", "Ali", "Sara", "Omar", "Layla", "Khalid", "Noura", "Hassan", "Aisha", "Yousef", "Mariam", "Ibrahim"];
 const lastNames = ["Al-Sayed", "Khan", "Smith", "Johnson", "Al-Harbi", "Nasser", "Othman", "Kamal", "Fawzi", "Salim"];
 
-for (let i = 6; i <= 50; i++) {
+for (let i = 7; i <= 50; i++) {
     const role = extraRoles[i % extraRoles.length];
     const fname = firstNames[i % firstNames.length];
     const lname = lastNames[i % lastNames.length];
@@ -158,6 +159,13 @@ export const MOCK_ROLES: RoleDefinition[] = [
         description: 'External Repair Access',
         is_system_role: true,
         permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: [], reports: [], users: [], settings: [] }
+    },
+    {
+        id: '6',
+        name: 'Inspector',
+        description: 'Compliance & History Review (Read-Only)',
+        is_system_role: true,
+        permissions: { assets: ['view'], work_orders: ['view'], inventory: ['view'], reports: ['view'], users: ['view'], settings: ['view'] }
     }
 ];
 

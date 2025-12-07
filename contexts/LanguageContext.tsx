@@ -14,6 +14,7 @@ export const translations = {
     role_technician: "Technician",
     role_nurse: "Nurse",
     role_vendor: "Vendor",
+    role_inspector: "Inspector",
     login_title: "Sign in to your account",
     login_subtitle: "Enter your credentials to access the system",
     email_label: "Email Address",
@@ -31,6 +32,7 @@ export const translations = {
     nav_analysis: "Analysis & Knowledge",
     nav_users: "User Management",
     nav_rfid: "RFID Audit & Tracking",
+    nav_inspector: "Compliance Audit",
     op_overview: "Operational Overview",
     total_assets: "Total Assets",
     open_tickets: "Open Tickets",
@@ -370,8 +372,6 @@ export const translations = {
     history_insight: "Historical Insights (Same Model)",
     similar_faults: "Similar Faults",
     no_history: "No historical data found for this model.",
-    
-    // Vendor Rating
     vendor_score: "Vendor Performance Score",
     reliability_index: "Reliability Index",
     support_speed: "Support Speed (MTTR)",
@@ -381,8 +381,6 @@ export const translations = {
     vendor_table: "Detailed Vendor Analysis",
     total_units: "Total Units",
     failure_rate: "Failure Rate",
-
-    // Training Dashboard
     training_dashboard: "Nursing Training Dashboard",
     top_user_errors: "Top 5 User Errors",
     training_flyer: "Training Flyer",
@@ -396,13 +394,9 @@ export const translations = {
     flyer_preview: "Flyer Preview",
     session_needed: "Session Needed",
     no_major_errors: "No major user errors detected. Keep up the good work!",
-
-    // AI Image
     btn_gen_image: "Generate AI Image",
     generating_image: "Creating...",
     gen_image_success: "Image Generated!",
-
-    // New Asset Details
     manuf_date: "Manufacturing Date",
     install_date: "Installation Date",
     lifespan: "Expected Lifespan",
@@ -414,7 +408,18 @@ export const translations = {
     file_size: "Size",
     asset_timeline: "Lifecycle Timeline",
     event: "Event",
-    date: "Date"
+    date: "Date",
+    inspector_search_placeholder: "Search Asset ID (AST-1002) or Control No...",
+    compliance_docs: "Compliance & Certificates",
+    qa_reports: "QA Reports",
+    calibration_certs: "Calibration Certificates",
+    view_asset_file: "View Asset File",
+    search_assets: "Search Assets",
+    asset_file: "Asset File",
+    risk_level: "Risk Level",
+    next_cal_due: "Next Calibration",
+    history_log: "History Log",
+    download: "Download"
   },
   ar: {
     appName: "A2M MED",
@@ -426,6 +431,7 @@ export const translations = {
     role_technician: "فني",
     role_nurse: "ممرض/ة",
     role_vendor: "بائع",
+    role_inspector: "مفتش / مدقق",
     login_title: "تسجيل الدخول",
     login_subtitle: "أدخل بيانات الاعتماد للوصول إلى النظام",
     email_label: "البريد الإلكتروني",
@@ -443,6 +449,7 @@ export const translations = {
     nav_analysis: "التحليل والمعرفة",
     nav_users: "إدارة المستخدمين",
     nav_rfid: "جرد وتتبع RFID",
+    nav_inspector: "تدقيق الامتثال",
     op_overview: "نظرة عامة",
     total_assets: "إجمالي الأصول",
     open_tickets: "التذاكر المفتوحة",
@@ -807,8 +814,6 @@ export const translations = {
     btn_gen_image: "توليد صورة (AI)",
     generating_image: "جاري التوليد...",
     gen_image_success: "تم إنشاء الصورة!",
-    
-    // New Asset Details
     manuf_date: "تاريخ التصنيع",
     install_date: "تاريخ التركيب",
     lifespan: "العمر الافتراضي",
@@ -820,7 +825,18 @@ export const translations = {
     file_size: "الحجم",
     asset_timeline: "الجدول الزمني للأصل",
     event: "حدث",
-    date: "التاريخ"
+    date: "التاريخ",
+    inspector_search_placeholder: "ابحث عن رقم الأصل (AST-1002) أو رقم التحكم...",
+    compliance_docs: "الامتثال والشهادات",
+    qa_reports: "تقارير الجودة",
+    calibration_certs: "شهادات المعايرة",
+    view_asset_file: "عرض ملف الأصل",
+    search_assets: "البحث في الأصول",
+    asset_file: "ملف الأصل",
+    risk_level: "مستوى الخطر",
+    next_cal_due: "المعايرة القادمة",
+    history_log: "سجل العمليات",
+    download: "تحميل"
   }
 };
 

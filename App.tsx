@@ -7,6 +7,7 @@ import { Layout } from './components/Layout';
 import { SupervisorView } from './components/SupervisorView';
 import { TechnicianView } from './components/TechnicianView';
 import { NurseView } from './components/NurseView';
+import { InspectorView } from './components/InspectorView'; // New Import
 import { Login } from './components/Login';
 import { LanguageProvider } from './contexts/LanguageContext';
 
@@ -83,6 +84,7 @@ const AppContent: React.FC = () => {
     setUser(selectedUser);
     if (selectedUser.role === UserRole.SUPERVISOR || selectedUser.role === UserRole.ADMIN) setCurrentView('dashboard');
     else if (selectedUser.role === UserRole.TECHNICIAN || selectedUser.role === UserRole.VENDOR) setCurrentView('tasks');
+    else if (selectedUser.role === UserRole.INSPECTOR) setCurrentView('inspector');
     else setCurrentView('report');
   };
 
@@ -141,6 +143,13 @@ const AppContent: React.FC = () => {
           assets={assets}
           workOrders={workOrders}
           refreshData={refreshData}
+        />
+      )}
+
+      {user.role === UserRole.INSPECTOR && (
+        <InspectorView
+          assets={assets}
+          workOrders={workOrders}
         />
       )}
     </Layout>

@@ -74,6 +74,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [maintenanceViewMode, setMaintenanceViewMode] = useState<'kanban' | 'list'>('kanban');
     const [maintenanceFilterPriority, setMaintenanceFilterPriority] = useState<string>('all');
     const [maintenanceFilterType, setMaintenanceFilterType] = useState<string>('all');
+    const [maintenanceFilterStatus, setMaintenanceFilterStatus] = useState<string>('all');
+    const [maintenanceFilterTechnician, setMaintenanceFilterTechnician] = useState<string>('all');
+    const [maintenanceFilterAsset, setMaintenanceFilterAsset] = useState<string>('');
+
     const [isCreateWOModalOpen, setIsCreateWOModalOpen] = useState(false);
     const [newWOForm, setNewWOForm] = useState({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
     const [selectedWorkOrderForDetails, setSelectedWorkOrderForDetails] = useState<WorkOrder | null>(null);
@@ -365,6 +369,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 2. ASSETS VIEW (Enhanced)
     // ============================================
     if (currentView === 'assets') {
+        // ... existing asset view logic ...
+        // (Truncated for brevity - logic preserved)
         if (selectedAsset) {
             const assetWOs = workOrders.filter(w => w.asset_id === selectedAsset.asset_id || w.asset_id === selectedAsset.nfc_tag_id);
             const calHistory = assetWOs.filter(w => w.type === WorkOrderType.CALIBRATION);
@@ -650,7 +656,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </table>
                 </div>
 
-                {/* Add Asset Modal (Updated with new fields) */}
+                {/* Add Asset Modal */}
                 {isAddModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95">
@@ -679,7 +685,12 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 mb-1">{t('form_image')}</label>
                                     <div className="flex gap-2">
-                                        <input type="file" accept="image/*" onChange={handleImageChange} className="input-modern p-2 flex-1"/>
+                                        <label className="cursor-pointer flex-1 bg-gray-50 border border-gray-200 rounded-xl p-2 flex items-center justify-center gap-2 hover:bg-gray-100 transition-colors">
+                                            <input type="file" accept="image/*" onChange={handleImageChange} className="hidden"/>
+                                            <ImageIcon size={16} className="text-gray-500"/>
+                                            <span className="text-xs font-bold text-gray-600">Upload Photo</span>
+                                        </label>
+                                        
                                         <button 
                                             type="button" 
                                             onClick={handleGenerateImage}
@@ -714,6 +725,15 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const filteredWOs = workOrders.filter(wo => {
             if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
             if (maintenanceFilterType !== 'all' && wo.type !== maintenanceFilterType) return false;
+            
+            // New filters
+            if (maintenanceFilterStatus !== 'all' && wo.status !== maintenanceFilterStatus) return false;
+            if (maintenanceFilterTechnician !== 'all' && wo.assigned_to_id.toString() !== maintenanceFilterTechnician) return false;
+            
+            if (maintenanceFilterAsset) {
+                const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                if (!asset || !asset.name.toLowerCase().includes(maintenanceFilterAsset.toLowerCase())) return false;
+            }
             return true;
         });
         const columns = {
@@ -726,7 +746,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
         return (
             <div className="space-y-6 animate-in fade-in h-full flex flex-col">
-                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-white p-4 rounded-2xl shadow-sm border border-border gap-4">
                     <div className="flex items-center gap-4">
                         <h2 className="text-2xl font-bold text-gray-900">{t('wo_title')}</h2>
                         <div className="flex bg-gray-100 p-1 rounded-lg">
@@ -734,12 +754,37 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             <button onClick={() => setMaintenanceViewMode('list')} className={`p-1.5 rounded ${maintenanceViewMode === 'list' ? 'bg-white shadow' : 'text-gray-500'}`}><List size={18}/></button>
                         </div>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap">
                         <select className="input-modern py-2 w-auto" value={maintenanceFilterPriority} onChange={(e) => setMaintenanceFilterPriority(e.target.value)}>
                             <option value="all">{t('filter_all')} Priority</option>
                             <option value={Priority.CRITICAL}>{Priority.CRITICAL}</option>
                             <option value={Priority.HIGH}>{Priority.HIGH}</option>
                         </select>
+                        {/* New Filters */}
+                         <select className="input-modern py-2 w-auto" value={maintenanceFilterStatus} onChange={(e) => setMaintenanceFilterStatus(e.target.value)}>
+                            <option value="all">All Status</option>
+                            <option value="Open">Open</option>
+                            <option value="Assigned">Assigned</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Awaiting Approval">Review</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                         <select className="input-modern py-2 w-auto" value={maintenanceFilterTechnician} onChange={(e) => setMaintenanceFilterTechnician(e.target.value)}>
+                            <option value="all">All Techs</option>
+                            {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
+                                <option key={u.user_id} value={u.user_id}>{u.name}</option>
+                            ))}
+                        </select>
+                        <div className="relative">
+                            <Search className="absolute left-2 top-2.5 text-gray-400" size={14}/>
+                            <input 
+                                className="input-modern py-2 pl-8 w-40" 
+                                placeholder="Search Asset..." 
+                                value={maintenanceFilterAsset} 
+                                onChange={(e) => setMaintenanceFilterAsset(e.target.value)}
+                            />
+                        </div>
+
                         <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('create_wo')}</button>
                     </div>
                 </div>
@@ -996,6 +1041,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 4. INVENTORY VIEW
     // ============================================
     if (currentView === 'inventory') {
+        // ... (rest of the file content)
         return (
             <div className="space-y-6 animate-in fade-in">
                 <div className="bg-white p-5 rounded-2xl border border-border shadow-soft">
@@ -1070,7 +1116,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 6. ANALYSIS VIEW (Reports, AI, Financial)
     // ============================================
     if (currentView === 'analysis') {
-        const subTabs = [
+       // ... existing analysis view ...
+       const subTabs = [
             { id: 'tab_analytics', label: t('tab_analytics'), icon: BarChart2 },
             { id: 'tab_financial', label: t('tab_financial'), icon: DollarSign },
             { id: 'tab_gen_report', label: t('tab_gen_report'), icon: FileText },
@@ -1369,6 +1416,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 7. USERS VIEW (List & Roles)
     // ============================================
     if (currentView === 'users') {
+        // ... (rest of the file content)
         return (
             <div className="space-y-6 animate-in fade-in">
                 <div className="bg-white p-1 rounded-xl border border-border shadow-sm inline-flex mb-4">
@@ -1476,6 +1524,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 8. RFID VIEW (Audit & Gate)
     // ============================================
     if (currentView === 'rfid') {
+        // ... (rest of the file content)
         return (
             <div className="space-y-6 animate-in fade-in h-full flex flex-col">
                 <div className="flex justify-between items-start">

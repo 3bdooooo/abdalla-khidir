@@ -6,6 +6,7 @@ export enum UserRole {
   TECHNICIAN = 'Technician',
   NURSE = 'Nurse',
   VENDOR = 'Vendor',
+  INSPECTOR = 'Inspector', // New Role
 }
 
 export enum AssetStatus {

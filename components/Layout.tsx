@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { User, UserRole } from '../types';
-import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio, Home, ClipboardList, ScanLine, UserCircle, X, Check, AlertTriangle } from 'lucide-react';
+import { LogOut, LayoutDashboard, Boxes, Wrench, Menu, Package, Activity, FileText, Globe, Users as UsersIcon, ChevronRight, Bell, Radio, Home, ClipboardList, ScanLine, UserCircle, X, Check, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface LayoutProps {
@@ -105,6 +105,41 @@ export const Layout: React.FC<LayoutProps> = ({ user, onLogout, currentView, onN
         </nav>
       </div>
     );
+  }
+
+  // --- INSPECTOR LAYOUT (Simplified Sidebar) ---
+  if (user.role === UserRole.INSPECTOR) {
+      const sidebarTransform = isSidebarOpen ? 'translate-x-0' : (dir === 'rtl' ? 'translate-x-full' : '-translate-x-full');
+      return (
+        <div className="min-h-screen bg-background flex font-sans text-text-main overflow-hidden">
+            <aside className={`fixed inset-y-0 start-0 z-50 w-72 bg-white border-e border-border shadow-soft transform transition-transform duration-300 ease-out ${sidebarTransform} lg:relative lg:translate-x-0 flex flex-col`}>
+                <div className="h-24 flex items-center px-8 border-b border-border/50">
+                    <BrandLogo />
+                </div>
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider px-4 mb-2 mt-4">Audit Mode</div>
+                    <button onClick={() => onNavigate('inspector')} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-brand text-white shadow-lg shadow-brand/25 transition-all">
+                        <ShieldCheck size={20} />
+                        <span className="flex-1 text-start font-medium text-sm">{t('nav_inspector')}</span>
+                        <ChevronRight size={16} className="text-white/50 rtl:rotate-180" />
+                    </button>
+                </nav>
+                <div className="border-t border-border/50 bg-gray-50/50 p-4">
+                    <div className="flex items-center gap-3 p-3 bg-white border border-border rounded-xl shadow-sm">
+                        <div className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-sm">{user.name[0]}</div>
+                        <div className="flex-1 min-w-0 text-start">
+                            <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
+                            <p className="text-xs text-text-muted truncate">Auditor</p>
+                        </div>
+                        <button onClick={onLogout} className="text-text-muted hover:text-danger p-1"><LogOut size={18} className="rtl:rotate-180" /></button>
+                    </div>
+                </div>
+            </aside>
+            <main className="flex-1 overflow-y-auto p-6 lg:p-8 scroll-smooth relative">
+                {children}
+            </main>
+        </div>
+      );
   }
 
   // --- DESKTOP LAYOUT (Supervisor, Admin) ---
