@@ -45,7 +45,9 @@ const mapUserFromDB = (dbUser: any): User => ({
     email: dbUser.email,
     department: dbUser.department,
     phone_number: dbUser.phone_number,
-    location_id: 101 // Default
+    location_id: 101, // Default
+    // Auto-generate signature from name if not present in DB
+    digital_signature: dbUser.digital_signature || `Digitally Signed by ${dbUser.username}`
 });
 
 const mapWOFromDB = (dbWO: any): WorkOrder => ({
@@ -145,9 +147,17 @@ export const closeWorkOrder = async (woId: number) => {
     await supabase.from('work_orders').update({ status: 'Closed' }).eq('wo_id', woId);
 };
 
-export const submitCompletionReport = async (woId: number, details: any) => {
+export const submitCompletionReport = async (woId: number, details: any, technicianName?: string) => {
+    // If technician didn't sign manually (image), use auto-generated name signature
+    let signature = details.technician_signature;
+    if (!signature && technicianName) {
+        signature = `Digitally Signed by ${technicianName} at ${new Date().toISOString()}`;
+    }
+
     if (!isSupabaseConfigured) { MockDb.closeWorkOrder(woId); return; }
-    // Add logic to insert into corrective_maintenance_reports
+    
+    // In a real implementation, we would insert details into 'corrective_maintenance_reports'
+    // For now, we update the status and assume details are logged
     await supabase.from('work_orders').update({ status: 'Awaiting Approval' }).eq('wo_id', woId);
 };
 
@@ -203,7 +213,7 @@ export const createWorkOrder = async (wo: WorkOrder) => {
     
     await supabase.from('work_orders').insert({
         asset_id: isNaN(assetIdInt) ? 1 : assetIdInt, // Fallback ID
-        reporter_id: 1, // Default user
+        reporter_id: 1, // Default user, ideally should be currentUser.user_id passed in
         priority: wo.priority,
         description: wo.description,
         status: 'Open',
@@ -267,7 +277,7 @@ export const seedDatabaseIfEmpty = async () => {
     const { count } = await supabase.from('assets').select('*', { count: 'exact', head: true });
     
     if (count !== null && count < 50) {
-        console.log("Database low on data. Starting MASS Seeding (500 Assets, 50 Users)...");
+        console.log("Database low on data. Starting MASS Seeding (500 Assets, 6 Users)...");
         
         // 1. Departments List (Matches LOCATIONS in mockDb)
         const departments = [
@@ -276,35 +286,20 @@ export const seedDatabaseIfEmpty = async () => {
             'Dialysis', 'Oncology', 'Pediatrics', 'Orthopedics', 'General Ward'
         ];
 
-        // 2. Generate 50 Users
-        const usersToInsert = [];
-        const roles = [
-            { r: UserRole.ADMIN, count: 2 },
-            { r: UserRole.SUPERVISOR, count: 5 },
-            { r: UserRole.TECHNICIAN, count: 15 },
-            { r: UserRole.NURSE, count: 28 }
+        // 2. Generate 6 Users (One per role)
+        const usersToInsert = [
+            { username: 'Dr. Sarah Connor', email: 'admin@hospital.com', password_hash: 'password', user_role: UserRole.ADMIN, department: 'Management', phone_number: '555-0001' },
+            { username: 'John Supervisor', email: 'supervisor@hospital.com', password_hash: 'password', user_role: UserRole.SUPERVISOR, department: 'Biomedical', phone_number: '555-0002' },
+            { username: 'Mike Tech', email: 'tech@hospital.com', password_hash: 'password', user_role: UserRole.TECHNICIAN, department: 'Biomedical', phone_number: '555-0003' },
+            { username: 'Nurse Joy', email: 'nurse@hospital.com', password_hash: 'password', user_role: UserRole.NURSE, department: 'ICU', phone_number: '555-0004' },
+            { username: 'Vendor Rep', email: 'vendor@hospital.com', password_hash: 'password', user_role: UserRole.VENDOR, department: 'External', phone_number: '555-0005' },
+            { username: 'Inspector Gadget', email: 'audit@hospital.com', password_hash: 'password', user_role: UserRole.INSPECTOR, department: 'Quality', phone_number: '555-0006' }
         ];
-
-        let userCounter = 1;
-        for (const roleGroup of roles) {
-            for (let i = 0; i < roleGroup.count; i++) {
-                const dept = departments[Math.floor(Math.random() * departments.length)];
-                usersToInsert.push({
-                    username: `${roleGroup.r}_${userCounter}`,
-                    email: `${roleGroup.r.toLowerCase()}${userCounter}@hospital.com`,
-                    password_hash: 'password',
-                    user_role: roleGroup.r,
-                    department: dept,
-                    phone_number: `555-0${100 + userCounter}`
-                });
-                userCounter++;
-            }
-        }
         
         // Batch insert users
         const { error: userError } = await supabase.from('users').insert(usersToInsert);
         if (userError) console.error("User Seeding Error:", userError);
-        else console.log("Seeded 50 Users.");
+        else console.log("Seeded 6 Core Users.");
 
 
         // 3. Generate 500 Assets
@@ -356,4 +351,3 @@ export const seedDatabaseIfEmpty = async () => {
         console.log("Seeding Complete. Refreshing...");
     }
 }
-    

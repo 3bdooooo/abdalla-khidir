@@ -32,6 +32,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // Notification Toast State
     const [showToast, setShowToast] = useState(false);
     
+    // Asset Search
+    const [assetSearch, setAssetSearch] = useState('');
+
     // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [newAssetForm, setNewAssetForm] = useState({ 
@@ -369,8 +372,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 2. ASSETS VIEW (Enhanced)
     // ============================================
     if (currentView === 'assets') {
-        // ... existing asset view logic ...
-        // (Truncated for brevity - logic preserved)
+        // Filter assets based on search
+        const filteredAssets = assets.filter(asset => 
+            asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+            asset.model.toLowerCase().includes(assetSearch.toLowerCase()) ||
+            asset.asset_id.toLowerCase().includes(assetSearch.toLowerCase()) ||
+            (asset.serial_number || '').toLowerCase().includes(assetSearch.toLowerCase())
+        );
+
         if (selectedAsset) {
             const assetWOs = workOrders.filter(w => w.asset_id === selectedAsset.asset_id || w.asset_id === selectedAsset.nfc_tag_id);
             const calHistory = assetWOs.filter(w => w.type === WorkOrderType.CALIBRATION);
@@ -605,11 +614,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
         return (
             <div className="space-y-6 animate-in fade-in">
-                {/* ... (Existing List View remains same but ensures onRowClick sets selectedAsset) ... */}
-                <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border">
+                {/* Header with Search and Add Button */}
+                <div className="flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-border gap-4">
                     <h2 className="text-2xl font-bold text-gray-900">{t('tab_list')}</h2>
-                    <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={16}/> {t('add_equipment')}</button>
+                    <div className="flex gap-4 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-3 top-3 text-gray-400" size={18}/>
+                            <input 
+                                className="input-modern pl-10" 
+                                placeholder={t('search_assets')} 
+                                value={assetSearch}
+                                onChange={(e) => setAssetSearch(e.target.value)}
+                            />
+                        </div>
+                        <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm whitespace-nowrap"><Plus size={16}/> {t('add_equipment')}</button>
+                    </div>
                 </div>
+
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase border-b border-border">
@@ -624,7 +645,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
-                            {assets.map(asset => (
+                            {filteredAssets.length > 0 ? filteredAssets.map(asset => (
                                 <tr key={asset.asset_id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => setSelectedAsset(asset)}>
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
@@ -651,7 +672,13 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     </td>
                                     <td className="p-4"><button className="text-brand hover:underline text-xs font-bold">Details</button></td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={7} className="p-8 text-center text-gray-400 font-medium">
+                                        No assets found matching "{assetSearch}"
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

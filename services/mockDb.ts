@@ -100,28 +100,8 @@ export const MOCK_USERS: User[] = [
   { user_id: 6, name: 'Inspector Gadget', role: UserRole.INSPECTOR, email: 'audit@hospital.com', password: 'password', location_id: 101, department: 'Quality & Compliance', phone_number: '555-0006' },
 ];
 
-// GENERATE 45 MORE USERS
-const extraRoles = [UserRole.NURSE, UserRole.TECHNICIAN, UserRole.SUPERVISOR, UserRole.NURSE, UserRole.NURSE];
-const firstNames = ["Ahmed", "Mohamed", "Fatima", "Ali", "Sara", "Omar", "Layla", "Khalid", "Noura", "Hassan", "Aisha", "Yousef", "Mariam", "Ibrahim"];
-const lastNames = ["Al-Sayed", "Khan", "Smith", "Johnson", "Al-Harbi", "Nasser", "Othman", "Kamal", "Fawzi", "Salim"];
-
-for (let i = 7; i <= 50; i++) {
-    const role = extraRoles[i % extraRoles.length];
-    const fname = firstNames[i % firstNames.length];
-    const lname = lastNames[i % lastNames.length];
-    const dept = LOCATIONS[i % LOCATIONS.length].department;
-    
-    MOCK_USERS.push({
-        user_id: i,
-        name: `${fname} ${lname} ${i}`,
-        role: role,
-        email: `${role.toLowerCase()}${i}@hospital.com`,
-        password: 'password',
-        location_id: 101,
-        department: dept,
-        phone_number: `555-0${100+i}`
-    });
-}
+// Removed extra user generation loop. 
+// We are sticking to the 6 core users defined above.
 
 // RBAC DEFINITIONS
 export const MOCK_ROLES: RoleDefinition[] = [
@@ -200,7 +180,7 @@ for (let i = 1; i <= 500; i++) {
     
     const manufDate = `${manufactureYear}-${(i % 12) + 1}-15`;
     const purchDate = `${purchaseYear}-${(i % 12) + 1}-20`;
-    const instDate = `${installYear}-${(i % 12) + 1}-25`;
+    const installDate = `${installYear}-${(i % 12) + 1}-25`;
     const warrantyExp = `${installYear + 3}-${(i % 12) + 1}-25`; // 3 Year Warranty default
 
     // Assign Vendor based on Model or Randomly distributed
@@ -223,7 +203,7 @@ for (let i = 1; i <= 500; i++) {
         // NEW DATE FIELDS
         manufacturing_date: manufDate,
         purchase_date: purchDate,
-        installation_date: instDate,
+        installation_date: installDate,
         warranty_expiration: warrantyExp,
         expected_lifespan: 10,
 
