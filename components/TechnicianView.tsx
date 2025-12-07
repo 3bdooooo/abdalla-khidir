@@ -152,22 +152,13 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     smartMatches.forEach(doc => { if (!existingTitles.has(doc.title)) foundDocs.push(doc); });
                 }
                 
-                if (foundDocs && foundDocs.length > 0) { 
-                    setAssetDocs(foundDocs); 
-                    setShowDocsModal(true);
-                    setIsStartingJob(false); // Hide scan overlay
-                } else {
-                    // No docs? Start immediately
-                    await api.startWorkOrder(currentWoId, coords); 
-                    refreshData(); 
-                    setSelectedWO({...wo, status: 'In Progress'});
-                    setPendingWO(null);
-                    setIsStartingJob(false);
-                    setScanState('idle');
-                }
+                // ALWAYS show modal for confirmation before starting
+                setAssetDocs(foundDocs || []); 
+                setShowDocsModal(true);
+                setIsStartingJob(false); // Hide scan overlay
             },
             async (error) => {
-                // Fallback
+                // Fallback (Geolocation failed but still try to find docs)
                 const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 if (asset) {
@@ -176,18 +167,9 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     smartMatches.forEach(doc => { if (!existingTitles.has(doc.title)) foundDocs.push(doc); });
                 }
 
-                if (foundDocs && foundDocs.length > 0) {
-                    setAssetDocs(foundDocs);
-                    setShowDocsModal(true);
-                    setIsStartingJob(false);
-                } else {
-                    await api.startWorkOrder(currentWoId);
-                    refreshData();
-                    setSelectedWO({...wo, status: 'In Progress'});
-                    setPendingWO(null);
-                    setIsStartingJob(false);
-                    setScanState('idle');
-                }
+                setAssetDocs(foundDocs || []);
+                setShowDocsModal(true);
+                setIsStartingJob(false);
             },
             { enableHighAccuracy: true, timeout: 7000 }
         );
@@ -354,8 +336,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                         </div>
 
                                         <div className="flex gap-3 mb-4">
-                                            <div className="w-12 h-12 bg-gray-50 rounded-lg shrink-0 flex items-center justify-center border border-gray-100">
-                                                {asset?.image ? <img src={asset.image} className="w-full h-full object-cover rounded-lg"/> : <Box size={20} className="text-gray-400"/>}
+                                            <div className="w-12 h-12 bg-gray-50 rounded-lg shrink-0 flex items-center justify-center border border-gray-100 overflow-hidden">
+                                                {asset?.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Box size={20} className="text-gray-400"/>}
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-gray-900 leading-tight">{asset?.name || 'Unknown Asset'}</h3>
@@ -491,29 +473,39 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     </div>
                 )}
                 
-                {/* Docs Found Modal - Uses pendingWO to display data while in dashboard state */}
+                {/* Verification & Docs Modal */}
                 {showDocsModal && pendingWO && (
                     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
-                            <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-4 mx-auto">
-                                <BookOpen size={24}/>
+                            {/* Asset Identity Header */}
+                            <div className="flex flex-col items-center mb-6">
+                                 <div className="w-20 h-20 bg-gray-100 rounded-xl mb-3 overflow-hidden border border-gray-200">
+                                     {pendingAsset?.image ? <img src={pendingAsset.image} className="w-full h-full object-cover"/> : <Box size={32} className="m-auto text-gray-400"/>}
+                                 </div>
+                                 <h3 className="text-lg font-bold text-gray-900 text-center leading-tight">{pendingAsset?.name}</h3>
+                                 <div className="flex items-center gap-2 mt-1">
+                                     <span className="text-[10px] text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded font-bold">{pendingAsset?.asset_id}</span>
+                                     <span className="text-xs text-brand font-bold uppercase"><CheckCircle2 size={12} className="inline mr-1"/> Verified</span>
+                                 </div>
                             </div>
-                            <h3 className="text-xl font-bold text-center mb-2">{t('manuals_detected')}</h3>
-                            <p className="text-center text-gray-500 text-sm mb-6">
-                                {t('relevant_docs')} for <strong>{pendingAsset?.model || 'Asset'}</strong>
-                            </p>
-                            
-                            <div className="space-y-3 mb-6">
-                                {assetDocs.map(doc => (
-                                    <div key={doc.doc_id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                                        <FileText size={18} className="text-brand"/>
-                                        <div className="text-sm font-bold text-gray-800 line-clamp-1">{doc.title}</div>
-                                        <div className="ml-auto text-xs px-2 py-0.5 bg-white border rounded text-gray-500">{doc.type}</div>
+
+                            <div className="mb-6">
+                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2"><BookOpen size={12}/> {t('relevant_docs')}</h4>
+                                {assetDocs.length > 0 ? (
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                                        {assetDocs.map(doc => (
+                                            <div key={doc.doc_id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg border border-gray-100 hover:border-brand/30 transition-colors">
+                                                <FileText size={16} className="text-brand shrink-0"/>
+                                                <div className="text-xs font-bold text-gray-700 line-clamp-1">{doc.title}</div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                ) : (
+                                    <div className="text-center text-xs text-gray-400 italic py-2 border-2 border-dashed border-gray-100 rounded-lg">No manuals found for this model.</div>
+                                )}
                             </div>
                             
-                            <button onClick={executeStartJob} className="w-full btn-primary">
+                            <button onClick={executeStartJob} className="w-full btn-primary h-12 shadow-brand/25">
                                 {t('continue_work')}
                             </button>
                         </div>
