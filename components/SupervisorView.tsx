@@ -7,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon, CalendarDays, Factory, Hourglass, ShieldCheck as ShieldCheckIcon } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon, CalendarDays, Factory, Hourglass, ShieldCheck as ShieldCheckIcon, Server, Database, Cpu, HardDrive } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -29,6 +29,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
     const { t, language, dir } = useLanguage();
     
+    const isAdmin = currentUser.role === UserRole.ADMIN;
+
     // Notification Toast State
     const [showToast, setShowToast] = useState(false);
     
@@ -307,6 +309,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return { mttrTrend, statusData, riskData, tcoData, financialAnalysis, topDepts, lowRepDepts, assetReputation, vendorStats };
     }, [assets, workOrders, users]);
 
+    // Admin Aggregates
+    const adminAggregates = useMemo(() => {
+        if (!isAdmin) return null;
+        const totalAssetValue = assets.reduce((sum, a) => sum + (a.purchase_cost || 0), 0);
+        const totalMaintCost = assets.reduce((sum, a) => sum + (a.accumulated_maintenance_cost || 0), 0);
+        
+        return {
+            totalAssetValue,
+            totalMaintCost,
+            recentActivity: [
+                { id: 1, user: 'Dr. Sarah', action: 'System Login', time: '2 mins ago' },
+                { id: 2, user: 'Mike Tech', action: 'Closed WO #2236', time: '15 mins ago' },
+                { id: 3, user: 'John Sup.', action: 'Restocked Inventory', time: '1 hour ago' }
+            ]
+        };
+    }, [assets, isAdmin]);
+
     // Training Data Calc
     const trainingData = useMemo(() => {
         if (!selectedTrainingDept) return null;
@@ -369,9 +388,221 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const getAssetsInZone = (deptId: string) => assets.filter(a => { const loc = getLocations().find(l => l.location_id === a.location_id); return loc?.department === deptId || (loc?.department && loc.department.includes(deptId)); });
 
     // ============================================
+    // 1. DASHBOARD VIEW (Default)
+    // ============================================
+    if (currentView === 'dashboard') {
+        return (
+            <div className="space-y-6 animate-in fade-in">
+                
+                {/* ADMIN EXECUTIVE OVERVIEW (Only for Admins) */}
+                {isAdmin && adminAggregates && (
+                    <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg mb-8 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-5">
+                            <Server size={180} />
+                        </div>
+                        <h2 className="text-xl font-bold mb-6 flex items-center gap-2 relative z-10"><ShieldCheckIcon size={24} className="text-blue-400"/> Executive Command Center</h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10">
+                            {/* Financials */}
+                            <div className="space-y-4 border-r border-white/10 pr-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-300"><DollarSign size={20}/></div>
+                                    <span className="text-sm font-medium text-slate-300">Financial Snapshot</span>
+                                </div>
+                                <div>
+                                    <div className="text-3xl font-black tracking-tight">${(adminAggregates.totalAssetValue / 1000000).toFixed(1)}M</div>
+                                    <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">Total Asset Value</div>
+                                </div>
+                                <div>
+                                    <div className="text-2xl font-bold text-red-300 tracking-tight">${(adminAggregates.totalMaintCost / 1000).toFixed(1)}k</div>
+                                    <div className="text-xs text-slate-400 uppercase tracking-wider font-bold">YTD Maintenance Spend</div>
+                                </div>
+                            </div>
+
+                            {/* System Health */}
+                            <div className="space-y-4 border-r border-white/10 pr-6">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-green-500/20 rounded-lg text-green-300"><Activity size={20}/></div>
+                                    <span className="text-sm font-medium text-slate-300">System Health</span>
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                                        <div className="flex items-center gap-2"><Database size={14} className="text-slate-400"/><span className="text-sm">Supabase DB</span></div>
+                                        <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold">Online</span>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                                        <div className="flex items-center gap-2"><BrainCircuit size={14} className="text-slate-400"/><span className="text-sm">Gemini AI</span></div>
+                                        <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded font-bold">Active</span>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-white/5 p-2 rounded-lg">
+                                        <div className="flex items-center gap-2"><Scan size={14} className="text-slate-400"/><span className="text-sm">Zebra IoT</span></div>
+                                        <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded font-bold">Standby</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Activity Log */}
+                            <div className="space-y-2">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-300"><History size={20}/></div>
+                                    <span className="text-sm font-medium text-slate-300">Recent Activity</span>
+                                </div>
+                                <div className="space-y-2">
+                                    {adminAggregates.recentActivity.map(act => (
+                                        <div key={act.id} className="flex justify-between items-center text-sm p-2 bg-white/5 rounded-lg border border-white/5">
+                                            <div>
+                                                <span className="font-bold text-white">{act.user}</span>
+                                                <span className="text-slate-400 mx-2">•</span>
+                                                <span className="text-slate-300">{act.action}</span>
+                                            </div>
+                                            <span className="text-xs text-slate-500 font-mono">{act.time}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* KPI Cards (Standard Operational) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{t('kpi_mtbf')}</p>
+                            <h3 className="text-2xl font-black text-gray-900 group-hover:text-brand transition-colors">4,250h</h3>
+                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded flex items-center w-fit gap-1 mt-1"><TrendingUp size={10}/> +12%</span>
+                        </div>
+                        <div className="w-12 h-12 rounded-xl bg-brand/5 text-brand flex items-center justify-center"><Activity size={24}/></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">{t('kpi_mttr')}</p>
+                            <h3 className="text-2xl font-black text-gray-900">3.2h</h3>
+                            <span className="text-[10px] text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded flex items-center w-fit gap-1 mt-1"><TrendingUp size={10}/> -5%</span>
+                        </div>
+                        <div className="w-12 h-12 rounded-xl bg-orange-50 text-orange-500 flex items-center justify-center"><Clock size={24}/></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Availability</p>
+                            <h3 className="text-2xl font-black text-gray-900">98.5%</h3>
+                            <span className="text-[10px] text-text-muted mt-1 block">Target: 99.0%</span>
+                        </div>
+                        <div className="w-12 h-12 rounded-xl bg-green-50 text-green-500 flex items-center justify-center"><CheckCircle2 size={24}/></div>
+                    </div>
+                    <div className="bg-white p-5 rounded-2xl shadow-soft border border-border flex items-center justify-between group hover:border-brand/30 transition-colors">
+                        <div>
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-1">Open WOs</p>
+                            <h3 className="text-2xl font-black text-gray-900">{workOrders.filter(w => w.status === 'Open').length}</h3>
+                            <span className="text-[10px] text-red-500 font-bold bg-red-50 px-1.5 py-0.5 rounded mt-1 block w-fit">Needs Attention</span>
+                        </div>
+                        <div className="w-12 h-12 rounded-xl bg-red-50 text-red-500 flex items-center justify-center"><AlertCircle size={24}/></div>
+                    </div>
+                </div>
+
+                {/* 3D Map Section */}
+                <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden flex flex-col lg:flex-row h-[600px]">
+                    <div className="flex-1 relative bg-gray-50 overflow-hidden">
+                        <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur p-2 rounded-xl shadow-sm border border-gray-200">
+                            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2"><MapPin size={16} className="text-brand"/> {t('dept_map')}</h3>
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="w-2 h-2 rounded-full bg-green-500"></span><span className="text-[10px] font-bold text-gray-500">Normal</span>
+                                <span className="w-2 h-2 rounded-full bg-red-500"></span><span className="text-[10px] font-bold text-gray-500">Issues</span>
+                            </div>
+                        </div>
+                        <div className="absolute bottom-4 left-4 z-10">
+                            <button onClick={() => setIsSimulationActive(!isSimulationActive)} className={`px-4 py-2 rounded-lg text-xs font-bold shadow-md transition-all flex items-center gap-2 ${isSimulationActive ? 'bg-brand text-white' : 'bg-white text-gray-700'}`}>
+                                <Zap size={14} className={isSimulationActive ? 'text-yellow-300' : ''}/> {isSimulationActive ? 'Simulating Live Traffic' : 'Start Simulation'}
+                            </button>
+                        </div>
+                        
+                        {/* Isometric Map Container */}
+                        <div className="w-full h-full flex items-center justify-center perspective-[1000px] overflow-auto p-10">
+                            <div className="relative w-[600px] h-[600px] transform rotate-x-60 rotate-z-45 transition-transform duration-500" style={{transformStyle: 'preserve-3d'}}>
+                                {departmentZones.map(zone => {
+                                    const zoneAssets = getAssetsInZone(zone.id);
+                                    const hasIssues = zoneAssets.some(a => a.status === AssetStatus.DOWN);
+                                    const issueCount = zoneAssets.filter(a => a.status === AssetStatus.DOWN).length;
+                                    const isSelected = selectedMapZone === zone.id;
+                                    
+                                    return (
+                                        <div 
+                                            key={zone.id}
+                                            onClick={() => setSelectedMapZone(zone.id)}
+                                            className={`absolute transition-all duration-300 cursor-pointer shadow-xl border-2 hover:-translate-y-2 group
+                                                ${isSelected ? 'border-brand z-50 translate-y-[-10px]' : hasIssues ? 'border-red-400' : 'border-white'}
+                                                ${hasIssues ? 'bg-red-50' : zone.color}
+                                            `}
+                                            style={{
+                                                left: `${zone.x}%`,
+                                                top: `${zone.y}%`,
+                                                width: `${zone.width}%`,
+                                                height: `${zone.height}%`,
+                                                transformStyle: 'preserve-3d'
+                                            }}
+                                        >
+                                            {/* Zone Label */}
+                                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                <span className={`text-xs font-black uppercase tracking-wider transform -rotate-45 ${hasIssues ? 'text-red-700' : 'text-gray-400 group-hover:text-gray-800'}`}>{zone.name}</span>
+                                            </div>
+                                            {/* Issue Bubble */}
+                                            {issueCount > 0 && (
+                                                <div className="absolute -top-3 -right-3 w-6 h-6 bg-red-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border-2 border-white shadow-md animate-bounce z-20 transform -rotate-45">
+                                                    {issueCount}
+                                                </div>
+                                            )}
+                                            {/* Asset Dots (Simulated) */}
+                                            <div className="absolute inset-0 p-1 flex flex-wrap content-start gap-0.5 opacity-50">
+                                                {zoneAssets.slice(0, 12).map((a, i) => (
+                                                    <div key={i} className={`w-1.5 h-1.5 rounded-full ${a.status === AssetStatus.DOWN ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Sidebar Details Panel */}
+                    <div className={`w-full lg:w-80 bg-white border-l border-border flex flex-col transition-all duration-300 ${selectedMapZone ? 'translate-x-0' : 'translate-x-full hidden lg:flex'}`}>
+                        {selectedMapZone ? (
+                            <div className="flex flex-col h-full">
+                                <div className="p-4 border-b border-border flex justify-between items-center bg-gray-50">
+                                    <h3 className="font-bold text-gray-900">{departmentZones.find(z => z.id === selectedMapZone)?.name} Details</h3>
+                                    <button onClick={() => setSelectedMapZone(null)}><X size={18} className="text-gray-400 hover:text-gray-600"/></button>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                    {getAssetsInZone(selectedMapZone).map(asset => (
+                                        <div key={asset.asset_id} className="p-3 bg-white border border-border rounded-xl shadow-sm hover:border-brand transition-colors cursor-pointer" onClick={() => { setSelectedAsset(asset); onNavigate('assets'); }}>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${asset.status === AssetStatus.RUNNING ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{asset.status}</span>
+                                                <span className="text-[10px] text-gray-400 font-mono">{asset.asset_id}</span>
+                                            </div>
+                                            <div className="font-bold text-sm text-gray-900">{asset.name}</div>
+                                            <div className="text-xs text-gray-500">{asset.model}</div>
+                                        </div>
+                                    ))}
+                                    {getAssetsInZone(selectedMapZone).length === 0 && <div className="text-center text-gray-400 py-8 text-sm">No assets in this zone.</div>}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400 p-6 text-center">
+                                <MapPin size={48} className="mb-4 opacity-20"/>
+                                <p className="text-sm font-medium">Select a zone on the map to view asset details.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ============================================
     // 2. ASSETS VIEW (Enhanced)
     // ============================================
     if (currentView === 'assets') {
+        // ... (rest of the file content unchanged from original)
         // Filter assets based on search
         const filteredAssets = assets.filter(asset => 
             asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
@@ -746,7 +977,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }
 
     // ============================================
-    // 3. MAINTENANCE VIEW
+    // 3. MAINTENANCE VIEW (Updated)
     // ============================================
     if (currentView === 'maintenance') {
         const filteredWOs = workOrders.filter(wo => {
