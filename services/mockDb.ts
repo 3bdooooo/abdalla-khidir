@@ -108,42 +108,42 @@ export const MOCK_ROLES: RoleDefinition[] = [
     {
         id: '1',
         name: 'Admin',
-        description: 'Full System Access',
+        description: 'Complete system control. Can manage all users, settings, and view executive analytics.',
         is_system_role: true,
         permissions: { assets: ['view', 'create', 'edit', 'delete'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit', 'delete'], reports: ['view', 'create', 'edit', 'delete'], users: ['view', 'create', 'edit', 'delete'], settings: ['view', 'create', 'edit', 'delete'] }
     },
     {
         id: '2',
         name: 'Supervisor',
-        description: 'Department & Team Management',
+        description: 'Departmental oversight. Can approve work orders, manage inventory, and view reports.',
         is_system_role: true,
         permissions: { assets: ['view', 'create', 'edit'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit'], reports: ['view', 'create'], users: ['view', 'create', 'edit'], settings: ['view'] }
     },
     {
         id: '3',
         name: 'Technician',
-        description: 'Assigned Task Execution',
+        description: 'Field execution role. Can view assigned tasks, update work order status, and log parts.',
         is_system_role: true,
         permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: ['view'], reports: [], users: [], settings: [] }
     },
     {
         id: '4',
         name: 'Nurse',
-        description: 'Fault Reporting & Verification',
+        description: 'Requester role. Can report faults, view department assets, and verify completed repairs.',
         is_system_role: true,
         permissions: { assets: ['view'], work_orders: ['view', 'create'], inventory: [], reports: [], users: [], settings: [] }
     },
     {
         id: '5',
         name: 'Vendor',
-        description: 'External Repair Access',
+        description: 'External partner access. Limited to viewing and updating assigned outsourced tasks.',
         is_system_role: true,
         permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: [], reports: [], users: [], settings: [] }
     },
     {
         id: '6',
         name: 'Inspector',
-        description: 'Compliance & History Review (Read-Only)',
+        description: 'Audit and compliance role. Read-only access to all assets, logs, and certificates.',
         is_system_role: true,
         permissions: { assets: ['view'], work_orders: ['view'], inventory: ['view'], reports: ['view'], users: ['view'], settings: ['view'] }
     }

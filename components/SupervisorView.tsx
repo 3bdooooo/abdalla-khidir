@@ -391,6 +391,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 1. DASHBOARD VIEW (Default)
     // ============================================
     if (currentView === 'dashboard') {
+        // ... (existing dashboard code) ...
         return (
             <div className="space-y-6 animate-in fade-in">
                 
@@ -599,10 +600,10 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }
 
     // ============================================
-    // 2. ASSETS VIEW (Enhanced)
+    // 2. ASSETS VIEW
     // ============================================
     if (currentView === 'assets') {
-        // ... (rest of the file content unchanged from original)
+       // ... existing code ...
         // Filter assets based on search
         const filteredAssets = assets.filter(asset => 
             asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
@@ -977,7 +978,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     }
 
     // ============================================
-    // 3. MAINTENANCE VIEW (Updated)
+    // 3. MAINTENANCE VIEW
     // ============================================
     if (currentView === 'maintenance') {
         const filteredWOs = workOrders.filter(wo => {
@@ -1709,7 +1710,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <div className="flex justify-between items-start mb-3">
                                     <div>
                                         <h3 className="font-bold text-lg text-gray-900">{role.name}</h3>
-                                        <p className="text-xs text-gray-500">{role.description}</p>
+                                        <p className="text-sm text-gray-600 mt-2 min-h-[40px] leading-relaxed">{role.description}</p>
                                     </div>
                                     {role.is_system_role && <Lock size={16} className="text-gray-400" />}
                                 </div>
