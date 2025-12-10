@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import * as api from '../services/api';
 import { LOCATIONS, getAssetDocuments } from '../services/mockDb';
 import { Priority, WorkOrderType, Asset, User, AssetStatus, WorkOrder } from '../types';
-import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star, QrCode, Camera, Lightbulb, BookOpen, ChevronDown, ChevronUp, FileText, Smartphone } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star, QrCode, Camera, Lightbulb, BookOpen, ChevronDown, ChevronUp, FileText, Smartphone, UserCheck, Clock } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface NurseViewProps {
@@ -50,6 +50,18 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
           
           // Show if pending AND in same department
           return isPending && (assetLoc?.department === userLoc?.department || true);
+      });
+  }, [workOrders, assets, user.location_id]);
+
+  // Active WOs for Technician Arrival Button
+  const activeDepartmentWOs = useMemo(() => {
+      return workOrders.filter(wo => {
+          const isActive = wo.status === 'Open' || wo.status === 'Assigned' || wo.status === 'In Progress';
+          const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+          const userLoc = LOCATIONS.find(l => l.location_id === user.location_id);
+          const assetLoc = LOCATIONS.find(l => l.location_id === asset?.location_id);
+          
+          return isActive && (assetLoc?.department === userLoc?.department || true);
       });
   }, [workOrders, assets, user.location_id]);
   
@@ -105,6 +117,11 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
     }, 2500);
   };
 
+  const handleTechArrived = (woId: number) => {
+      // Logic to log arrival time (In a real app, this updates the WO 'arrival_time' field)
+      alert(t('tech_arrived_msg').replace('{id}', woId.toString()));
+  };
+
   const openVerifyModal = (wo: WorkOrder) => {
       setSelectedWoForVerify(wo);
       setNurseSignature('');
@@ -127,7 +144,6 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
       const [expandedStep, setExpandedStep] = useState<number | null>(null);
       const docs = getAssetDocuments(asset.asset_id);
       
-      // Mock Troubleshooting Steps based on simple logic
       const steps = [
           { title: "Power Cycle Device", desc: "Turn off the device using the rear switch, wait 10 seconds, and turn it back on." },
           { title: "Check Connections", desc: "Ensure all patient cables and power cords are securely plugged in." },
@@ -313,6 +329,35 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
                 </div>
             </div>
 
+            {/* Active Requests & Technician Arrival */}
+            {activeDepartmentWOs.length > 0 && (
+                <div className="bg-white border border-orange-200 rounded-xl p-4 shadow-sm animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2 mb-3">
+                        <AlertCircle size={18} className="text-orange-500" />
+                        <h3 className="font-bold text-gray-900 text-sm">{t('active_requests')}</h3>
+                    </div>
+                    <div className="space-y-3">
+                        {activeDepartmentWOs.map(wo => {
+                            const asset = assets.find(a => a.asset_id === wo.asset_id || a.nfc_tag_id === wo.asset_id);
+                            return (
+                                <div key={wo.wo_id} className="p-3 bg-orange-50/50 rounded-lg border border-orange-100 flex justify-between items-center">
+                                    <div>
+                                        <div className="font-bold text-sm text-gray-900">{asset?.name}</div>
+                                        <div className="text-xs text-gray-500">#{wo.wo_id} • {wo.status}</div>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleTechArrived(wo.wo_id)}
+                                        className="px-3 py-2 bg-white border border-orange-200 text-orange-600 hover:bg-orange-600 hover:text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                                    >
+                                        <UserCheck size={14} /> {t('btn_tech_arrived')}
+                                    </button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* Asset List */}
             <div className="space-y-2">
                 <h3 className="text-sm font-bold text-text-muted uppercase tracking-wider ms-1 mb-2">Department Devices</h3>
@@ -329,6 +374,7 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
                             <div>
                                 <div className="font-bold text-gray-900">{asset.name}</div>
                                 <div className="text-xs text-text-muted font-medium">{asset.model}</div>
+                                {asset.control_number && <div className="text-[10px] text-gray-400 font-mono mt-0.5">{asset.control_number}</div>}
                             </div>
                         </div>
                         

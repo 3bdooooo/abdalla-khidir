@@ -37,6 +37,28 @@ export const DEVICE_IMAGES: Record<string, string> = {
     'Generic': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80' // Modern Med Background
 };
 
+// GMDN Classifications Mapping
+const DEVICE_CLASSIFICATIONS: Record<string, string> = {
+    'Magnetom Vida': 'Magnetic Resonance Imaging system, full-body',
+    'Somatom Force': 'Computed Tomography system, full-body',
+    'Mobilett Elara': 'Mobile general-purpose X-ray system',
+    'OEC Elite': 'Mobile fluoroscopic C-arm system',
+    'Voluson E10': 'General-purpose diagnostic ultrasound system',
+    'Servo-U': 'Intensive care ventilator',
+    'Drager Fabius': 'General inhalation anaesthesia system',
+    'Isolette 8000': 'Infant incubator, mobile',
+    'IntelliVue MX40': 'Multiparameter patient monitoring system',
+    'LifePak 15': 'Defibrillator/monitor, external, automated/manual',
+    'MAC 2000': 'Electrocardiograph, multichannel',
+    'Avalon FM30': 'Foetal heart rate monitor',
+    'Alaris System': 'Infusion pump, general-purpose',
+    '4008S Classix': 'Haemodialysis unit, single-patient',
+    'XN-1000': 'Haematology analyser, automated',
+    'Steris AMSCO': 'Steam steriliser, large-chamber',
+    'A-dec 500': 'Dental treatment unit',
+    'Evis X1': 'Video endoscopy system processor'
+};
+
 export const getModelImage = (model: string): string => {
     if (!model) return DEVICE_IMAGES['Generic'];
     const m = model.trim();
@@ -100,9 +122,6 @@ export const MOCK_USERS: User[] = [
   { user_id: 6, name: 'Inspector Gadget', role: UserRole.INSPECTOR, email: 'audit@hospital.com', password: 'password', location_id: 101, department: 'Quality & Compliance', phone_number: '555-0006' },
 ];
 
-// Removed extra user generation loop. 
-// We are sticking to the 6 core users defined above.
-
 // RBAC DEFINITIONS
 export const MOCK_ROLES: RoleDefinition[] = [
     {
@@ -151,13 +170,12 @@ export const MOCK_ROLES: RoleDefinition[] = [
 
 // --- VENDOR & ASSET GENERATION ---
 
-// 1. Define Vendors with Performance Profiles
 const VENDORS = [
-    { name: 'GE Healthcare', reliability: 0.95, speed: 1.2 }, // Very reliable, Fast support
+    { name: 'GE Healthcare', reliability: 0.95, speed: 1.2 }, 
     { name: 'Siemens Healthineers', reliability: 0.94, speed: 1.1 },
     { name: 'Philips Medical', reliability: 0.92, speed: 1.0 },
-    { name: 'Drager', reliability: 0.96, speed: 0.9 }, // High reliability, slightly slower
-    { name: 'Mindray', reliability: 0.85, speed: 1.1 }, // Good speed, lower reliability
+    { name: 'Drager', reliability: 0.96, speed: 0.9 }, 
+    { name: 'Mindray', reliability: 0.85, speed: 1.1 }, 
     { name: 'Getinge', reliability: 0.90, speed: 1.0 },
     { name: 'Stryker', reliability: 0.93, speed: 1.3 },
     { name: 'Olympus', reliability: 0.91, speed: 0.8 },
@@ -174,21 +192,26 @@ for (let i = 1; i <= 500; i++) {
     
     // Realistic Dates
     const currentYear = new Date().getFullYear();
-    const manufactureYear = currentYear - (i % 10) - 1; // 1-10 years old
+    const manufactureYear = currentYear - (i % 10) - 1; 
     const purchaseYear = manufactureYear + (Math.random() > 0.5 ? 0 : 1);
     const installYear = purchaseYear;
     
     const manufDate = `${manufactureYear}-${(i % 12) + 1}-15`;
     const purchDate = `${purchaseYear}-${(i % 12) + 1}-20`;
     const installDate = `${installYear}-${(i % 12) + 1}-25`;
-    const warrantyExp = `${installYear + 3}-${(i % 12) + 1}-25`; // 3 Year Warranty default
+    const warrantyExp = `${installYear + 3}-${(i % 12) + 1}-25`;
 
-    // Assign Vendor based on Model or Randomly distributed
     let vendor = VENDORS[i % VENDORS.length].name;
     if (model.includes('Magnetom') || model.includes('Somatom')) vendor = 'Siemens Healthineers';
     else if (model.includes('IntelliVue') || model.includes('EPIQ')) vendor = 'Philips Medical';
     else if (model.includes('Drager') || model.includes('Fabius')) vendor = 'Drager';
     else if (model.includes('GE') || model.includes('Voluson')) vendor = 'GE Healthcare';
+
+    // Generate Distinctive Control Number: SITE/DEPT/ID
+    const siteCode = "UMLUJ";
+    const deptCode = loc.department.substring(0, 3).toUpperCase();
+    const uniqueId = 5000 + i;
+    const controlNo = `${siteCode}/${deptCode}/${uniqueId}`;
 
     assets.push({
         asset_id: `AST-${1000 + i}`,
@@ -200,7 +223,10 @@ for (let i = 1; i <= 500; i++) {
         location_id: loc.location_id,
         status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
         
-        // NEW DATE FIELDS
+        // NEW FIELDS
+        classification: DEVICE_CLASSIFICATIONS[model] || 'General Medical Device',
+        control_number: controlNo,
+
         manufacturing_date: manufDate,
         purchase_date: purchDate,
         installation_date: installDate,
@@ -240,13 +266,10 @@ for (let i = 1; i <= 200; i++) {
     const isClosed = i > 20; 
     let type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
     
-    // VENDOR BIAS LOGIC
     const vendorProfile = VENDORS.find(v => v.name === asset.manufacturer);
     if (vendorProfile && type === WorkOrderType.CORRECTIVE) {
         if (Math.random() > vendorProfile.reliability) { 
-            // Keep Corrective
         } else {
-            // Flip to Preventive to simulate reliability (less breakdowns)
             if (Math.random() > 0.5) type = WorkOrderType.PREVENTIVE; 
         }
     }
@@ -303,7 +326,6 @@ for (let i = 1; i <= 100; i++) {
     });
 }
 
-// Exports
 export const getAssets = () => assets;
 export const getInventory = () => inventory;
 export const getWorkOrders = () => workOrders;
@@ -331,7 +353,6 @@ export const getAssetDocuments = (assetId: string): AssetDocument[] => {
 };
 
 export const findRelevantDocuments = (model: string, manufacturer: string): AssetDocument[] => {
-    // Search in the large generated list
     const matches = kbDocs.filter(d => 
         d.title.toLowerCase().includes(model.toLowerCase()) || 
         d.title.toLowerCase().includes(manufacturer.toLowerCase())

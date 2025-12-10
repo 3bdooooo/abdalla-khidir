@@ -35,6 +35,10 @@ const mapAssetFromDB = (dbAsset: any): Asset => {
         operating_hours: 0, // Default
         risk_score: 0, // Default
         image: dbAsset.image || MockDb.getModelImage(dbAsset.model_number || ''),
+        
+        // New Fields
+        classification: dbAsset.classification || 'General Medical Device',
+        control_number: dbAsset.control_number || `CN-${dbAsset.asset_id}`,
     };
 };
 

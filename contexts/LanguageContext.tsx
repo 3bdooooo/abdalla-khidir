@@ -419,7 +419,13 @@ export const translations = {
     risk_level: "Risk Level",
     next_cal_due: "Next Calibration",
     history_log: "History Log",
-    download: "Download"
+    download: "Download",
+    btn_tech_arrived: "Technician Arrived",
+    tech_arrived_msg: "Arrival time logged for Work Order #{id}.",
+    active_requests: "Active Requests",
+    no_active_requests: "No active requests at the moment.",
+    control_no: "Control No",
+    classification: "Classification"
   },
   ar: {
     appName: "A2M MED",
@@ -836,7 +842,13 @@ export const translations = {
     risk_level: "مستوى الخطر",
     next_cal_due: "المعايرة القادمة",
     history_log: "سجل العمليات",
-    download: "تحميل"
+    download: "تحميل",
+    btn_tech_arrived: "حضور الفني",
+    tech_arrived_msg: "تم تسجيل وقت وصول الفني للبلاغ رقم #{id}.",
+    active_requests: "الطلبات النشطة",
+    no_active_requests: "لا توجد طلبات نشطة حالياً.",
+    control_no: "رقم التحكم",
+    classification: "التصنيف"
   }
 };
 

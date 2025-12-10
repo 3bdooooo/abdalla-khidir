@@ -98,6 +98,10 @@ export interface Asset {
   // New Financial Fields for TCO
   purchase_cost?: number;
   accumulated_maintenance_cost?: number; // Sum of parts + labor over time
+
+  // NEW: Global Classifications & Identifiers
+  classification?: string; // e.g., GMDN Term "Diagnostic Ultrasound System"
+  control_number?: string; // Distinctive Name e.g., "UMLUJ/ER/5522"
 }
 
 // Incident/Trouble Ticket Table
