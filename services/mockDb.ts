@@ -23,6 +23,8 @@ export const LOCATIONS: Location[] = [
     { location_id: 1301, name: 'Sterilization', department: 'CSSD', building: 'Basement', room: 'CSSD-01' },
     { location_id: 1401, name: 'Rehab Gym', department: 'Physical Therapy', building: 'South Wing', room: 'PT-01' },
     { location_id: 1501, name: 'Ent Suite', department: 'ENT', building: 'Clinic Block', room: 'ENT-01' },
+    { location_id: 1601, name: 'Dental Chair 1', department: 'Dental', building: 'Clinic Block', room: 'DENT-01' },
+    { location_id: 1701, name: 'Admin Office', department: 'Administration', building: 'Admin Block', room: 'ADM-01' },
 ];
 
 export const DEVICE_CATALOG = [
@@ -36,6 +38,9 @@ export const DEVICE_CATALOG = [
     { name: 'Defibrillator', model: 'LifePak 15', manufacturer: 'Stryker', image: 'https://images.unsplash.com/photo-1584362917165-52e812c2085e?auto=format&fit=crop&q=80&w=300' },
     { name: 'Incubator', model: 'Isolette 8000', manufacturer: 'Drager', image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=300' },
     { name: 'ECG Machine', model: 'MAC 5500', manufacturer: 'GE Healthcare', image: 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?auto=format&fit=crop&q=80&w=300' },
+    { name: 'C-Arm', model: 'OEC Elite', manufacturer: 'GE Healthcare', image: 'https://images.unsplash.com/photo-1530497610245-94d3c16cda28?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Dental Chair', model: 'A-dec 500', manufacturer: 'A-dec', image: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Endoscope', model: 'Evis Exera III', manufacturer: 'Olympus', image: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&q=80&w=300' },
 ];
 
 export const MOCK_USERS: User[] = [
@@ -59,36 +64,88 @@ export const MOCK_ROLES: RoleDefinition[] = [
 ];
 
 // Mock Data Generators
-const generateAssets = (): Asset[] => [
-    {
-        asset_id: 'AST-1001', nfc_tag_id: 'NFC-1001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens',
-        serial_number: 'SN-998877', location_id: 301, status: AssetStatus.RUNNING,
-        manufacturing_date: '2020-01-01', purchase_date: '2020-06-01', installation_date: '2020-06-15', warranty_expiration: '2025-06-15',
-        expected_lifespan: 10, operating_hours: 14500, risk_score: 15, purchase_cost: 1500000, accumulated_maintenance_cost: 45000,
-        image: 'https://images.unsplash.com/photo-1516549655169-df83a092dd14?auto=format&fit=crop&q=80&w=300'
-    },
-    {
-        asset_id: 'AST-1002', nfc_tag_id: 'NFC-1002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge',
-        serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING,
-        manufacturing_date: '2021-03-01', purchase_date: '2021-04-01', installation_date: '2021-04-05', warranty_expiration: '2024-04-05',
-        expected_lifespan: 7, operating_hours: 8200, risk_score: 5, purchase_cost: 45000, accumulated_maintenance_cost: 2100,
-        image: 'https://images.unsplash.com/photo-1584036561566-b93a9499d6d3?auto=format&fit=crop&q=80&w=300'
-    },
-    {
-        asset_id: 'AST-1003', nfc_tag_id: 'NFC-1003', name: 'Infusion Pump', model: 'Alaris PC', manufacturer: 'BD',
-        serial_number: 'SN-445566', location_id: 101, status: AssetStatus.DOWN,
-        manufacturing_date: '2019-11-01', purchase_date: '2020-01-10', installation_date: '2020-01-15', warranty_expiration: '2023-01-15',
-        expected_lifespan: 5, operating_hours: 22000, risk_score: 85, purchase_cost: 3500, accumulated_maintenance_cost: 1200,
-        image: 'https://images.unsplash.com/photo-1583946099397-9954d183d237?auto=format&fit=crop&q=80&w=300'
-    },
-     {
-        asset_id: 'AST-1004', nfc_tag_id: 'NFC-1004', name: 'Patient Monitor', model: 'Intellivue MX800', manufacturer: 'Philips',
-        serial_number: 'SN-778899', location_id: 102, status: AssetStatus.UNDER_MAINT,
-        manufacturing_date: '2022-01-01', purchase_date: '2022-02-01', installation_date: '2022-02-05', warranty_expiration: '2025-02-05',
-        expected_lifespan: 8, operating_hours: 4500, risk_score: 30, purchase_cost: 12000, accumulated_maintenance_cost: 500,
-        image: 'https://plus.unsplash.com/premium_photo-1661766569022-1b7f918ac3f3?auto=format&fit=crop&q=80&w=300'
-    }
-];
+const generateAssets = (): Asset[] => {
+    // 1. Core fixed assets to ensure test consistency
+    const coreAssets: Asset[] = [
+        {
+            asset_id: 'AST-1001', nfc_tag_id: 'NFC-1001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens',
+            serial_number: 'SN-998877', location_id: 301, status: AssetStatus.RUNNING,
+            manufacturing_date: '2020-01-01', purchase_date: '2020-06-01', installation_date: '2020-06-15', warranty_expiration: '2025-06-15',
+            expected_lifespan: 10, operating_hours: 14500, risk_score: 15, purchase_cost: 1500000, accumulated_maintenance_cost: 45000,
+            image: 'https://images.unsplash.com/photo-1516549655169-df83a092dd14?auto=format&fit=crop&q=80&w=300',
+            control_number: 'RAD/MRI/001', classification: 'Diagnostic Imaging'
+        },
+        {
+            asset_id: 'AST-1002', nfc_tag_id: 'NFC-1002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge',
+            serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING,
+            manufacturing_date: '2021-03-01', purchase_date: '2021-04-01', installation_date: '2021-04-05', warranty_expiration: '2024-04-05',
+            expected_lifespan: 7, operating_hours: 8200, risk_score: 5, purchase_cost: 45000, accumulated_maintenance_cost: 2100,
+            image: 'https://images.unsplash.com/photo-1584036561566-b93a9499d6d3?auto=format&fit=crop&q=80&w=300',
+            control_number: 'ICU/VENT/005', classification: 'Life Support'
+        },
+        {
+            asset_id: 'AST-1003', nfc_tag_id: 'NFC-1003', name: 'Infusion Pump', model: 'Alaris PC', manufacturer: 'BD',
+            serial_number: 'SN-445566', location_id: 101, status: AssetStatus.DOWN,
+            manufacturing_date: '2019-11-01', purchase_date: '2020-01-10', installation_date: '2020-01-15', warranty_expiration: '2023-01-15',
+            expected_lifespan: 5, operating_hours: 22000, risk_score: 85, purchase_cost: 3500, accumulated_maintenance_cost: 1200,
+            image: 'https://images.unsplash.com/photo-1583946099397-9954d183d237?auto=format&fit=crop&q=80&w=300',
+            control_number: 'ICU/PUMP/012', classification: 'Therapeutic'
+        },
+         {
+            asset_id: 'AST-1004', nfc_tag_id: 'NFC-1004', name: 'Patient Monitor', model: 'Intellivue MX800', manufacturer: 'Philips',
+            serial_number: 'SN-778899', location_id: 102, status: AssetStatus.UNDER_MAINT,
+            manufacturing_date: '2022-01-01', purchase_date: '2022-02-01', installation_date: '2022-02-05', warranty_expiration: '2025-02-05',
+            expected_lifespan: 8, operating_hours: 4500, risk_score: 30, purchase_cost: 12000, accumulated_maintenance_cost: 500,
+            image: 'https://plus.unsplash.com/premium_photo-1661766569022-1b7f918ac3f3?auto=format&fit=crop&q=80&w=300',
+            control_number: 'ICU/MON/003', classification: 'Monitoring'
+        }
+    ];
+
+    const generatedAssets: Asset[] = [];
+    let idCounter = 1005;
+
+    // 2. Loop through ALL locations to ensure coverage
+    LOCATIONS.forEach(loc => {
+        // Skip locations already covered by core assets if desired, or just add more
+        // Add 5-8 assets per department
+        const count = 5 + Math.floor(Math.random() * 4); 
+        
+        for (let i = 0; i < count; i++) {
+            const type = DEVICE_CATALOG[Math.floor(Math.random() * DEVICE_CATALOG.length)];
+            const year = 2018 + Math.floor(Math.random() * 6);
+            const statusRoll = Math.random();
+            let status = AssetStatus.RUNNING;
+            if (statusRoll > 0.92) status = AssetStatus.DOWN;
+            else if (statusRoll > 0.85) status = AssetStatus.UNDER_MAINT;
+
+            generatedAssets.push({
+                asset_id: `AST-${idCounter}`,
+                nfc_tag_id: `NFC-${idCounter}`,
+                name: type.name,
+                model: type.model,
+                manufacturer: type.manufacturer,
+                serial_number: `SN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+                location_id: loc.location_id,
+                status: status,
+                manufacturing_date: `${year}-01-01`,
+                purchase_date: `${year}-06-01`,
+                installation_date: `${year}-06-15`,
+                warranty_expiration: `${year + 5}-06-15`,
+                expected_lifespan: 8 + Math.floor(Math.random() * 5),
+                operating_hours: Math.floor(Math.random() * 15000),
+                risk_score: Math.floor(Math.random() * 100),
+                purchase_cost: 5000 + Math.floor(Math.random() * 50000),
+                accumulated_maintenance_cost: Math.floor(Math.random() * 5000),
+                image: type.image,
+                control_number: `${loc.department.substring(0,3).toUpperCase()}/${type.name.substring(0,3).toUpperCase()}/${idCounter}`,
+                classification: 'General Medical'
+            });
+            idCounter++;
+        }
+    });
+
+    return [...coreAssets, ...generatedAssets];
+};
 
 const generateInventory = (): InventoryPart[] => [
     { part_id: 1, part_name: 'Flow Sensor', current_stock: 5, min_reorder_level: 10, cost: 150 },
@@ -96,6 +153,11 @@ const generateInventory = (): InventoryPart[] => [
     { part_id: 3, part_name: 'Battery Pack (Li-Ion)', current_stock: 2, min_reorder_level: 3, cost: 200 },
     { part_id: 4, part_name: 'Patient Circuit', current_stock: 50, min_reorder_level: 20, cost: 15 },
     { part_id: 5, part_name: 'ECG Lead Set', current_stock: 12, min_reorder_level: 10, cost: 85 },
+    { part_id: 6, part_name: 'SpO2 Sensor', current_stock: 8, min_reorder_level: 15, cost: 120 },
+    { part_id: 7, part_name: 'NIBP Cuff (Adult)', current_stock: 30, min_reorder_level: 10, cost: 25 },
+    { part_id: 8, part_name: 'Main Board PCB', current_stock: 1, min_reorder_level: 2, cost: 1200 },
+    { part_id: 9, part_name: 'Power Supply Unit', current_stock: 3, min_reorder_level: 3, cost: 450 },
+    { part_id: 10, part_name: 'Touch Screen Assembly', current_stock: 2, min_reorder_level: 2, cost: 800 },
 ];
 
 const generateWorkOrders = (): WorkOrder[] => [
@@ -169,7 +231,11 @@ export const getKnowledgeBaseDocs = () => [
     { id: 'KB-001', title: 'Servo-U Service Manual', tags: ['ventilator', 'getinge'] },
     { id: 'KB-002', title: 'Magnetom Vida Troubleshooting', tags: ['mri', 'siemens'] },
     { id: 'KB-003', title: 'Alaris PC Pump Maintenance', tags: ['pump', 'bd'] },
-    { id: 'KB-004', title: 'Intellivue MX800 Config Guide', tags: ['monitor', 'philips'] }
+    { id: 'KB-004', title: 'Intellivue MX800 Config Guide', tags: ['monitor', 'philips'] },
+    { id: 'KB-005', title: 'Aisys CS2 Anesthesia Machine Technical Reference', tags: ['anesthesia', 'ge'] },
+    { id: 'KB-006', title: 'Voluson E10 User Manual', tags: ['ultrasound', 'ge'] },
+    { id: 'KB-007', title: 'LifePak 15 Service Manual', tags: ['defibrillator', 'stryker'] },
+    { id: 'KB-008', title: 'Isolette 8000 Maintenance Guide', tags: ['incubator', 'drager'] }
 ];
 
 // Reports
