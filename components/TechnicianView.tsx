@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Asset, InventoryPart, WorkOrder, AssetDocument, WorkOrderType, Priority, User } from '../types';
-import { analyzeRootCause, suggestDiagnosisAndParts } from '../services/geminiService';
+import { suggestDiagnosisAndParts } from '../services/geminiService';
 import { analyzeHistoricalPatterns, HistoricalInsight } from '../services/predictiveService';
 import { getAssets, getAssetDocuments, findRelevantDocuments } from '../services/mockDb';
 import * as api from '../services/api';
-import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Clock, Box, Eye, CheckCircle2, Search, AlertTriangle, ListChecks, ClipboardList, CheckSquare, Image as ImageIcon, BookOpen, FileCheck, Filter, Activity, Briefcase, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit, History, User as UserIcon } from 'lucide-react';
+import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Box, Eye, CheckCircle2, Search, ClipboardList, BookOpen, Activity, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit, History, User as UserIcon } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TechnicianProps {
@@ -20,13 +20,13 @@ interface TechnicianProps {
 export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWorkOrders, allWorkOrders, users, inventory, refreshData }) => {
     // State Management
     const [selectedWO, setSelectedWO] = useState<WorkOrder | null>(null);
-    const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); // Explicitly typed
+    const [pendingWO, setPendingWO] = useState<WorkOrder | null>(null); 
     const [dashboardTab, setDashboardTab] = useState<'requests' | 'inprogress' | 'pms'>('requests');
     const [filterPriority, setFilterPriority] = useState<string>('All');
     const [filterStatus, setFilterStatus] = useState<string>('All');
     const [filterType, setFilterType] = useState<string>('All');
     const [activeDetailTab, setActiveDetailTab] = useState<'diagnosis' | 'parts' | 'visual' | 'history' | 'finish'>('diagnosis');
-    const { t, dir } = useLanguage();
+    const { t } = useLanguage();
     
     // Detail View State
     const [symptoms, setSymptoms] = useState('');
@@ -71,7 +71,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         return assets.find(a => a.asset_id === assetId || a.nfc_tag_id === assetId);
     };
 
-    // Derived State for Pending WO Asset (Fix for TS Error)
     const pendingAsset = pendingWO ? getAssetForWO(pendingWO.asset_id) : null;
 
     // Reset state when WO is selected
@@ -120,16 +119,15 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
     const handleStartJob = async (e: React.MouseEvent, wo: WorkOrder, method: 'nfc' | 'qr' = 'nfc') => { 
         e.stopPropagation(); 
-        setPendingWO(wo); // Set pending, don't switch view yet
+        setPendingWO(wo); 
         setScanType(method);
         
-        const currentWoId = wo.wo_id; 
         const currentAssetId = wo.asset_id; 
         
         setIsStartingJob(true);
         setScanState('scanning');
 
-        // 1. Simulate NFC Scan Delay
+        // 1. Simulate Delay
         await new Promise(resolve => setTimeout(resolve, method === 'qr' ? 2500 : 1500));
         setScanState('locating');
 
@@ -152,13 +150,12 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     smartMatches.forEach(doc => { if (!existingTitles.has(doc.title)) foundDocs.push(doc); });
                 }
                 
-                // ALWAYS show modal for confirmation before starting
                 setAssetDocs(foundDocs || []); 
                 setShowDocsModal(true);
-                setIsStartingJob(false); // Hide scan overlay
+                setIsStartingJob(false); 
             },
-            async (error) => {
-                // Fallback (Geolocation failed but still try to find docs)
+            async () => {
+                // Fallback (Geolocation failed)
                 const asset = getAssets().find(a => a.asset_id === currentAssetId || a.nfc_tag_id === currentAssetId);
                 let foundDocs = getAssetDocuments(currentAssetId);
                 if (asset) {
@@ -183,7 +180,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
         const model = asset?.model || 'Generic';
         const name = asset?.name || 'Unknown Device';
 
-        // 1. Generative AI Analysis
+        // 1. Generative AI
         const result = await suggestDiagnosisAndParts(name, model, symptoms, inventory);
         setRootCause(result.rootCause);
         if (result.recommendedPart && result.recommendedPart !== "None") {
@@ -191,8 +188,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
             setPartsSearch(result.recommendedPart);
         }
 
-        // 2. Historical Analysis (Smart Engineering Assistant)
-        // Note: Using the passed 'allWorkOrders' for broader context
+        // 2. Historical
         const history = analyzeHistoricalPatterns(model, symptoms, allWorkOrders);
         setHistoricalInsight(history);
 
@@ -234,7 +230,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     // --- FILTERING LOGIC ---
     const filteredOrders = userWorkOrders.filter(wo => { 
         let matchesTab = false; 
-        // 1. Tab Logic
         if (dashboardTab === 'requests') {
             matchesTab = (wo.status === 'Open' || wo.status === 'Assigned') && wo.type === WorkOrderType.CORRECTIVE;
         } else if (dashboardTab === 'inprogress') {
@@ -252,7 +247,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     
     const filteredInventory = inventory.filter(p => p.part_name.toLowerCase().includes(partsSearch.toLowerCase()));
 
-    // Get asset history for selected WO
     const assetHistory = selectedWO ? allWorkOrders.filter(wo => 
         (wo.asset_id === selectedWO.asset_id || wo.asset_id === selectedWO.asset_id.replace('NFC-', 'AST-')) && 
         wo.status === 'Closed' &&
@@ -262,7 +256,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     // --- DASHBOARD RENDER ---
     if (!selectedWO) {
         return (
-            <div className="space-y-6 pb-20 font-sans animate-in fade-in">
+            <div className="space-y-6 pb-24 font-sans animate-in fade-in">
                 {/* Header */}
                 <div className="flex items-center justify-between px-1">
                     <div>
@@ -293,13 +287,21 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                    <select className="input-modern w-auto py-2 text-xs" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                    <select className="input-modern w-auto py-2 text-xs shrink-0" value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
                         <option value="All">{t('filter_all')} {t('priority')}</option>
-                        <option value={Priority.HIGH}>{Priority.HIGH}</option>
                         <option value={Priority.CRITICAL}>{Priority.CRITICAL}</option>
+                        <option value={Priority.HIGH}>{Priority.HIGH}</option>
+                        <option value={Priority.MEDIUM}>{Priority.MEDIUM}</option>
+                        <option value={Priority.LOW}>{Priority.LOW}</option>
                     </select>
-                    <select className="input-modern w-auto py-2 text-xs" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
+                    <select className="input-modern w-auto py-2 text-xs shrink-0" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+                        <option value="All">{t('filter_all')} {t('status')}</option>
+                        <option value="Open">{t('wo_status_open')}</option>
+                        <option value="In Progress">{t('wo_status_inprogress')}</option>
+                        <option value="Assigned">{t('wo_status_assigned')}</option>
+                    </select>
+                    <select className="input-modern w-auto py-2 text-xs shrink-0" value={filterType} onChange={(e) => setFilterType(e.target.value)}>
                         <option value="All">{t('filter_all')} {t('type')}</option>
                         <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
                         <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
@@ -321,7 +323,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                             
                             return (
                                 <div key={wo.wo_id} className="bg-white rounded-2xl p-5 border border-border shadow-soft hover:shadow-md transition-all group relative overflow-hidden">
-                                    {/* Priority Stripe */}
                                     <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${wo.priority === Priority.CRITICAL ? 'bg-danger' : wo.priority === Priority.HIGH ? 'bg-warning' : 'bg-success'}`}></div>
                                     
                                     <div className="pl-3">
@@ -409,27 +410,29 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                         ))}
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('type')}</label>
-                                    <select 
-                                        className="input-modern"
-                                        value={newWO.type}
-                                        onChange={e => setNewWO({...newWO, type: e.target.value as WorkOrderType})}
-                                    >
-                                        <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
-                                        <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
-                                        <option value={WorkOrderType.CALIBRATION}>{WorkOrderType.CALIBRATION}</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('priority')}</label>
-                                    <select 
-                                        className="input-modern"
-                                        value={newWO.priority}
-                                        onChange={e => setNewWO({...newWO, priority: e.target.value as Priority})}
-                                    >
-                                        {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
-                                    </select>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('type')}</label>
+                                        <select 
+                                            className="input-modern"
+                                            value={newWO.type}
+                                            onChange={e => setNewWO({...newWO, type: e.target.value as WorkOrderType})}
+                                        >
+                                            <option value={WorkOrderType.CORRECTIVE}>{WorkOrderType.CORRECTIVE}</option>
+                                            <option value={WorkOrderType.PREVENTIVE}>{WorkOrderType.PREVENTIVE}</option>
+                                            <option value={WorkOrderType.CALIBRATION}>{WorkOrderType.CALIBRATION}</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('priority')}</label>
+                                        <select 
+                                            className="input-modern"
+                                            value={newWO.priority}
+                                            onChange={e => setNewWO({...newWO, priority: e.target.value as Priority})}
+                                        >
+                                            {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                        </select>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('wo_description')}</label>
@@ -477,7 +480,6 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                 {showDocsModal && pendingWO && (
                     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
-                            {/* Asset Identity Header */}
                             <div className="flex flex-col items-center mb-6">
                                  <div className="w-20 h-20 bg-gray-100 rounded-xl mb-3 overflow-hidden border border-gray-200">
                                      {pendingAsset?.image ? <img src={pendingAsset.image} className="w-full h-full object-cover"/> : <Box size={32} className="m-auto text-gray-400"/>}
@@ -518,26 +520,25 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     // --- DETAIL VIEW ---
     const asset = selectedWO ? getAssetForWO(selectedWO.asset_id) : null;
     
-    // ... Detail JSX ...
     return (
-        <div className="min-h-screen pb-20 font-sans">
-             {/* Header */}
-             <div className="bg-white border-b border-border sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-sm/50 backdrop-blur-md bg-white/90">
+        <div className="min-h-screen pb-32 font-sans bg-gray-50 -mx-4 -mt-4 sm:mx-0 sm:mt-0 sm:rounded-2xl">
+             {/* Sticky Header */}
+             <div className="bg-white border-b border-border sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-sm backdrop-blur-md bg-white/95">
                  <button onClick={() => setSelectedWO(null)} className="p-2 -ml-2 hover:bg-gray-100 rounded-lg text-text-muted flex items-center gap-1">
                      <ChevronLeft size={20} className="rtl:rotate-180"/> <span className="text-sm font-bold">{t('back')}</span>
                  </button>
                  <div className="text-center">
-                     <div className="text-xs font-bold text-text-muted uppercase tracking-wider">#{selectedWO?.wo_id}</div>
+                     <div className="text-[10px] font-bold text-text-muted uppercase tracking-wider">#{selectedWO?.wo_id}</div>
                      <div className="font-bold text-gray-900 text-sm">{selectedWO?.type}</div>
                  </div>
-                 <div className="w-10"></div>
+                 <div className="w-8"></div>
              </div>
 
-             <div className="p-4 max-w-3xl mx-auto space-y-6 animate-in slide-in-from-right-4">
+             <div className="p-4 max-w-3xl mx-auto space-y-4 animate-in slide-in-from-right-4">
                  {/* Asset Card */}
                  <div className="bg-white p-4 rounded-2xl border border-border shadow-sm flex gap-4">
-                     <div className="w-16 h-16 bg-gray-50 rounded-xl border border-border flex items-center justify-center shrink-0">
-                         {asset?.image ? <img src={asset.image} className="w-full h-full object-cover rounded-xl"/> : <Box size={24} className="text-gray-400"/>}
+                     <div className="w-16 h-16 bg-gray-50 rounded-xl border border-border flex items-center justify-center shrink-0 overflow-hidden">
+                         {asset?.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Box size={24} className="text-gray-400"/>}
                      </div>
                      <div>
                          <h3 className="font-bold text-gray-900">{asset?.name}</h3>
@@ -549,18 +550,18 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                  </div>
 
                  {/* Tabs */}
-                 <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto">
+                 <div className="flex bg-white p-1 rounded-xl border border-border shadow-sm overflow-x-auto scrollbar-hide">
                      {[
                          {id: 'diagnosis', label: t('tab_diagnosis'), icon: Activity},
                          {id: 'parts', label: t('tab_parts'), icon: Box},
                          {id: 'visual', label: t('step_visual'), icon: Eye},
-                         {id: 'history', label: t('maintenance_history'), icon: History}, // Added History Tab
+                         {id: 'history', label: t('maintenance_history'), icon: History},
                          {id: 'finish', label: t('tab_finish'), icon: CheckCircle2}
                      ].map(tab => (
                          <button
                             key={tab.id}
                             onClick={() => setActiveDetailTab(tab.id as any)}
-                            className={`flex-1 min-w-[90px] py-3 text-sm font-bold rounded-lg flex flex-col items-center gap-1 transition-all ${activeDetailTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
+                            className={`flex-1 min-w-[80px] py-3 text-xs font-bold rounded-lg flex flex-col items-center gap-1 transition-all shrink-0 ${activeDetailTab === tab.id ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}
                          >
                              <tab.icon size={18}/>
                              {tab.label}
@@ -607,7 +608,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                          <span className="opacity-70 font-normal text-xs ml-1">based on {asset?.model}</span>
                                      </button>
                                      
-                                     {/* SMART ENGINEERING ASSISTANT (HISTORICAL) */}
+                                     {/* SMART ENGINEERING ASSISTANT */}
                                      {historicalInsight && historicalInsight.similarCasesCount > 0 && (
                                          <div className="p-4 bg-teal-50 rounded-xl border border-teal-100 animate-in slide-in-from-top-2 space-y-3">
                                              <div className="flex items-center gap-2 mb-2 pb-2 border-b border-teal-100">
@@ -743,23 +744,17 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                                  
                                  {/* AR Overlays */}
                                  <div className="absolute inset-0 pointer-events-none">
-                                     {/* Grid */}
                                      <div className="w-full h-full" style={{backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '20px 20px'}}></div>
-                                     
-                                     {/* Target Box */}
                                      <div className="absolute top-1/4 left-1/4 w-1/2 h-1/2 border-2 border-brand/50 rounded-lg animate-pulse flex items-center justify-center">
                                          <div className="absolute -top-3 -left-3 w-6 h-6 border-t-2 border-l-2 border-brand"></div>
                                          <div className="absolute -bottom-3 -right-3 w-6 h-6 border-b-2 border-r-2 border-brand"></div>
                                      </div>
-
-                                     {/* Data Tag */}
                                      <div className="absolute top-1/4 right-1/4 translate-x-1/2 -translate-y-1/2 bg-black/70 backdrop-blur text-white p-2 rounded-lg border border-white/20 text-xs">
                                          <div className="font-bold text-brand">{asset?.model}</div>
                                          <div>Status: Analyzed</div>
                                      </div>
                                  </div>
 
-                                 {/* AR Context Message */}
                                  <div className="absolute bottom-4 left-4 right-4 bg-white/90 backdrop-blur p-3 rounded-xl border border-white/40 shadow-lg animate-in slide-in-from-bottom-2">
                                      <div className="flex gap-3">
                                          <div className="w-10 h-10 bg-brand text-white rounded-full flex items-center justify-center shrink-0 shadow-glow">
@@ -775,7 +770,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                          </div>
                      )}
 
-                     {/* 4. HISTORY (NEW) */}
+                     {/* 4. HISTORY */}
                      {activeDetailTab === 'history' && (
                          <div className="space-y-4 animate-in fade-in h-full overflow-y-auto max-h-[400px] pr-2">
                              <h4 className="font-bold text-gray-900 mb-2 flex items-center gap-2">
@@ -856,8 +851,8 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                      )}
                  </div>
 
-                 {/* ACTION BAR */}
-                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-40">
+                 {/* ACTION BAR (High Z-Index to overlap Mobile Nav) */}
+                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-border shadow-[0_-4px_20px_rgba(0,0,0,0.05)] z-[60]">
                      <div className="max-w-3xl mx-auto flex gap-4">
                          {activeDetailTab !== 'finish' ? (
                              <button 
@@ -885,7 +880,7 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
 
              {/* Confirmation Modal */}
              {showConfirmModal && (
-                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                 <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
                      <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95">
                          <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4">
                              <Check size={32}/>
