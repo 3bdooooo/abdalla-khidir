@@ -59,6 +59,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // Inventory State
     const [restockModalOpen, setRestockModalOpen] = useState(false);
     const [selectedPartForRestock, setSelectedPartForRestock] = useState<InventoryPart | null>(null);
+    const [restockQty, setRestockQty] = useState(0);
+    const [showRestockConfirm, setShowRestockConfirm] = useState(false);
     
     // Reporting State
     const [reportType, setReportType] = useState<'CM' | 'PPM' | 'COMPLIANCE'>('CM');
@@ -72,6 +74,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [maintenanceViewMode, setMaintenanceViewMode] = useState<'kanban' | 'list'>('kanban');
     const [maintenanceFilterPriority, setMaintenanceFilterPriority] = useState<string>('all');
     const [maintenanceFilterStatus, setMaintenanceFilterStatus] = useState<string>('all');
+    const [maintenanceFilterTechnician, setMaintenanceFilterTechnician] = useState<string>('all');
+    const [maintenanceFilterAsset, setMaintenanceFilterAsset] = useState<string>('');
 
     const [isCreateWOModalOpen, setIsCreateWOModalOpen] = useState(false);
     const [newWOForm, setNewWOForm] = useState({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
@@ -114,6 +118,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const currentAudit = activeAuditRef.current;
         if (!currentAudit) return;
         const cleanId = scannedId.trim();
+        // If missing, move to found
         if (currentAudit.missing_assets.includes(cleanId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
@@ -144,7 +149,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (rfidTabRef.current === 'audit') {
             handleRealScan(scannedTag);
         } else if (rfidTabRef.current === 'gate') {
-            handleGateScan(scannedTag, 101);
+            handleGateScan(scannedTag, 101); // Simulate Gate 101 for now
         }
     }, [handleRealScan, handleGateScan]);
 
@@ -182,6 +187,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (currentView !== 'rfid') setIsGateMonitoring(false);
     }, [currentView]);
 
+    // Dashboard Simulation Effect
     useEffect(() => { 
         let interval: ReturnType<typeof setInterval>; 
         if (isSimulationActive && currentView === 'dashboard') { 
@@ -201,6 +207,31 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         } 
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
+
+    // Gate Monitor Simulation Effect
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
+            interval = setInterval(() => {
+                // Randomly pick a reader to come online/ping
+                setGateReaders(prev => prev.map(r => ({
+                    ...r,
+                    status: Math.random() > 0.1 ? 'online' : 'offline',
+                    lastPing: new Date().toLocaleTimeString()
+                })));
+
+                // Randomly trigger a scan
+                if (Math.random() > 0.7) {
+                    const randomAsset = assets[Math.floor(Math.random() * assets.length)];
+                    const randomGate = gateReaders[Math.floor(Math.random() * gateReaders.length)];
+                    handleGateScan(randomAsset.asset_id, randomGate.id);
+                }
+            }, 2000);
+        } else {
+            setGateReaders(prev => prev.map(r => ({ ...r, status: 'offline' })));
+        }
+        return () => clearInterval(interval);
+    }, [isGateMonitoring, currentView, rfidTab, assets, handleGateScan]);
 
     // Analytics Calculations
     const analyticsData = useMemo(() => {
@@ -318,7 +349,26 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             return { year, amount: replacementCost };
         });
 
-        return { mttrTrend, vendorData, tcoData, technicianStats, costAnalysis, budgetForecast };
+        // 7. User Error Analysis (Mock)
+        const userErrors = workOrders
+            .filter(wo => wo.failure_type === 'UserError')
+            .reduce((acc, wo) => {
+                const asset = assets.find(a => a.asset_id === wo.asset_id);
+                if (asset) {
+                    const loc = getLocations().find(l => l.location_id === asset.location_id);
+                    const dept = loc?.department || 'Unknown';
+                    acc[dept] = (acc[dept] || 0) + 1;
+                }
+                return acc;
+            }, {} as Record<string, number>);
+        
+        const trainingData = Object.entries(userErrors).map(([dept, count]) => ({
+            department: dept,
+            errors: count,
+            recommendation: count > 2 ? 'Schedule Training' : 'Monitor'
+        }));
+
+        return { mttrTrend, vendorData, tcoData, technicianStats, costAnalysis, budgetForecast, trainingData };
     }, [workOrders, users, assets, inventory]);
 
     // --- ACTIONS ---
@@ -344,6 +394,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         setIsAddModalOpen(false);
     };
 
+    const handleCreateWO = async () => {
+        if (!newWOForm.assetId) return;
+        await api.createWorkOrder({
+            wo_id: Math.floor(Math.random() * 100000),
+            asset_id: newWOForm.assetId,
+            type: newWOForm.type,
+            priority: newWOForm.priority,
+            description: newWOForm.description,
+            assigned_to_id: newWOForm.assignedToId ? parseInt(newWOForm.assignedToId) : undefined as any,
+            status: newWOForm.assignedToId ? 'Assigned' : 'Open',
+            created_at: new Date().toISOString()
+        } as WorkOrder);
+        refreshData();
+        setIsCreateWOModalOpen(false);
+        setNewWOForm({ assetId: '', type: WorkOrderType.CORRECTIVE, priority: Priority.MEDIUM, description: '', assignedToId: '' });
+    };
+
     const handleAssign = async (wo: WorkOrder) => {
         if (!users || users.length === 0) return;
         setSelectedWOForAssignment(wo);
@@ -366,6 +433,19 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         }
     };
 
+    const handleRestock = async () => {
+        if (!selectedPartForRestock || restockQty <= 0) return;
+        if (restockQty > 50 && !showRestockConfirm) {
+            setShowRestockConfirm(true);
+            return;
+        }
+        await api.restockPart(selectedPartForRestock.part_id, restockQty);
+        refreshData();
+        setRestockModalOpen(false);
+        setRestockQty(0);
+        setShowRestockConfirm(false);
+    };
+
     const handleStartAudit = (dept: string) => {
         if (!dept) return;
         const deptAssets = assets.filter(a => getLocationName(a.location_id).includes(dept));
@@ -381,6 +461,13 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             found_assets: [],
             status: 'In Progress'
         });
+    };
+
+    const handleSimulateScan = () => {
+        if (activeAudit && activeAudit.missing_assets.length > 0) {
+            const nextAssetId = activeAudit.missing_assets[0];
+            handleRealScan(nextAssetId);
+        }
     };
 
     const handleAiSearch = async () => {
@@ -417,6 +504,17 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         });
     };
 
+    const handleAddUserSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (onAddUser) {
+            onAddUser({
+                user_id: Math.floor(Math.random() * 10000),
+                ...newUserForm
+            } as any);
+        }
+        setIsAddUserModalOpen(false);
+    };
+
     // --- RENDER SECTIONS ---
 
     // 1. DASHBOARD
@@ -449,6 +547,36 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </button>
                     </div>
                 </div>
+
+                {/* Admin Only: Executive Overview */}
+                {isAdmin && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2 animate-in fade-in">
+                        <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg flex items-center justify-between">
+                            <div>
+                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">System Health</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                                    <span className="font-bold">Online</span>
+                                </div>
+                            </div>
+                            <Server size={24} className="text-slate-500"/>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Financial Exposure</p>
+                                <h4 className="font-black text-xl text-gray-900 mt-1">$4.2M</h4>
+                            </div>
+                            <Coins size={24} className="text-brand"/>
+                        </div>
+                        <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
+                            <div>
+                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Active Users</p>
+                                <h4 className="font-black text-xl text-gray-900 mt-1">{users.length}</h4>
+                            </div>
+                            <UsersIcon size={24} className="text-green-500"/>
+                        </div>
+                    </div>
+                )}
 
                 {/* KPI Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -603,20 +731,20 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
         if (selectedAsset) {
             return (
-                <div className="max-w-5xl mx-auto space-y-6">
+                <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-right-4">
                     {/* Header */}
                     <div className="flex items-center justify-between">
                         <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-gray-500 hover:text-brand font-bold transition-colors">
                             <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
                         </button>
-                        <button className="btn-secondary text-xs py-2 px-3">
+                        <button onClick={() => window.print()} className="btn-secondary text-xs py-2 px-3">
                             <Printer size={16}/> Print Datasheet
                         </button>
                     </div>
 
                     {/* Hero Card */}
                     <div className="bg-white rounded-2xl border border-border shadow-soft p-6 flex flex-col md:flex-row gap-8">
-                        <div className="w-48 h-48 bg-gray-50 rounded-xl border border-border shrink-0 flex items-center justify-center p-2">
+                        <div className="w-48 h-48 bg-gray-50 rounded-xl border border-border shrink-0 flex items-center justify-center p-2 overflow-hidden">
                             {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover rounded-lg"/> : <ImageIcon size={48} className="text-gray-300"/>}
                         </div>
                         <div className="flex-1">
@@ -700,6 +828,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                             <span className={`px-2 py-1 text-xs font-bold rounded ${wo.status === 'Closed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{wo.status}</span>
                                         </div>
                                     ))}
+                                    {workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id).length === 0 && (
+                                        <div className="text-center text-gray-400 py-8">No maintenance history found.</div>
+                                    )}
                                 </div>
                             )}
 
@@ -714,6 +845,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                             <button className="text-gray-400 hover:text-brand"><Download size={18}/></button>
                                         </div>
                                     ))}
+                                    {getAssetDocuments(selectedAsset.asset_id).length === 0 && (
+                                        <div className="text-center text-gray-400 py-8">No documents linked.</div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -822,6 +956,11 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const filteredWOs = workOrders.filter(wo => {
             if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
             if (maintenanceFilterStatus !== 'all' && wo.status.toLowerCase() !== maintenanceFilterStatus.toLowerCase()) return false;
+            if (maintenanceFilterTechnician !== 'all' && wo.assigned_to_id.toString() !== maintenanceFilterTechnician) return false;
+            if (maintenanceFilterAsset) {
+                const asset = assets.find(a => a.asset_id === wo.asset_id);
+                if (!asset?.name.toLowerCase().includes(maintenanceFilterAsset.toLowerCase())) return false;
+            }
             return true;
         });
 
@@ -835,21 +974,31 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 </div>
 
                 {/* Toolbar */}
-                <div className="flex justify-between items-center bg-white p-2 rounded-xl border border-border shadow-sm">
-                    <div className="flex gap-2">
-                        <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}>
-                            <option value="all">All Priorities</option>
-                            <option value="High">High</option>
-                            <option value="Critical">Critical</option>
-                        </select>
-                        <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterStatus} onChange={e => setMaintenanceFilterStatus(e.target.value)}>
-                            <option value="all">All Status</option>
-                            <option value="Open">Open</option>
-                            <option value="Assigned">Assigned</option>
-                            <option value="Closed">Closed</option>
-                        </select>
-                    </div>
-                    <div className="flex bg-gray-100 p-1 rounded-lg">
+                <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-xl border border-border shadow-sm">
+                    <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}>
+                        <option value="all">All Priorities</option>
+                        <option value="High">High</option>
+                        <option value="Critical">Critical</option>
+                    </select>
+                    <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterStatus} onChange={e => setMaintenanceFilterStatus(e.target.value)}>
+                        <option value="all">All Status</option>
+                        <option value="Open">Open</option>
+                        <option value="Assigned">Assigned</option>
+                        <option value="Closed">Closed</option>
+                    </select>
+                    <select className="input-modern py-2 text-xs w-40" value={maintenanceFilterTechnician} onChange={e => setMaintenanceFilterTechnician(e.target.value)}>
+                        <option value="all">All Technicians</option>
+                        {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
+                            <option key={u.user_id} value={u.user_id}>{u.name}</option>
+                        ))}
+                    </select>
+                    <input 
+                        className="input-modern py-2 text-xs w-48"
+                        placeholder="Filter by Asset Name..."
+                        value={maintenanceFilterAsset}
+                        onChange={e => setMaintenanceFilterAsset(e.target.value)}
+                    />
+                    <div className="flex bg-gray-100 p-1 rounded-lg ml-auto">
                         <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded ${maintenanceViewMode === 'kanban' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}><LayoutGrid size={18}/></button>
                         <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded ${maintenanceViewMode === 'list' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}><List size={18}/></button>
                     </div>
@@ -930,6 +1079,26 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 )}
 
                 {/* Modals */}
+                {isCreateWOModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_create_wo')}</h3>
+                            <div className="space-y-4">
+                                <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})}>
+                                    <option value="">Select Asset</option>
+                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name}</option>)}
+                                </select>
+                                <select className="input-modern" value={newWOForm.priority} onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}>
+                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                                </select>
+                                <textarea className="input-modern" placeholder={t('wo_description')} value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})}/>
+                                <button onClick={handleCreateWO} className="w-full btn-primary">{t('btn_dispatch')}</button>
+                                <button onClick={() => setIsCreateWOModalOpen(false)} className="w-full btn-secondary">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {isAssignModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
@@ -1103,6 +1272,34 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </tbody>
                     </table>
                 </div>
+
+                {/* Restock Modal */}
+                {restockModalOpen && selectedPartForRestock && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}</h3>
+                            <p className="text-sm text-gray-600 mb-4">{selectedPartForRestock.part_name}</p>
+                            <input 
+                                type="number" 
+                                className="input-modern mb-4"
+                                placeholder={t('restock_qty')}
+                                value={restockQty} 
+                                onChange={(e) => setRestockQty(parseInt(e.target.value))}
+                            />
+                            {showRestockConfirm ? (
+                                <div className="space-y-3">
+                                    <p className="text-red-500 text-xs font-bold">{t('confirm_large_restock_msg').replace('{qty}', restockQty.toString())}</p>
+                                    <button onClick={handleRestock} className="w-full btn-primary bg-red-600 hover:bg-red-700">Confirm Large Restock</button>
+                                </div>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <button onClick={() => setRestockModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button onClick={handleRestock} className="flex-1 btn-primary">{t('restock_btn')}</button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -1645,6 +1842,34 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                     </div>
                 )}
+
+                {/* Add User Modal */}
+                {isAddUserModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_add_user')}</h3>
+                            <form onSubmit={handleAddUserSubmit} className="space-y-3">
+                                <input placeholder={t('user_name')} className="input-modern" value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} required/>
+                                <input placeholder={t('user_email')} className="input-modern" type="email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} required/>
+                                <input placeholder={t('user_phone')} className="input-modern" value={newUserForm.phone} onChange={e => setNewUserForm({...newUserForm, phone: e.target.value})}/>
+                                <input placeholder={t('user_password')} className="input-modern" type="password" value={newUserForm.password} onChange={e => setNewUserForm({...newUserForm, password: e.target.value})} required/>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <select className="input-modern" value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value})}>
+                                        <option value={UserRole.TECHNICIAN}>{UserRole.TECHNICIAN}</option>
+                                        <option value={UserRole.ENGINEER}>{UserRole.ENGINEER}</option>
+                                        <option value={UserRole.SUPERVISOR}>{UserRole.SUPERVISOR}</option>
+                                        <option value={UserRole.NURSE}>{UserRole.NURSE}</option>
+                                    </select>
+                                    <input placeholder={t('user_dept')} className="input-modern" value={newUserForm.department} onChange={e => setNewUserForm({...newUserForm, department: e.target.value})}/>
+                                </div>
+                                <div className="flex justify-end gap-3 pt-2">
+                                    <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
+                                    <button type="submit" className="btn-primary">{t('btn_create_user')}</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
@@ -1673,13 +1898,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <h3 className="font-bold text-gray-900 text-lg">Active Audit: ICU Dept</h3>
                                 <p className="text-sm text-gray-500">Progress: {activeAudit ? Math.round((activeAudit.total_scanned / activeAudit.total_expected) * 100) : 0}%</p>
                             </div>
-                            <button 
-                                onClick={() => !activeAudit && handleStartAudit('ICU')} 
-                                disabled={!!activeAudit}
-                                className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
-                            >
-                                {activeAudit ? 'Audit In Progress' : 'Start Audit'}
-                            </button>
+                            <div className="flex gap-2">
+                                {activeAudit && (
+                                    <button 
+                                        onClick={handleSimulateScan} 
+                                        className="btn-secondary text-xs"
+                                    >
+                                        Simulate Scan
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={() => !activeAudit && handleStartAudit('ICU')} 
+                                    disabled={!!activeAudit}
+                                    className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
+                                >
+                                    {activeAudit ? 'Audit In Progress' : 'Start Audit'}
+                                </button>
+                            </div>
                         </div>
                         {activeAudit && (
                             <div className="grid grid-cols-2 gap-6">
