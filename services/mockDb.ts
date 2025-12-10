@@ -6,9 +6,36 @@ export const LOCATIONS: Location[] = [
     { location_id: 101, name: 'ICU Bed 1', department: 'ICU', building: 'Main Wing', room: '101' },
     { location_id: 102, name: 'ICU Bed 2', department: 'ICU', building: 'Main Wing', room: '102' },
     { location_id: 201, name: 'ER Triage', department: 'Emergency', building: 'Main Wing', room: 'ER-1' },
+    { location_id: 202, name: 'ER Trauma', department: 'Emergency', building: 'Main Wing', room: 'ER-2' },
     { location_id: 301, name: 'MRI Suite', department: 'Radiology', building: 'East Wing', room: 'RAD-01' },
+    { location_id: 302, name: 'CT Scan', department: 'Radiology', building: 'East Wing', room: 'RAD-02' },
     { location_id: 401, name: 'Lab Processing', department: 'Laboratory', building: 'East Wing', room: 'LAB-05' },
     { location_id: 501, name: 'OR 1', department: 'Surgery', building: 'Main Wing', room: 'OR-01' },
+    { location_id: 502, name: 'OR 2', department: 'Surgery', building: 'Main Wing', room: 'OR-02' },
+    { location_id: 601, name: 'Cath Lab', department: 'Cardiology', building: 'West Wing', room: 'CARD-01' },
+    { location_id: 701, name: 'Nursery', department: 'Pediatrics', building: 'North Wing', room: 'PED-01' },
+    { location_id: 702, name: 'NICU', department: 'Pediatrics', building: 'North Wing', room: 'NICU-01' },
+    { location_id: 801, name: 'Chemo Bay', department: 'Oncology', building: 'West Wing', room: 'ONC-01' },
+    { location_id: 901, name: 'Dialysis Unit', department: 'Nephrology', building: 'South Wing', room: 'NEPH-01' },
+    { location_id: 1001, name: 'Delivery Room', department: 'Maternity', building: 'North Wing', room: 'MAT-01' },
+    { location_id: 1101, name: 'Exam Room 1', department: 'Outpatient', building: 'Clinic Block', room: 'OPD-01' },
+    { location_id: 1201, name: 'Dispensing', department: 'Pharmacy', building: 'Central', room: 'PHARM-01' },
+    { location_id: 1301, name: 'Sterilization', department: 'CSSD', building: 'Basement', room: 'CSSD-01' },
+    { location_id: 1401, name: 'Rehab Gym', department: 'Physical Therapy', building: 'South Wing', room: 'PT-01' },
+    { location_id: 1501, name: 'Ent Suite', department: 'ENT', building: 'Clinic Block', room: 'ENT-01' },
+];
+
+export const DEVICE_CATALOG = [
+    { name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens', image: 'https://images.unsplash.com/photo-1516549655169-df83a092dd14?auto=format&fit=crop&q=80&w=300' },
+    { name: 'CT Scanner', model: 'Revolution Apex', manufacturer: 'GE Healthcare', image: 'https://plus.unsplash.com/premium_photo-1682126112993-9b6330452304?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge', image: 'https://images.unsplash.com/photo-1584036561566-b93a9499d6d3?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Infusion Pump', model: 'Alaris PC', manufacturer: 'BD', image: 'https://images.unsplash.com/photo-1583946099397-9954d183d237?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Patient Monitor', model: 'Intellivue MX800', manufacturer: 'Philips', image: 'https://plus.unsplash.com/premium_photo-1661766569022-1b7f918ac3f3?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Anesthesia Machine', model: 'Aisys CS2', manufacturer: 'GE Healthcare', image: 'https://images.unsplash.com/photo-1579684385180-1ea90f842331?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Ultrasound', model: 'Voluson E10', manufacturer: 'GE Healthcare', image: 'https://images.unsplash.com/photo-1581093458791-9f3c3900df4b?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Defibrillator', model: 'LifePak 15', manufacturer: 'Stryker', image: 'https://images.unsplash.com/photo-1584362917165-52e812c2085e?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Incubator', model: 'Isolette 8000', manufacturer: 'Drager', image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=300' },
+    { name: 'ECG Machine', model: 'MAC 5500', manufacturer: 'GE Healthcare', image: 'https://plus.unsplash.com/premium_photo-1664474619075-644dd191935f?auto=format&fit=crop&q=80&w=300' },
 ];
 
 export const MOCK_USERS: User[] = [

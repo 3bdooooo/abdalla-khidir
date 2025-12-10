@@ -239,15 +239,57 @@ export const seedDatabaseIfEmpty = async () => {
     if (!isSupabaseConfigured) return;
     const { count } = await supabase.from('assets').select('*', { count: 'exact', head: true });
     
-    if (count === 0) {
-        console.log("Database empty. Seeding initial data...");
+    if (count === 0 || count === null) {
+        console.log("Database empty. Starting Mass Seeding (1000 Assets)...");
+        
+        // 1. Insert Users
         await supabase.from('users').insert(MockDb.MOCK_USERS);
-        const mockAssets = MockDb.getAssets();
-        for (let i = 0; i < mockAssets.length; i += 50) {
-            const batch = mockAssets.slice(i, i + 50);
-            await supabase.from('assets').insert(batch);
+        console.log("Users inserted.");
+
+        // 2. Generate 1000 Assets
+        const locations = MockDb.LOCATIONS;
+        const catalog = MockDb.DEVICE_CATALOG;
+        const generatedAssets: Asset[] = [];
+
+        for (let i = 0; i < 1000; i++) {
+            const type = catalog[Math.floor(Math.random() * catalog.length)];
+            const loc = locations[Math.floor(Math.random() * locations.length)];
+            const year = 2018 + Math.floor(Math.random() * 6);
+            
+            generatedAssets.push({
+                asset_id: `AST-${1000 + i}`,
+                nfc_tag_id: `NFC-${1000 + i}`,
+                name: type.name,
+                model: type.model,
+                manufacturer: type.manufacturer,
+                serial_number: `SN-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+                location_id: loc.location_id,
+                status: Math.random() > 0.9 ? AssetStatus.DOWN : Math.random() > 0.8 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING,
+                manufacturing_date: `${year}-01-01`,
+                purchase_date: `${year}-06-01`,
+                installation_date: `${year}-06-15`,
+                warranty_expiration: `${year + 5}-06-15`,
+                expected_lifespan: 10,
+                operating_hours: Math.floor(Math.random() * 20000),
+                risk_score: Math.floor(Math.random() * 100),
+                purchase_cost: 5000 + Math.floor(Math.random() * 50000),
+                accumulated_maintenance_cost: Math.floor(Math.random() * 5000),
+                image: type.image
+            });
         }
+
+        // 3. Batch Insert Assets (Supabase limit is usually ~100 per request safely)
+        console.log(`Generated ${generatedAssets.length} assets. Inserting...`);
+        for (let i = 0; i < generatedAssets.length; i += 50) {
+            const batch = generatedAssets.slice(i, i + 50);
+            const { error } = await supabase.from('assets').insert(batch);
+            if (error) console.error("Batch insert error:", error);
+            else console.log(`Inserted assets ${i} to ${i+50}`);
+        }
+        
         console.log("Seeding complete.");
+    } else {
+        console.log(`Database already has ${count} assets. Skipping seed.`);
     }
 };
 
