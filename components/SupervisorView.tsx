@@ -1,13 +1,13 @@
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ComposedChart, ScatterChart, Scatter, ZAxis } from 'recharts';
-import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
-import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getPMReports, getSystemAlerts, getKnowledgeBaseDocs } from '../services/mockDb';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
+import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getKnowledgeBaseDocs } from '../services/mockDb';
 import * as api from '../services/api';
 import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Calendar, TrendingUp, Sparkles, Package, ChevronLeft, Wrench, X, Download, Printer, ArrowUpCircle, Bell, ShieldAlert, Lock, BarChart2, Zap, LayoutGrid, List, Plus, UploadCloud, Check, Users as UsersIcon, Phone, Mail, Key, ClipboardCheck, RefreshCw, Book, FileCheck, FileCode, Eye, History, Thermometer, PieChart as PieChartIcon, MoreVertical, Filter, BrainCircuit, Library, Lightbulb, BookOpen, ArrowRight, User as UserIcon, UserPlus, FileSignature, CheckSquare, PenTool, Layers, Box, Signal, DollarSign, Star, ThumbsUp, Radio, LogIn, LogOut, Scan, Bluetooth, Wifi, MonitorCheck, CheckCircle2, Shield, Award, ThumbsDown, Briefcase, GraduationCap, Info, Table, XCircle, SearchX, Globe, Menu, Image as ImageIcon, CalendarDays, Factory, Hourglass, ShieldCheck as ShieldCheckIcon, Server, Database, Cpu, HardDrive, TrendingDown, Coins, DoorOpen } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Package, ChevronLeft, X, Download, Printer, ShieldCheck as ShieldCheckIcon, Plus, Check, Users as UsersIcon, GraduationCap, Sparkles, Book, Coins, Box, ArrowRight, User as UserIcon, UserPlus, Image as ImageIcon, LayoutGrid, List, Radio, TrendingUp, DollarSign, Calendar, Lock, Unlock, PenTool, CheckCircle2, Sliders } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -27,7 +27,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // --- STATE MANAGEMENT ---
     const [activeTab, setActiveTab] = useState('tab_analytics'); 
     const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-    const { t, language, dir } = useLanguage();
+    const { t, language } = useLanguage();
     
     const isAdmin = currentUser.role === UserRole.ADMIN;
 
@@ -62,9 +62,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const [restockQty, setRestockQty] = useState(0);
     const [showRestockConfirm, setShowRestockConfirm] = useState(false);
     
+    // Calibration State
+    const [isCalibrateModalOpen, setIsCalibrateModalOpen] = useState(false);
+    const [selectedAssetForCal, setSelectedAssetForCal] = useState<Asset | null>(null);
+    const [newCalDate, setNewCalDate] = useState('');
+
     // Reporting State
-    const [reportType, setReportType] = useState<'CM' | 'PPM' | 'COMPLIANCE'>('CM');
     const [selectedJobReport, setSelectedJobReport] = useState<DetailedJobOrderReport | null>(null);
+    const [reportSearchId, setReportSearchId] = useState('');
     
     // 3D Map State
     const [selectedMapZone, setSelectedMapZone] = useState<string | null>(null);
@@ -117,14 +122,18 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const handleRealScan = useCallback((scannedId: string) => {
         const currentAudit = activeAuditRef.current;
         if (!currentAudit) return;
+        
         const cleanId = scannedId.trim();
-        // If missing, move to found
-        if (currentAudit.missing_assets.includes(cleanId)) {
+        // Check if scanned ID matches an asset ID or NFC/RFID tag
+        const asset = assetsRef.current.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
+        const targetId = asset ? asset.asset_id : cleanId;
+
+        if (currentAudit.missing_assets.includes(targetId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
                 total_scanned: prev.total_scanned + 1,
-                missing_assets: prev.missing_assets.filter(id => id !== cleanId),
-                found_assets: [...prev.found_assets, cleanId]
+                missing_assets: prev.missing_assets.filter(id => id !== targetId),
+                found_assets: [...prev.found_assets, targetId]
             } : null);
         }
     }, []);
@@ -149,7 +158,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (rfidTabRef.current === 'audit') {
             handleRealScan(scannedTag);
         } else if (rfidTabRef.current === 'gate') {
-            handleGateScan(scannedTag, 101); // Simulate Gate 101 for now
+            handleGateScan(scannedTag, 101); // Simulate Gate 101
         }
     }, [handleRealScan, handleGateScan]);
 
@@ -162,6 +171,18 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const kbDocuments = useMemo(() => getKnowledgeBaseDocs(), []);
     const filteredKbDocs = kbDocuments.filter(doc => doc.title.toLowerCase().includes(kbSearch.toLowerCase()));
     
+    // Filter Assets based on Search
+    const filteredAssets = useMemo(() => {
+        if (!assetSearch) return assets;
+        const q = assetSearch.toLowerCase();
+        return assets.filter(a => 
+            a.name.toLowerCase().includes(q) || 
+            a.model.toLowerCase().includes(q) || 
+            a.asset_id.toLowerCase().includes(q) ||
+            a.serial_number?.toLowerCase().includes(q)
+        );
+    }, [assets, assetSearch]);
+
     useEffect(() => {
         const movementLogs = getMovementLogs();
         assets.forEach(asset => {
@@ -207,31 +228,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         } 
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
-
-    // Gate Monitor Simulation Effect
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
-            interval = setInterval(() => {
-                // Randomly pick a reader to come online/ping
-                setGateReaders(prev => prev.map(r => ({
-                    ...r,
-                    status: Math.random() > 0.1 ? 'online' : 'offline',
-                    lastPing: new Date().toLocaleTimeString()
-                })));
-
-                // Randomly trigger a scan
-                if (Math.random() > 0.7) {
-                    const randomAsset = assets[Math.floor(Math.random() * assets.length)];
-                    const randomGate = gateReaders[Math.floor(Math.random() * gateReaders.length)];
-                    handleGateScan(randomAsset.asset_id, randomGate.id);
-                }
-            }, 2000);
-        } else {
-            setGateReaders(prev => prev.map(r => ({ ...r, status: 'offline' })));
-        }
-        return () => clearInterval(interval);
-    }, [isGateMonitoring, currentView, rfidTab, assets, handleGateScan]);
 
     // Analytics Calculations
     const analyticsData = useMemo(() => {
@@ -302,15 +298,12 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         // 5. Cost Analysis by Department
         const costByDept: Record<string, { parts: number, labor: number }> = {};
         const locations = getLocations();
-        
         workOrders.forEach(wo => {
              const asset = assets.find(a => a.asset_id === wo.asset_id);
              if (asset) {
                  const loc = locations.find(l => l.location_id === asset.location_id);
                  if (loc) {
                     if (!costByDept[loc.department]) costByDept[loc.department] = { parts: 0, labor: 0 };
-                    
-                    // Parts Cost
                     if (wo.parts_used) {
                         const partsCost = wo.parts_used.reduce((acc, p) => {
                              const part = inventory.find(i => i.part_id === p.part_id);
@@ -318,8 +311,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         }, 0);
                         costByDept[loc.department].parts += partsCost;
                     }
-
-                    // Labor Cost (Mock: $50/hr for closed jobs)
                     if (wo.status === 'Closed' && wo.start_time && wo.close_time) {
                          const hours = (new Date(wo.close_time).getTime() - new Date(wo.start_time).getTime()) / (1000 * 60 * 60);
                          costByDept[loc.department].labor += (hours * 50);
@@ -327,29 +318,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                  }
              }
         });
-
         const costAnalysis = Object.entries(costByDept).map(([name, costs]) => ({
-            name,
-            parts: Math.round(costs.parts),
-            labor: Math.round(costs.labor)
+            name, parts: Math.round(costs.parts), labor: Math.round(costs.labor)
         })).filter(c => c.parts > 0 || c.labor > 0).slice(0, 5);
 
         // 6. Capital Budget Forecast
         const currentYear = new Date().getFullYear();
         const budgetForecast = Array.from({length: 5}, (_, i) => {
             const year = currentYear + i;
-            const replacementCost = assets
-                .filter(a => {
+            const replacementCost = assets.filter(a => {
                     const purchaseYear = new Date(a.purchase_date).getFullYear();
                     const eolYear = purchaseYear + (a.expected_lifespan || 10);
-                    // Replace if EOL this year OR Risk > 80 this year
                     return eolYear === year || (a.risk_score > 80 && i === 0);
-                })
-                .reduce((sum, a) => sum + (a.purchase_cost || 5000), 0);
+                }).reduce((sum, a) => sum + (a.purchase_cost || 5000), 0);
             return { year, amount: replacementCost };
         });
 
-        // 7. User Error Analysis (Mock)
+        // 7. User Error Analysis (Training Data)
         const userErrors = workOrders
             .filter(wo => wo.failure_type === 'UserError')
             .reduce((acc, wo) => {
@@ -365,8 +350,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         const trainingData = Object.entries(userErrors).map(([dept, count]) => ({
             department: dept,
             errors: count,
-            recommendation: count > 2 ? 'Schedule Training' : 'Monitor'
-        }));
+            recommendation: count > 1 ? 'Schedule Training' : 'Monitor'
+        })).sort((a,b) => b.errors - a.errors);
 
         return { mttrTrend, vendorData, tcoData, technicianStats, costAnalysis, budgetForecast, trainingData };
     }, [workOrders, users, assets, inventory]);
@@ -470,6 +455,19 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         }
     };
 
+    const handleCalibrateSubmit = async () => {
+        if (selectedAssetForCal && newCalDate) {
+            await api.updateAssetCalibration(
+                selectedAssetForCal.asset_id, 
+                new Date().toISOString().split('T')[0], 
+                newCalDate
+            );
+            refreshData();
+            setIsCalibrateModalOpen(false);
+            setNewCalDate('');
+        }
+    };
+
     const handleAiSearch = async () => {
         if (!aiQuery) return;
         setIsAiSearching(true);
@@ -559,7 +557,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                     <span className="font-bold">Online</span>
                                 </div>
                             </div>
-                            <Server size={24} className="text-slate-500"/>
+                            <Activity size={24} className="text-slate-500"/>
                         </div>
                         <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
                             <div>
@@ -722,132 +720,102 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // 2. ASSETS
     if (currentView === 'assets') {
-        const filteredAssets = assets.filter(a => 
-            a.name.toLowerCase().includes(assetSearch.toLowerCase()) || 
-            a.model.toLowerCase().includes(assetSearch.toLowerCase()) ||
-            a.asset_id.toLowerCase().includes(assetSearch.toLowerCase()) ||
-            a.serial_number?.toLowerCase().includes(assetSearch.toLowerCase())
-        );
-
         if (selectedAsset) {
-            return (
-                <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-right-4">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                        <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-gray-500 hover:text-brand font-bold transition-colors">
-                            <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
-                        </button>
-                        <button onClick={() => window.print()} className="btn-secondary text-xs py-2 px-3">
-                            <Printer size={16}/> Print Datasheet
-                        </button>
-                    </div>
+            const assetDocs = getAssetDocuments(selectedAsset.asset_id);
+            const assetHistory = workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id);
+            const handleDownloadPdf = () => alert("Downloading PDF..."); // Mock
 
-                    {/* Hero Card */}
-                    <div className="bg-white rounded-2xl border border-border shadow-soft p-6 flex flex-col md:flex-row gap-8">
-                        <div className="w-48 h-48 bg-gray-50 rounded-xl border border-border shrink-0 flex items-center justify-center p-2 overflow-hidden">
-                            {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover rounded-lg"/> : <ImageIcon size={48} className="text-gray-300"/>}
+            return (
+                <div className="space-y-6 animate-in slide-in-from-right-4">
+                    <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-text-muted hover:text-brand font-bold mb-4">
+                        <ChevronLeft size={20} className="rtl:rotate-180"/> {t('back')}
+                    </button>
+                    
+                    <div className="bg-white rounded-2xl border border-border shadow-soft p-6 flex flex-col md:flex-row gap-6">
+                        <div className="w-48 h-48 bg-gray-50 rounded-xl flex items-center justify-center shrink-0 border border-gray-200">
+                            {selectedAsset.image ? <img src={selectedAsset.image} className="w-full h-full object-cover rounded-xl"/> : <Package size={48} className="text-gray-300"/>}
                         </div>
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h1 className="text-3xl font-black text-gray-900">{selectedAsset.name}</h1>
-                                    <div className="flex items-center gap-2 mt-2">
-                                        <span className="bg-gray-100 text-gray-700 font-mono text-sm px-2 py-1 rounded font-bold">{selectedAsset.asset_id}</span>
-                                        <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${selectedAsset.status === 'Running' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{selectedAsset.status}</span>
-                                    </div>
+                                    <p className="text-text-muted font-mono mt-1">{selectedAsset.model} • {selectedAsset.asset_id}</p>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-sm text-gray-500">Risk Score</div>
-                                    <div className={`text-2xl font-black ${selectedAsset.risk_score > 70 ? 'text-red-600' : 'text-green-600'}`}>{selectedAsset.risk_score}/100</div>
+                                <div className="flex gap-2">
+                                    <button onClick={handleDownloadPdf} className="btn-secondary text-xs py-2 px-3 flex items-center gap-2"><Printer size={16}/> Print Datasheet</button>
                                 </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-8 pt-6 border-t border-border">
-                                <div>
-                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('manufacturer')}</div>
-                                    <div className="font-semibold text-gray-900">{selectedAsset.manufacturer}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('form_model')}</div>
-                                    <div className="font-semibold text-gray-900">{selectedAsset.model}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('location')}</div>
-                                    <div className="font-semibold text-gray-900">{getLocationName(selectedAsset.location_id)}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">{t('warranty_exp')}</div>
-                                    <div className="font-semibold text-gray-900">{selectedAsset.warranty_expiration}</div>
-                                </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-gray-100">
+                                <div><div className="text-xs font-bold text-gray-400 uppercase">{t('status')}</div><div className={`text-lg font-bold ${selectedAsset.status === 'Running' ? 'text-success' : 'text-danger'}`}>{selectedAsset.status}</div></div>
+                                <div><div className="text-xs font-bold text-gray-400 uppercase">{t('risk_score')}</div><div className="text-lg font-bold text-gray-800">{selectedAsset.risk_score}/100</div></div>
+                                <div><div className="text-xs font-bold text-gray-400 uppercase">{t('location')}</div><div className="text-lg font-bold text-gray-800">{getLocationName(selectedAsset.location_id)}</div></div>
+                                <div><div className="text-xs font-bold text-gray-400 uppercase">{t('purchase_date')}</div><div className="text-lg font-bold text-gray-800">{selectedAsset.purchase_date}</div></div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Tabs */}
+                    {/* Asset Detail Tabs */}
                     <div className="bg-white rounded-2xl border border-border shadow-soft min-h-[400px]">
-                        <div className="flex border-b border-border">
+                        <div className="flex border-b border-gray-100">
                             {['overview', 'history', 'docs'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setAssetDetailTab(tab as any)}
                                     className={`flex-1 py-4 text-sm font-bold capitalize transition-colors ${assetDetailTab === tab ? 'text-brand border-b-2 border-brand bg-brand/5' : 'text-gray-500 hover:bg-gray-50'}`}
                                 >
-                                    {tab === 'docs' ? t('tab_docs') : tab === 'history' ? t('maintenance_history') : t('asset_info')}
+                                    {tab}
                                 </button>
                             ))}
                         </div>
                         <div className="p-6">
                             {assetDetailTab === 'overview' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-6">
-                                        <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-2">Lifecycle Data</h4>
+                                <div className="grid grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-gray-900 border-b pb-2">Lifecycle</h3>
                                         <div className="grid grid-cols-2 gap-4 text-sm">
-                                            <div><span className="block text-gray-500 text-xs">Purchase Date</span>{selectedAsset.purchase_date}</div>
-                                            <div><span className="block text-gray-500 text-xs">Install Date</span>{selectedAsset.installation_date || 'N/A'}</div>
-                                            <div><span className="block text-gray-500 text-xs">Life Expectancy</span>{selectedAsset.expected_lifespan} Years</div>
-                                            <div><span className="block text-gray-500 text-xs">Accumulated Cost</span>${selectedAsset.accumulated_maintenance_cost}</div>
+                                            <div><div className="text-gray-500">Manufacturer</div><div className="font-medium">{selectedAsset.manufacturer}</div></div>
+                                            <div><div className="text-gray-500">Serial No</div><div className="font-medium">{selectedAsset.serial_number}</div></div>
+                                            <div><div className="text-gray-500">Warranty Exp</div><div className="font-medium">{selectedAsset.warranty_expiration}</div></div>
+                                            <div><div className="text-gray-500">Lifespan</div><div className="font-medium">{selectedAsset.expected_lifespan} Years</div></div>
                                         </div>
                                     </div>
-                                    <div className="space-y-6">
-                                        <h4 className="font-bold text-gray-900 border-b border-gray-100 pb-2">Live Readings (Mock)</h4>
-                                        <div className="h-40 w-full bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-center text-gray-400">
-                                            <Activity size={24} className="mr-2"/> IoT Telemetry Feed
+                                    <div className="space-y-4">
+                                        <h3 className="font-bold text-gray-900 border-b pb-2">Financials</h3>
+                                        <div className="grid grid-cols-2 gap-4 text-sm">
+                                            <div><div className="text-gray-500">Purchase Cost</div><div className="font-medium">${selectedAsset.purchase_cost}</div></div>
+                                            <div><div className="text-gray-500">Maint. Cost</div><div className="font-medium">${selectedAsset.accumulated_maintenance_cost}</div></div>
                                         </div>
                                     </div>
                                 </div>
                             )}
-                            
                             {assetDetailTab === 'history' && (
                                 <div className="space-y-4">
-                                    {workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id).map(wo => (
-                                        <div key={wo.wo_id} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border border-gray-200">
+                                    {assetHistory.map(wo => (
+                                        <div key={wo.wo_id} className="p-4 border rounded-xl flex justify-between items-center bg-gray-50">
                                             <div>
-                                                <div className="font-bold text-gray-900">{wo.type} - #{wo.wo_id}</div>
-                                                <div className="text-xs text-gray-500">{new Date(wo.created_at).toLocaleDateString()} • {users.find(u => u.user_id === wo.assigned_to_id)?.name}</div>
+                                                <div className="font-bold text-gray-900">{wo.type} #{wo.wo_id}</div>
+                                                <div className="text-sm text-gray-500">{wo.description}</div>
                                             </div>
-                                            <span className={`px-2 py-1 text-xs font-bold rounded ${wo.status === 'Closed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{wo.status}</span>
+                                            <div className="text-right">
+                                                <div className="text-xs font-bold uppercase text-gray-400">{new Date(wo.created_at).toLocaleDateString()}</div>
+                                                <div className="text-sm font-medium">{wo.status}</div>
+                                            </div>
                                         </div>
                                     ))}
-                                    {workOrders.filter(wo => wo.asset_id === selectedAsset.asset_id).length === 0 && (
-                                        <div className="text-center text-gray-400 py-8">No maintenance history found.</div>
-                                    )}
                                 </div>
                             )}
-
                             {assetDetailTab === 'docs' && (
-                                <div className="space-y-3">
-                                    {getAssetDocuments(selectedAsset.asset_id).map(doc => (
-                                        <div key={doc.doc_id} className="flex justify-between items-center p-3 border border-gray-200 rounded-xl hover:border-brand transition-colors group">
+                                <div className="space-y-2">
+                                    {assetDocs.map(doc => (
+                                        <div key={doc.doc_id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-all cursor-pointer group">
                                             <div className="flex items-center gap-3">
-                                                <FileText className="text-brand" size={20}/>
-                                                <span className="text-sm font-bold text-gray-700 group-hover:text-brand">{doc.title}</span>
+                                                <FileText size={20} className="text-brand"/>
+                                                <span className="font-medium text-gray-700">{doc.title}</span>
                                             </div>
-                                            <button className="text-gray-400 hover:text-brand"><Download size={18}/></button>
+                                            <Download size={18} className="text-gray-400 group-hover:text-brand"/>
                                         </div>
                                     ))}
-                                    {getAssetDocuments(selectedAsset.asset_id).length === 0 && (
-                                        <div className="text-center text-gray-400 py-8">No documents linked.</div>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -860,60 +828,58 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-900">{t('nav_assets')}</h2>
-                    <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={18}/> {t('add_equipment')}</button>
+                    <button onClick={() => setIsAddModalOpen(true)} className="btn-primary py-2 px-4 text-sm">
+                        <Plus size={18}/> {t('add_equipment')}
+                    </button>
                 </div>
-
-                {/* Search Bar */}
-                <div className="relative group">
-                    <Search className="absolute left-4 top-3.5 text-gray-400 group-focus-within:text-brand transition-colors" size={20} />
+                
+                <div className="relative">
+                    <Search className="absolute left-4 top-3.5 text-gray-400" size={20}/>
                     <input 
                         type="text" 
-                        placeholder={t('search_assets')}
-                        className="input-modern pl-12 h-12 text-base"
+                        placeholder={t('search_assets')} 
                         value={assetSearch}
                         onChange={(e) => setAssetSearch(e.target.value)}
+                        className="input-modern pl-12"
                     />
                 </div>
 
-                {/* Asset List */}
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('asset_info')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('form_model')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('form_sn')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">{t('location')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">{t('status')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">{t('actions')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('asset_info')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('form_model')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('form_sn')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('location')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('status')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {filteredAssets.map(asset => (
-                                <tr key={asset.asset_id} className="hover:bg-gray-50/80 transition-colors group">
+                                <tr key={asset.asset_id} className="hover:bg-gray-50 transition-colors group">
                                     <td className="p-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 border border-gray-200 overflow-hidden">
-                                                {asset.image ? <img src={asset.image} className="w-full h-full object-cover"/> : <Box size={18} className="text-gray-400"/>}
+                                            <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center shrink-0 border border-gray-200">
+                                                {asset.image ? <img src={asset.image} className="w-full h-full object-cover rounded-lg"/> : <Package size={18} className="text-gray-400"/>}
                                             </div>
-                                            <span className="font-bold text-gray-900 text-sm">{asset.name}</span>
+                                            <div>
+                                                <div className="font-bold text-gray-900 text-sm">{asset.name}</div>
+                                                <div className="text-xs text-gray-500">{asset.classification}</div>
+                                            </div>
                                         </div>
                                     </td>
                                     <td className="p-4 text-sm text-gray-600">{asset.model}</td>
-                                    <td className="p-4 text-sm font-mono text-gray-500">{asset.asset_id}</td>
+                                    <td className="p-4 text-sm text-gray-600 font-mono">{asset.serial_number}</td>
                                     <td className="p-4 text-sm text-gray-600">{getLocationName(asset.location_id)}</td>
-                                    <td className="p-4 text-center">
-                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide border ${asset.status === 'Running' ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${asset.status === 'Running' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                                             {asset.status}
                                         </span>
                                     </td>
-                                    <td className="p-4 text-center">
-                                        <button 
-                                            onClick={() => setSelectedAsset(asset)}
-                                            className="p-2 text-gray-400 hover:text-brand hover:bg-brand/10 rounded-lg transition-colors"
-                                        >
-                                            <ArrowRight size={18}/>
-                                        </button>
+                                    <td className="p-4">
+                                        <button onClick={() => setSelectedAsset(asset)} className="text-brand hover:underline text-xs font-bold">View</button>
                                     </td>
                                 </tr>
                             ))}
@@ -923,26 +889,37 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
                 {/* Add Asset Modal */}
                 {isAddModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl animate-in zoom-in-95">
-                            <h3 className="text-xl font-bold mb-4">{t('modal_add_title')}</h3>
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="font-bold text-xl">{t('modal_add_title')}</h3>
+                                <button onClick={() => setIsAddModalOpen(false)}><X size={20}/></button>
+                            </div>
                             <form onSubmit={handleAddSubmit} className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <input placeholder={t('form_name')} className="input-modern" value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} required/>
-                                    <input placeholder={t('form_model')} className="input-modern" value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} required/>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('form_name')}</label>
+                                        <input className="input-modern" required value={newAssetForm.name} onChange={e => setNewAssetForm({...newAssetForm, name: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('form_model')}</label>
+                                        <input className="input-modern" required value={newAssetForm.model} onChange={e => setNewAssetForm({...newAssetForm, model: e.target.value})} />
+                                    </div>
                                 </div>
-                                <div className="flex gap-2 items-center">
-                                    <input placeholder="Image URL (Optional)" className="input-modern flex-1" value={newAssetForm.image} onChange={e => setNewAssetForm({...newAssetForm, image: e.target.value})}/>
-                                    <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage || !newAssetForm.model} className="btn-secondary py-2 px-3 text-xs">
-                                        {isGeneratingImage ? 'Generating...' : '✨ AI Gen'}
-                                    </button>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('form_sn')}</label>
+                                    <input className="input-modern" required value={newAssetForm.asset_id} onChange={e => setNewAssetForm({...newAssetForm, asset_id: e.target.value})} />
                                 </div>
-                                {newAssetForm.image && <div className="h-32 w-full bg-gray-100 rounded-lg overflow-hidden border border-gray-200"><img src={newAssetForm.image} className="w-full h-full object-cover"/></div>}
-                                <input placeholder={t('form_sn')} className="input-modern" value={newAssetForm.asset_id} onChange={e => setNewAssetForm({...newAssetForm, asset_id: e.target.value})} required/>
-                                <div className="flex justify-end gap-3 pt-4">
-                                    <button type="button" onClick={() => setIsAddModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                    <button type="submit" className="btn-primary">{t('btn_save')}</button>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{t('form_image')}</label>
+                                    <div className="flex gap-2">
+                                        <input className="input-modern" value={newAssetForm.image} onChange={e => setNewAssetForm({...newAssetForm, image: e.target.value})} placeholder="Image URL..." />
+                                        <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage || !newAssetForm.model} className="btn-secondary px-3 py-2 text-xs whitespace-nowrap">
+                                            {isGeneratingImage ? t('generating_image') : t('btn_gen_image')}
+                                        </button>
+                                    </div>
                                 </div>
+                                <button type="submit" className="w-full btn-primary mt-4">{t('btn_save')}</button>
                             </form>
                         </div>
                     </div>
@@ -954,13 +931,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 3. MAINTENANCE
     if (currentView === 'maintenance') {
         const filteredWOs = workOrders.filter(wo => {
-            if (maintenanceFilterPriority !== 'all' && wo.priority !== maintenanceFilterPriority) return false;
+            if (maintenanceFilterPriority !== 'all' && wo.priority.toLowerCase() !== maintenanceFilterPriority.toLowerCase()) return false;
             if (maintenanceFilterStatus !== 'all' && wo.status.toLowerCase() !== maintenanceFilterStatus.toLowerCase()) return false;
-            if (maintenanceFilterTechnician !== 'all' && wo.assigned_to_id.toString() !== maintenanceFilterTechnician) return false;
-            if (maintenanceFilterAsset) {
-                const asset = assets.find(a => a.asset_id === wo.asset_id);
-                if (!asset?.name.toLowerCase().includes(maintenanceFilterAsset.toLowerCase())) return false;
-            }
             return true;
         });
 
@@ -969,261 +941,171 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-900">{t('nav_maintenance')}</h2>
                     <div className="flex gap-2">
+                        <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded ${maintenanceViewMode === 'kanban' ? 'bg-gray-200' : 'hover:bg-gray-100'}`}><LayoutGrid size={20}/></button>
+                        <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded ${maintenanceViewMode === 'list' ? 'bg-gray-200' : 'hover:bg-gray-100'}`}><List size={20}/></button>
                         <button onClick={() => setIsCreateWOModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><Plus size={18}/> {t('create_wo')}</button>
                     </div>
                 </div>
 
-                {/* Toolbar */}
-                <div className="flex flex-wrap gap-2 items-center bg-white p-2 rounded-xl border border-border shadow-sm">
-                    <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}>
+                <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                    <select className="input-modern w-auto py-2 text-xs" value={maintenanceFilterPriority} onChange={e => setMaintenanceFilterPriority(e.target.value)}>
                         <option value="all">All Priorities</option>
-                        <option value="High">High</option>
-                        <option value="Critical">Critical</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
                     </select>
-                    <select className="input-modern py-2 text-xs w-32" value={maintenanceFilterStatus} onChange={e => setMaintenanceFilterStatus(e.target.value)}>
-                        <option value="all">All Status</option>
-                        <option value="Open">Open</option>
-                        <option value="Assigned">Assigned</option>
-                        <option value="Closed">Closed</option>
+                    <select className="input-modern w-auto py-2 text-xs" value={maintenanceFilterStatus} onChange={e => setMaintenanceFilterStatus(e.target.value)}>
+                        <option value="all">All Statuses</option>
+                        <option value="open">Open</option>
+                        <option value="assigned">Assigned</option>
+                        <option value="in progress">In Progress</option>
                     </select>
-                    <select className="input-modern py-2 text-xs w-40" value={maintenanceFilterTechnician} onChange={e => setMaintenanceFilterTechnician(e.target.value)}>
-                        <option value="all">All Technicians</option>
-                        {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
-                            <option key={u.user_id} value={u.user_id}>{u.name}</option>
-                        ))}
-                    </select>
-                    <input 
-                        className="input-modern py-2 text-xs w-48"
-                        placeholder="Filter by Asset Name..."
-                        value={maintenanceFilterAsset}
-                        onChange={e => setMaintenanceFilterAsset(e.target.value)}
-                    />
-                    <div className="flex bg-gray-100 p-1 rounded-lg ml-auto">
-                        <button onClick={() => setMaintenanceViewMode('kanban')} className={`p-2 rounded ${maintenanceViewMode === 'kanban' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}><LayoutGrid size={18}/></button>
-                        <button onClick={() => setMaintenanceViewMode('list')} className={`p-2 rounded ${maintenanceViewMode === 'list' ? 'bg-white shadow text-brand' : 'text-gray-500'}`}><List size={18}/></button>
-                    </div>
                 </div>
 
-                {/* Kanban View */}
-                {maintenanceViewMode === 'kanban' && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-x-auto pb-4">
+                {maintenanceViewMode === 'kanban' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 h-[calc(100vh-250px)] overflow-x-auto">
                         {['Open', 'Assigned', 'In Progress', 'Closed'].map(status => (
-                            <div key={status} className="bg-gray-50/50 rounded-2xl p-3 border border-border min-w-[280px]">
-                                <div className="flex justify-between items-center mb-3 px-1">
-                                    <h4 className="font-bold text-gray-700 text-sm uppercase tracking-wide">{status}</h4>
-                                    <span className="bg-gray-200 text-gray-600 text-[10px] font-bold px-2 py-0.5 rounded-full">{filteredWOs.filter(w => w.status === status).length}</span>
-                                </div>
-                                <div className="space-y-3">
+                            <div key={status} className="bg-gray-50 rounded-xl p-4 flex flex-col h-full border border-gray-200">
+                                <h3 className="font-bold text-gray-700 mb-4 flex justify-between">{status} <span className="bg-gray-200 text-xs px-2 py-0.5 rounded-full">{filteredWOs.filter(w => w.status === status).length}</span></h3>
+                                <div className="space-y-3 overflow-y-auto flex-1 pr-2">
                                     {filteredWOs.filter(w => w.status === status).map(wo => {
                                         const asset = assets.find(a => a.asset_id === wo.asset_id);
                                         return (
-                                            <div key={wo.wo_id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }}>
+                                            <div key={wo.wo_id} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-all cursor-pointer group" onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }}>
                                                 <div className="flex justify-between items-start mb-2">
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${wo.priority === 'Critical' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{wo.priority}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${wo.priority === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{wo.priority}</span>
                                                     <span className="text-xs font-mono text-gray-400">#{wo.wo_id}</span>
                                                 </div>
-                                                <div className="font-bold text-gray-900 text-sm mb-1">{asset?.name || 'Unknown Asset'}</div>
-                                                <p className="text-xs text-gray-500 line-clamp-2 mb-3">{wo.description}</p>
-                                                <div className="flex justify-between items-center border-t border-gray-100 pt-2 mt-2">
-                                                    <div className="flex -space-x-2">
-                                                        <div className="w-6 h-6 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-600">
-                                                            {wo.assigned_to_id ? users.find(u => u.user_id === wo.assigned_to_id)?.name[0] : '?'}
-                                                        </div>
-                                                    </div>
+                                                <div className="font-bold text-sm text-gray-900 mb-1">{asset?.name || 'Unknown Asset'}</div>
+                                                <div className="text-xs text-gray-500 line-clamp-2 mb-2">{wo.description}</div>
+                                                <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                                                     {status === 'Open' && (
                                                         <button 
                                                             onClick={(e) => { e.stopPropagation(); handleAssign(wo); }}
-                                                            className="text-[10px] font-bold text-brand bg-brand/10 px-2 py-1 rounded hover:bg-brand hover:text-white transition-colors"
+                                                            className="text-xs bg-brand text-white px-2 py-1 rounded font-bold hover:bg-brand-dark transition-colors w-full text-center"
                                                         >
                                                             {t('assign')}
                                                         </button>
                                                     )}
                                                 </div>
                                             </div>
-                                        );
+                                        )
                                     })}
                                 </div>
                             </div>
                         ))}
                     </div>
-                )}
-
-                {/* List View */}
-                {maintenanceViewMode === 'list' && (
+                ) : (
                     <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                         <table className="w-full text-left">
                             <thead className="bg-gray-50 border-b border-gray-200">
                                 <tr>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">ID</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">WO ID</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase">Asset</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase">Description</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase">Priority</th>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Assigned To</th>
                                     <th className="p-4 text-xs font-bold text-gray-500 uppercase">Status</th>
+                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {filteredWOs.map(wo => (
-                                    <tr key={wo.wo_id} className="hover:bg-gray-50 cursor-pointer" onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }}>
-                                        <td className="p-4 text-sm font-mono text-gray-500">#{wo.wo_id}</td>
-                                        <td className="p-4 text-sm font-bold text-gray-900">{assets.find(a => a.asset_id === wo.asset_id)?.name}</td>
-                                        <td className="p-4 text-sm text-gray-600 truncate max-w-xs">{wo.description}</td>
-                                        <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${wo.priority === 'Critical' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>{wo.priority}</span></td>
-                                        <td className="p-4 text-sm text-gray-600">{users.find(u => u.user_id === wo.assigned_to_id)?.name || '-'}</td>
-                                        <td className="p-4"><span className="px-2 py-1 bg-gray-100 rounded text-xs font-bold text-gray-600">{wo.status}</span></td>
-                                    </tr>
-                                ))}
+                                {filteredWOs.map(wo => {
+                                    const asset = assets.find(a => a.asset_id === wo.asset_id);
+                                    return (
+                                        <tr key={wo.wo_id} className="hover:bg-gray-50">
+                                            <td className="p-4 font-mono text-xs">{wo.wo_id}</td>
+                                            <td className="p-4 text-sm font-bold">{asset?.name}</td>
+                                            <td className="p-4 text-sm text-gray-600 truncate max-w-xs">{wo.description}</td>
+                                            <td className="p-4"><span className={`text-xs px-2 py-1 rounded font-bold ${wo.priority === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>{wo.priority}</span></td>
+                                            <td className="p-4 text-sm">{wo.status}</td>
+                                            <td className="p-4">
+                                                {wo.status === 'Open' && <button onClick={() => handleAssign(wo)} className="text-brand hover:underline text-xs font-bold">Assign</button>}
+                                                <button onClick={() => { setSelectedWorkOrderForDetails(wo); setIsWorkOrderDetailsModalOpen(true); }} className="text-gray-500 hover:text-gray-900 text-xs font-bold ml-2">Details</button>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
                             </tbody>
                         </table>
                     </div>
                 )}
 
-                {/* Modals */}
+                {/* Create WO Modal */}
                 {isCreateWOModalOpen && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
                             <h3 className="font-bold text-lg mb-4">{t('modal_create_wo')}</h3>
                             <div className="space-y-4">
                                 <select className="input-modern" value={newWOForm.assetId} onChange={e => setNewWOForm({...newWOForm, assetId: e.target.value})}>
-                                    <option value="">Select Asset</option>
-                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name}</option>)}
+                                    <option value="">Select Asset...</option>
+                                    {assets.map(a => <option key={a.asset_id} value={a.asset_id}>{a.name} ({a.asset_id})</option>)}
                                 </select>
-                                <select className="input-modern" value={newWOForm.priority} onChange={e => setNewWOForm({...newWOForm, priority: e.target.value as Priority})}>
-                                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
-                                </select>
-                                <textarea className="input-modern" placeholder={t('wo_description')} value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})}/>
-                                <button onClick={handleCreateWO} className="w-full btn-primary">{t('btn_dispatch')}</button>
-                                <button onClick={() => setIsCreateWOModalOpen(false)} className="w-full btn-secondary">Cancel</button>
+                                <textarea className="input-modern min-h-[100px]" placeholder="Description" value={newWOForm.description} onChange={e => setNewWOForm({...newWOForm, description: e.target.value})} />
+                                <div className="flex gap-2">
+                                    <button onClick={() => setIsCreateWOModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button onClick={handleCreateWO} className="flex-1 btn-primary">{t('btn_dispatch')}</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 )}
 
-                {isAssignModalOpen && (
+                {/* Assign Modal */}
+                {isAssignModalOpen && selectedWOForAssignment && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
                             <h3 className="font-bold text-lg mb-4">{t('assign_technician')}</h3>
                             <div className="space-y-4">
-                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                    <div className="text-sm font-bold text-gray-900">{assets.find(a => a.asset_id === selectedWOForAssignment?.asset_id)?.name}</div>
-                                    <div className="text-xs text-gray-500">{selectedWOForAssignment?.description}</div>
-                                </div>
-                                
                                 {recommendedTechs.length > 0 && (
-                                    <div>
-                                        <div className="text-xs font-bold text-brand uppercase mb-2">AI Recommendations</div>
-                                        <div className="space-y-2">
-                                            {recommendedTechs.slice(0, 2).map((rec, i) => (
-                                                <div 
-                                                    key={i} 
-                                                    onClick={() => setSelectedTechForAssignment(rec.user.user_id.toString())}
-                                                    className={`p-2 border rounded-lg cursor-pointer flex justify-between items-center transition-colors ${selectedTechForAssignment === rec.user.user_id.toString() ? 'border-brand bg-brand/5' : 'border-gray-200 hover:border-brand/50'}`}
-                                                >
-                                                    <div>
-                                                        <div className="font-bold text-sm">{rec.user.name}</div>
-                                                        <div className="text-[10px] text-gray-500">{rec.reason}</div>
-                                                    </div>
-                                                    <div className="text-xs font-bold text-green-600">{rec.score} pts</div>
-                                                </div>
-                                            ))}
-                                        </div>
+                                    <div className="bg-blue-50 p-3 rounded-lg mb-2">
+                                        <p className="text-xs font-bold text-blue-700 uppercase mb-2">AI Recommendations</p>
+                                        {recommendedTechs.slice(0, 2).map(rec => (
+                                            <div key={rec.user.user_id} className="flex justify-between items-center mb-1 cursor-pointer hover:bg-blue-100 p-1 rounded" onClick={() => setSelectedTechForAssignment(rec.user.user_id.toString())}>
+                                                <div className="text-sm font-bold">{rec.user.name}</div>
+                                                <div className="text-xs text-blue-600">{rec.score} pts ({rec.reason})</div>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
-
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Technician</label>
-                                    <select className="input-modern" value={selectedTechForAssignment} onChange={(e) => setSelectedTechForAssignment(e.target.value)}>
-                                        <option value="">Select...</option>
-                                        {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
-                                            <option key={u.user_id} value={u.user_id}>{u.name}</option>
-                                        ))}
-                                    </select>
+                                <select className="input-modern" value={selectedTechForAssignment} onChange={e => setSelectedTechForAssignment(e.target.value)}>
+                                    <option value="">Select Technician...</option>
+                                    {users.filter(u => u.role === UserRole.TECHNICIAN || u.role === UserRole.ENGINEER).map(u => (
+                                        <option key={u.user_id} value={u.user_id}>{u.name} ({u.role})</option>
+                                    ))}
+                                </select>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setIsAssignModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                    <button onClick={handleAssignSubmit} className="flex-1 btn-primary">{t('btn_assign_confirm')}</button>
                                 </div>
-                                <button onClick={handleAssignSubmit} className="w-full btn-primary">{t('btn_assign_confirm')}</button>
-                                <button onClick={() => setIsAssignModalOpen(false)} className="w-full btn-secondary">Cancel</button>
                             </div>
                         </div>
                     </div>
                 )}
 
+                {/* Details Modal */}
                 {isWorkOrderDetailsModalOpen && selectedWorkOrderForDetails && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-xl font-bold text-gray-900">Work Order #{selectedWorkOrderForDetails.wo_id}</h3>
-                                        <span className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${selectedWorkOrderForDetails.status === 'Closed' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{selectedWorkOrderForDetails.status}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-1">Created: {new Date(selectedWorkOrderForDetails.created_at).toLocaleString()}</p>
-                                </div>
-                                <button onClick={() => setIsWorkOrderDetailsModalOpen(false)} className="p-1 hover:bg-gray-100 rounded"><X size={20}/></button>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="font-bold text-xl">WO #{selectedWorkOrderForDetails.wo_id} Details</h3>
+                                <button onClick={() => setIsWorkOrderDetailsModalOpen(false)}><X size={20}/></button>
                             </div>
-
-                            <div className="space-y-6">
-                                <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Asset Details</h4>
-                                    <div className="flex gap-4">
-                                        <div className="w-16 h-16 bg-white rounded-lg border border-gray-200 flex items-center justify-center shrink-0">
-                                            <Package size={24} className="text-gray-400"/>
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-gray-900">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.name}</div>
-                                            <div className="text-xs text-gray-600">{assets.find(a => a.asset_id === selectedWorkOrderForDetails.asset_id)?.model}</div>
-                                            <div className="text-xs font-mono text-gray-400 mt-1">{selectedWorkOrderForDetails.asset_id}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Issue Description</h4>
-                                    <p className="text-sm text-gray-700 bg-white border border-gray-200 p-3 rounded-lg">{selectedWorkOrderForDetails.description}</p>
-                                </div>
-
+                            <div className="space-y-4 text-sm">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Assigned Technician</h4>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-xs font-bold">
-                                                {users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name[0]}
-                                            </div>
-                                            <span className="text-sm font-medium">{users.find(u => u.user_id === selectedWorkOrderForDetails.assigned_to_id)?.name || 'Unassigned'}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-1">Priority</h4>
-                                        <span className={`text-sm font-bold ${selectedWorkOrderForDetails.priority === 'Critical' ? 'text-red-600' : 'text-blue-600'}`}>{selectedWorkOrderForDetails.priority}</span>
-                                    </div>
+                                    <div><div className="text-gray-500 font-bold text-xs uppercase">Status</div><div className="font-medium">{selectedWorkOrderForDetails.status}</div></div>
+                                    <div><div className="text-gray-500 font-bold text-xs uppercase">Priority</div><div className="font-medium">{selectedWorkOrderForDetails.priority}</div></div>
                                 </div>
-
-                                {selectedWorkOrderForDetails.parts_used && selectedWorkOrderForDetails.parts_used.length > 0 && (
-                                    <div>
-                                        <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Parts Consumed</h4>
-                                        <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                            <table className="w-full text-sm">
-                                                <thead className="bg-gray-50">
-                                                    <tr>
-                                                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Part</th>
-                                                        <th className="px-3 py-2 text-center text-xs font-medium text-gray-500">Qty</th>
-                                                        <th className="px-3 py-2 text-right text-xs font-medium text-gray-500">Cost</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-100">
-                                                    {selectedWorkOrderForDetails.parts_used.map((p, idx) => {
-                                                        const part = inventory.find(i => i.part_id === p.part_id);
-                                                        return (
-                                                            <tr key={idx}>
-                                                                <td className="px-3 py-2">{part?.part_name || `Part #${p.part_id}`}</td>
-                                                                <td className="px-3 py-2 text-center">{p.quantity}</td>
-                                                                <td className="px-3 py-2 text-right">${(part?.cost || 0) * p.quantity}</td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                            </table>
+                                <div><div className="text-gray-500 font-bold text-xs uppercase">Description</div><div className="p-3 bg-gray-50 rounded border">{selectedWorkOrderForDetails.description}</div></div>
+                                <div>
+                                    <div className="text-gray-500 font-bold text-xs uppercase mb-2">Parts Used</div>
+                                    {selectedWorkOrderForDetails.parts_used?.length ? (
+                                        <div className="space-y-1">
+                                            {selectedWorkOrderForDetails.parts_used.map((p, i) => {
+                                                const part = inventory.find(inv => inv.part_id === p.part_id);
+                                                return <div key={i} className="flex justify-between bg-gray-50 p-2 rounded"><span>{part?.part_name}</span><span>x{p.quantity}</span></div>
+                                            })}
                                         </div>
-                                    </div>
-                                )}
+                                    ) : <div className="text-gray-400 italic">No parts used.</div>}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1242,27 +1124,25 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                                 <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('part_name')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">Stock</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">Reorder Point</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">Cost</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase text-center">Action</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('stock_level')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('unit_cost')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {inventory.map(part => (
                                 <tr key={part.part_id} className="hover:bg-gray-50">
-                                    <td className="p-4 font-bold text-gray-900 text-sm">{part.part_name}</td>
+                                    <td className="p-4 font-bold text-sm text-gray-900">{part.part_name}</td>
                                     <td className="p-4">
-                                        <span className={`px-2 py-1 rounded text-xs font-bold ${part.current_stock <= part.min_reorder_level ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                            {part.current_stock} Units
+                                        <span className={`px-2 py-1 rounded font-bold text-xs ${part.current_stock <= part.min_reorder_level ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                            {part.current_stock} units
                                         </span>
                                     </td>
-                                    <td className="p-4 text-sm text-gray-600">{part.min_reorder_level}</td>
-                                    <td className="p-4 text-sm text-gray-600">${part.cost}</td>
-                                    <td className="p-4 text-center">
+                                    <td className="p-4 text-sm">${part.cost}</td>
+                                    <td className="p-4">
                                         <button 
                                             onClick={() => { setSelectedPartForRestock(part); setRestockModalOpen(true); }}
-                                            className="text-xs font-bold text-brand hover:underline"
+                                            className="text-brand hover:underline text-xs font-bold"
                                         >
                                             {t('btn_restock')}
                                         </button>
@@ -1273,23 +1153,25 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     </table>
                 </div>
 
-                {/* Restock Modal */}
                 {restockModalOpen && selectedPartForRestock && (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
-                            <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}</h3>
-                            <p className="text-sm text-gray-600 mb-4">{selectedPartForRestock.part_name}</p>
+                            <h3 className="font-bold text-lg mb-4">{t('restock_modal_title')}: {selectedPartForRestock.part_name}</h3>
                             <input 
                                 type="number" 
-                                className="input-modern mb-4"
-                                placeholder={t('restock_qty')}
+                                className="input-modern mb-4" 
+                                placeholder={t('restock_qty')} 
                                 value={restockQty} 
-                                onChange={(e) => setRestockQty(parseInt(e.target.value))}
+                                onChange={(e) => setRestockQty(parseInt(e.target.value))} 
                             />
                             {showRestockConfirm ? (
-                                <div className="space-y-3">
-                                    <p className="text-red-500 text-xs font-bold">{t('confirm_large_restock_msg').replace('{qty}', restockQty.toString())}</p>
-                                    <button onClick={handleRestock} className="w-full btn-primary bg-red-600 hover:bg-red-700">Confirm Large Restock</button>
+                                <div className="bg-red-50 p-3 rounded-lg mb-4 border border-red-100">
+                                    <p className="text-red-700 text-sm font-bold mb-2">High Quantity Warning</p>
+                                    <p className="text-red-600 text-xs mb-3">Adding {restockQty} units. Confirm?</p>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => setShowRestockConfirm(false)} className="flex-1 btn-secondary py-1 text-xs">Cancel</button>
+                                        <button onClick={handleRestock} className="flex-1 btn-primary py-1 text-xs bg-red-600 hover:bg-red-700">Confirm</button>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex gap-2">
@@ -1306,22 +1188,24 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // 5. CALIBRATION
     if (currentView === 'calibration') {
-        const overdue = assets.filter(a => a.next_calibration_date && new Date(a.next_calibration_date) < new Date());
+        const dueSoon = assets.filter(a => {
+            if (!a.next_calibration_date) return false;
+            const days = (new Date(a.next_calibration_date).getTime() - new Date().getTime()) / (1000 * 3600 * 24);
+            return days < 30 && days > 0;
+        });
+
         return (
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900">{t('nav_calibration')}</h2>
-                
-                {/* Alert Box */}
-                {overdue.length > 0 && (
-                    <div className="bg-red-50 border border-red-100 p-4 rounded-xl flex items-center gap-3">
-                        <AlertCircle className="text-red-500" size={24}/>
+                {dueSoon.length > 0 && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-start gap-3">
+                        <AlertCircle className="text-orange-500 mt-1" size={20}/>
                         <div>
-                            <h4 className="font-bold text-red-800">Compliance Alert</h4>
-                            <p className="text-sm text-red-600">{overdue.length} assets are overdue for calibration.</p>
+                            <h4 className="font-bold text-orange-800">Calibration Due Soon</h4>
+                            <p className="text-sm text-orange-700 mt-1">{dueSoon.length} assets require calibration within 30 days.</p>
                         </div>
                     </div>
                 )}
-
                 <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-200">
@@ -1329,33 +1213,188 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('asset_info')}</th>
                                 <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('last_cal')}</th>
                                 <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('next_due')}</th>
-                                <th className="p-4 text-xs font-bold text-gray-500 uppercase text-center">{t('status')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('status')}</th>
+                                <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            {assets.filter(a => a.next_calibration_date).map(asset => {
-                                const isOverdue = new Date(asset.next_calibration_date!) < new Date();
-                                return (
-                                    <tr key={asset.asset_id} className="hover:bg-gray-50">
-                                        <td className="p-4 font-bold text-gray-900 text-sm">{asset.name} <span className="text-gray-400 font-normal ml-1">({asset.asset_id})</span></td>
-                                        <td className="p-4 text-sm text-gray-600">{asset.last_calibration_date}</td>
-                                        <td className="p-4 text-sm text-gray-600">{asset.next_calibration_date}</td>
-                                        <td className="p-4 text-center">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold uppercase ${isOverdue ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                                                {isOverdue ? t('cal_overdue') : t('cal_compliant')}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {assets.filter(a => a.next_calibration_date).map(asset => (
+                                <tr key={asset.asset_id} className="hover:bg-gray-50">
+                                    <td className="p-4 text-sm font-bold">{asset.name}</td>
+                                    <td className="p-4 text-sm text-gray-600">{asset.last_calibration_date}</td>
+                                    <td className="p-4 text-sm text-gray-600">{asset.next_calibration_date}</td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${new Date(asset.next_calibration_date!) < new Date() ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                            {new Date(asset.next_calibration_date!) < new Date() ? 'Overdue' : 'Compliant'}
+                                        </span>
+                                    </td>
+                                    <td className="p-4">
+                                        <button 
+                                            onClick={() => { setSelectedAssetForCal(asset); setIsCalibrateModalOpen(true); }}
+                                            className="text-brand hover:underline text-xs font-bold"
+                                        >
+                                            {t('btn_update_cal')}
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
+
+                {isCalibrateModalOpen && selectedAssetForCal && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-sm animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('update_cal_title')}</h3>
+                            <p className="text-sm text-gray-500 mb-4">Record new calibration date for {selectedAssetForCal.name}.</p>
+                            <input 
+                                type="date" 
+                                className="input-modern mb-4" 
+                                value={newCalDate} 
+                                onChange={(e) => setNewCalDate(e.target.value)} 
+                            />
+                            <div className="flex gap-2">
+                                <button onClick={() => setIsCalibrateModalOpen(false)} className="flex-1 btn-secondary">{t('btn_cancel')}</button>
+                                <button onClick={handleCalibrateSubmit} disabled={!newCalDate} className="flex-1 btn-primary">{t('btn_record')}</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         );
     }
 
-    // 6. ANALYSIS
+    // 6. USERS
+    if (currentView === 'users') {
+        return (
+            <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_users')}</h2>
+                    <div className="bg-white p-1 rounded-xl border border-border flex shadow-sm">
+                        <button onClick={() => setUserMgmtTab('users')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'users' ? 'bg-brand text-white' : 'text-gray-500'}`}>Users List</button>
+                        <button onClick={() => setUserMgmtTab('roles')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'roles' ? 'bg-brand text-white' : 'text-gray-500'}`}>Roles & Permissions</button>
+                    </div>
+                </div>
+
+                {userMgmtTab === 'users' ? (
+                    <>
+                        <div className="flex justify-end mb-4">
+                            <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><UserPlus size={18}/> {t('add_user')}</button>
+                        </div>
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 border-b border-gray-200">
+                                    <tr>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_name')}</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_email')}</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_role')}</th>
+                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_dept')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {users.map(u => (
+                                        <tr key={u.user_id} className="hover:bg-gray-50">
+                                            <td className="p-4 text-sm font-bold">{u.name}</td>
+                                            <td className="p-4 text-sm text-gray-600">{u.email}</td>
+                                            <td className="p-4"><span className="bg-gray-100 px-2 py-1 rounded text-xs font-bold">{u.role}</span></td>
+                                            <td className="p-4 text-sm text-gray-600">{u.department || '-'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {roles.map(role => (
+                            <div key={role.id} className="bg-white p-6 rounded-2xl border border-border shadow-soft hover:shadow-md transition-all">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="font-bold text-gray-900 text-lg">{role.name}</h3>
+                                        <p className="text-xs text-gray-500 mt-1">{role.description}</p>
+                                    </div>
+                                    <button onClick={() => openRoleEditor(role)} className="p-2 hover:bg-gray-50 rounded-lg text-brand"><Sliders size={18}/></button>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="text-xs font-bold text-gray-400 uppercase">Access Overview</div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {Object.entries(role.permissions).map(([res, acts]) => (
+                                            acts.length > 0 && <span key={res} className="bg-gray-50 border border-gray-100 px-2 py-1 rounded text-[10px] text-gray-600 capitalize">{res} ({acts.length})</span>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Add User Modal */}
+                {isAddUserModalOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-md animate-in zoom-in-95">
+                            <h3 className="font-bold text-lg mb-4">{t('modal_add_user')}</h3>
+                            <form onSubmit={handleAddUserSubmit} className="space-y-4">
+                                <input className="input-modern" required placeholder="Full Name" value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})}/>
+                                <input className="input-modern" required type="email" placeholder="Email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})}/>
+                                <select className="input-modern" value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value})}>
+                                    <option value={UserRole.TECHNICIAN}>Technician</option>
+                                    <option value={UserRole.SUPERVISOR}>Supervisor</option>
+                                    <option value={UserRole.NURSE}>Nurse</option>
+                                </select>
+                                <button type="submit" className="w-full btn-primary">{t('btn_create_user')}</button>
+                            </form>
+                            <button onClick={() => setIsAddUserModalOpen(false)} className="absolute top-4 right-4"><X size={20}/></button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Role Editor Modal */}
+                {isRoleEditorOpen && editingRole && (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="font-bold text-xl">{t('permissions_matrix')}: {editingRole.name}</h3>
+                                    <p className="text-xs text-gray-500">Toggle capabilities for this role.</p>
+                                </div>
+                                <button onClick={() => setIsRoleEditorOpen(false)}><X size={20}/></button>
+                            </div>
+                            <div className="space-y-6">
+                                {(['assets', 'work_orders', 'inventory', 'reports', 'users'] as Resource[]).map(res => (
+                                    <div key={res} className="border-b border-gray-100 pb-4 last:border-0">
+                                        <h4 className="font-bold text-gray-800 text-sm uppercase mb-3 flex items-center gap-2">
+                                            {res === 'assets' ? <Box size={16}/> : res === 'work_orders' ? <CheckCircle2 size={16}/> : <FileText size={16}/>}
+                                            {t(`res_${res}` as any)}
+                                        </h4>
+                                        <div className="grid grid-cols-4 gap-4">
+                                            {(['view', 'create', 'edit', 'delete'] as Action[]).map(act => {
+                                                const isAllowed = editingRole.permissions[res]?.includes(act);
+                                                return (
+                                                    <button
+                                                        key={act}
+                                                        onClick={() => togglePermission(res, act)}
+                                                        className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold border transition-all ${isAllowed ? 'bg-green-50 border-green-200 text-green-700' : 'bg-gray-50 border-gray-100 text-gray-400'}`}
+                                                    >
+                                                        {isAllowed ? <Unlock size={14}/> : <Lock size={14}/>}
+                                                        {t(`act_${act}` as any)}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="mt-6 flex justify-end">
+                                <button onClick={() => { api.saveRole(editingRole); setIsRoleEditorOpen(false); }} className="btn-primary py-2 px-6">Save Changes</button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // 7. ANALYSIS & REPORTS
     if (currentView === 'analysis') {
         return (
             <div className="space-y-6">
@@ -1372,501 +1411,202 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     ))}
                 </div>
 
+                {/* 1. Analytics Charts */}
                 {activeTab === 'tab_analytics' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-6 animate-in fade-in">
                         <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                            <h3 className="font-bold text-gray-900 mb-4">MTTR Trend (6 Months)</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={analyticsData.mttrTrend}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                    <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={12}/>
-                                    <YAxis axisLine={false} tickLine={false} fontSize={12}/>
-                                    <Tooltip/>
-                                    <Line type="monotone" dataKey="hours" stroke="#2563EB" strokeWidth={3} dot={{r: 4}} activeDot={{r: 6}}/>
-                                </LineChart>
-                            </ResponsiveContainer>
+                            <h3 className="font-bold text-gray-900 mb-4">{t('table_risk_report')}</h3>
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-xs text-gray-500 uppercase font-bold"><tr><th className="p-3">Asset</th><th className="p-3">Risk Score</th><th className="p-3">Status</th></tr></thead>
+                                <tbody>
+                                    {assets.sort((a,b) => b.risk_score - a.risk_score).slice(0,5).map(a => (
+                                        <tr key={a.asset_id} className="border-b last:border-0"><td className="p-3 text-sm font-bold">{a.name}</td><td className="p-3"><div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden"><div className={`h-full ${a.risk_score > 70 ? 'bg-red-500' : 'bg-green-500'}`} style={{width: `${a.risk_score}%`}}></div></div></td><td className="p-3 text-xs">{a.risk_score > 70 ? 'Critical' : 'Monitor'}</td></tr>
+                                    ))}
+                                </tbody>
+                            </table>
                         </div>
+                    </div>
+                )}
+
+                {/* 2. Knowledge Base with AI */}
+                {activeTab === 'tab_kb' && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
+                            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><Sparkles size={20} className="text-brand"/> {t('kb_ai_search')}</h3>
+                            <textarea 
+                                className="input-modern min-h-[120px] mb-4" 
+                                placeholder={t('ai_search_placeholder')}
+                                value={aiQuery}
+                                onChange={(e) => setAiQuery(e.target.value)}
+                            />
+                            <button 
+                                onClick={handleAiSearch} 
+                                disabled={isAiSearching || !aiQuery}
+                                className="w-full btn-primary"
+                            >
+                                {isAiSearching ? t('analyzing') : t('btn_analyze')}
+                            </button>
+                        </div>
+                        <div className="col-span-2 space-y-6">
+                            {aiResult && (
+                                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl animate-in slide-in-from-top-4">
+                                    <h4 className="font-bold text-indigo-900 text-lg mb-2">{t('ai_explanation')}</h4>
+                                    <p className="text-indigo-800 text-sm mb-4">{aiResult.explanation}</p>
+                                    <h4 className="font-bold text-indigo-900 text-lg mb-2">{t('ai_solution')}</h4>
+                                    <div className="bg-white p-4 rounded-xl border border-indigo-100 text-sm text-gray-700 whitespace-pre-wrap">{aiResult.solution}</div>
+                                </div>
+                            )}
+                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
+                                <h3 className="font-bold text-gray-900 mb-4">{t('kb_library')}</h3>
+                                <div className="space-y-2">
+                                    {filteredKbDocs.map(doc => (
+                                        <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-colors cursor-pointer">
+                                            <div className="flex items-center gap-3">
+                                                <Book size={20} className="text-gray-400"/>
+                                                <div>
+                                                    <div className="font-bold text-sm text-gray-900">{doc.title}</div>
+                                                    <div className="flex gap-2 mt-1">{doc.tags.map(tag => <span key={tag} className="text-[10px] bg-gray-100 px-2 rounded text-gray-500 uppercase">{tag}</span>)}</div>
+                                                </div>
+                                            </div>
+                                            <ChevronLeft size={16} className="text-gray-400 rtl:rotate-180"/>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. Report Generator */}
+                {activeTab === 'tab_gen_report' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-fit">
+                            <h3 className="font-bold text-gray-900 mb-4">{t('gen_report')}</h3>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Report Type</label>
+                                    <select className="input-modern">
+                                        <option>Job Order Report (Corrective)</option>
+                                        <option>PPM Compliance Report</option>
+                                        <option>Asset Lifecycle Report</option>
+                                    </select>
+                                </div>
+                                <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
+                                    <FileText size={48} className="mx-auto text-gray-300 mb-2"/>
+                                    <p className="text-xs text-gray-500">Preview generated reports here before downloading.</p>
+                                </div>
+                                <button onClick={handlePrintReport} className="w-full btn-primary"><Printer size={18}/> Print / PDF</button>
+                            </div>
+                        </div>
+                        {/* Printable Report Preview */}
+                        <div className="bg-white p-8 rounded-xl border border-border shadow-sm text-xs font-serif leading-relaxed h-[600px] overflow-y-auto">
+                            <div className="text-center border-b-2 border-black pb-4 mb-4">
+                                <h1 className="text-xl font-bold uppercase">Job Order Report</h1>
+                                <p>First Gulf Company - Kingdom of Saudi Arabia</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div><strong>Job Order No:</strong> 2236</div>
+                                <div><strong>Date:</strong> 2023-10-25</div>
+                                <div><strong>Asset:</strong> Ventilator Servo-U</div>
+                                <div><strong>Location:</strong> ICU - Room 101</div>
+                            </div>
+                            <div className="mb-4">
+                                <strong>Fault Description:</strong><br/>
+                                Unit failed self-test (Code E045). Flow sensor error detected.
+                            </div>
+                            <div className="mb-8">
+                                <strong>Work Done:</strong><br/>
+                                Replaced flow sensor. Calibrated flow offset. Verified operation with test lung.
+                            </div>
+                            <div className="grid grid-cols-3 gap-8 mt-12 text-center">
+                                <div className="border-t border-black pt-2">Technician</div>
+                                <div className="border-t border-black pt-2">Supervisor</div>
+                                <div className="border-t border-black pt-2">Nurse In-Charge</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. Training Dashboard */}
+                {activeTab === 'tab_training' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in">
                         <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                            <h3 className="font-bold text-gray-900 mb-4">Technician Performance</h3>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <BarChart data={analyticsData.technicianStats}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12}/>
-                                    <YAxis axisLine={false} tickLine={false} fontSize={12}/>
-                                    <Tooltip cursor={{fill: 'transparent'}}/>
+                            <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><GraduationCap size={20} className="text-brand"/> {t('training_dashboard')}</h3>
+                            {analyticsData.trainingData.length > 0 ? (
+                                <div className="space-y-4">
+                                    {analyticsData.trainingData.map((d, i) => (
+                                        <div key={d.department} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-brand shadow-sm">{i + 1}</div>
+                                                <div>
+                                                    <div className="font-bold text-gray-900">{d.department}</div>
+                                                    <div className="text-xs text-gray-500">{t('error_frequency')}: {d.errors}</div>
+                                                </div>
+                                            </div>
+                                            <span className={`px-2 py-1 text-xs font-bold rounded ${d.recommendation.includes('Training') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{d.recommendation}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-10 text-gray-400"><Check size={48} className="mx-auto mb-2 text-green-200"/><p>{t('no_major_errors')}</p></div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 5. TCO & Financials */}
+                {activeTab === 'tab_financial' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in">
+                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft h-[300px]">
+                            <h3 className="font-bold text-gray-900 mb-4">{t('chart_cost_vs_value')}</h3>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={analyticsData.tcoData} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false}/>
+                                    <XAxis type="number" hide/>
+                                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 10}}/>
+                                    <Tooltip/>
                                     <Legend/>
-                                    <Bar dataKey="jobs" fill="#2563EB" radius={[4, 4, 0, 0]} name="Jobs Done"/>
-                                    <Bar dataKey="mttr" fill="#F59E0B" radius={[4, 4, 0, 0]} name="Avg MTTR (h)"/>
+                                    <Bar dataKey="purchase" name="Purchase Cost" fill="#cbd5e1" stackId="a" radius={[0,4,4,0]}/>
+                                    <Bar dataKey="maintenance" name="Maint. Cost" fill="#ef4444" stackId="a" radius={[0,4,4,0]}/>
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
                 )}
 
-                {activeTab === 'tab_financial' && (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                                <h3 className="font-bold text-gray-900 mb-4">Cost Analysis by Department</h3>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={analyticsData.costAnalysis} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={true} stroke="#f1f5f9"/>
-                                        <XAxis type="number" axisLine={false} tickLine={false} fontSize={12}/>
-                                        <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} fontSize={12} width={100}/>
-                                        <Tooltip cursor={{fill: 'transparent'}}/>
-                                        <Legend/>
-                                        <Bar dataKey="parts" stackId="a" fill="#2563EB" radius={[0, 4, 4, 0]} name="Parts Cost"/>
-                                        <Bar dataKey="labor" stackId="a" fill="#10B981" radius={[0, 4, 4, 0]} name="Labor Cost"/>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                                <h3 className="font-bold text-gray-900 mb-4">Total Cost of Ownership (Top 5)</h3>
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={analyticsData.tcoData}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={10} angle={-45} textAnchor="end" height={60}/>
-                                        <YAxis axisLine={false} tickLine={false} fontSize={12}/>
-                                        <Tooltip/>
-                                        <Legend/>
-                                        <Bar dataKey="purchase" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Purchase Price"/>
-                                        <Bar dataKey="maintenance" fill="#ef4444" radius={[4, 4, 0, 0]} name="Maint. Cost"/>
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
+                {/* 6. Vendor Ratings */}
                 {activeTab === 'tab_vendor' && (
-                    <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Vendor</th>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Reliability Score</th>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Defect Rate</th>
-                                    <th className="p-4 text-xs font-bold text-gray-500 uppercase">Recommendation</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {analyticsData.vendorData.map((v: any) => (
-                                    <tr key={v.name} className="hover:bg-gray-50">
-                                        <td className="p-4 font-bold text-gray-900">{v.name}</td>
-                                        <td className="p-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                                    <div className={`h-full ${v.score > 80 ? 'bg-green-500' : v.score > 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width: `${v.score}%`}}></div>
-                                                </div>
-                                                <span className="text-xs font-bold">{v.score.toFixed(0)}%</span>
-                                            </div>
-                                        </td>
-                                        <td className="p-4 text-sm text-gray-600">{v.defects} Failures / {v.totalAssets} Units</td>
-                                        <td className="p-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${v.score > 70 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {v.score > 70 ? 'Recommended' : 'Review Contract'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
-                {activeTab === 'tab_training' && (
-                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center justify-center min-h-[300px] text-center">
-                        <div>
-                            <GraduationCap size={48} className="text-brand/30 mx-auto mb-4"/>
-                            <h3 className="text-lg font-bold text-gray-900">Training Insights</h3>
-                            <p className="text-sm text-gray-500 max-w-md mx-auto mt-2">No user-error patterns detected requiring intervention at this time.</p>
-                        </div>
-                    </div>
-                )}
-
-                {activeTab === 'tab_kb' && (
-                    <div className="space-y-4">
-                        <div className="flex gap-2">
-                            <input 
-                                className="input-modern flex-1" 
-                                placeholder="Describe fault or enter error code for AI analysis..." 
-                                value={aiQuery}
-                                onChange={(e) => setAiQuery(e.target.value)}
-                            />
-                            <button 
-                                onClick={handleAiSearch}
-                                disabled={isAiSearching}
-                                className="btn-primary"
-                            >
-                                {isAiSearching ? 'Analyzing...' : 'AI Search'}
-                            </button>
-                        </div>
-                        
-                        {aiResult && (
-                            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 animate-in slide-in-from-top-2">
-                                <h4 className="font-bold text-indigo-900 flex items-center gap-2 mb-2"><Sparkles size={16}/> AI Analysis</h4>
-                                <p className="text-sm text-indigo-800 mb-3">{aiResult.explanation}</p>
-                                <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                                    <div className="text-xs font-bold text-indigo-500 uppercase mb-1">Suggested Solution</div>
-                                    <p className="text-sm text-gray-800">{aiResult.solution}</p>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            {filteredKbDocs.map(doc => (
-                                <div key={doc.id} className="p-4 bg-white rounded-xl border border-gray-200 hover:border-brand transition-all cursor-pointer flex justify-between items-center group">
-                                    <div className="flex items-center gap-3">
-                                        <Book size={20} className="text-brand"/>
-                                        <span className="font-bold text-gray-800 text-sm group-hover:text-brand">{doc.title}</span>
+                    <div className="space-y-6 animate-in fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {analyticsData.vendorData.slice(0,3).map((v: any, i) => (
+                                <div key={v.name} className="bg-white p-6 rounded-2xl border border-border shadow-soft relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 font-black text-6xl text-gray-100 -z-10">#{i+1}</div>
+                                    <h3 className="font-bold text-gray-900 text-lg">{v.name}</h3>
+                                    <div className="flex gap-4 mt-4">
+                                        <div><div className="text-xs text-gray-500 uppercase font-bold">Reliability</div><div className="text-xl font-bold text-brand">{v.reliability.toFixed(1)}%</div></div>
+                                        <div><div className="text-xs text-gray-500 uppercase font-bold">Defects</div><div className="text-xl font-bold text-gray-800">{v.defects}</div></div>
                                     </div>
-                                    <Download size={18} className="text-gray-400 hover:text-brand"/>
+                                    <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 text-sm font-bold text-green-600"><CheckCircle2 size={16}/> Recommended Partner</div>
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {activeTab === 'tab_gen_report' && (
-                    <div className="space-y-6">
-                        {/* Controls - Hidden on Print */}
-                        <div className="bg-white p-4 rounded-2xl border border-border shadow-soft flex items-center justify-between print:hidden">
-                             <div>
-                                <h3 className="font-bold text-gray-900">Job Order Report Generator</h3>
-                                <p className="text-sm text-gray-500">Generate compliance-ready PDF reports.</p>
-                             </div>
-                             <div className="flex gap-2">
-                                 <button onClick={() => setSelectedJobReport(getDetailedReports()[0])} className="btn-secondary text-sm">Load Sample CM Report</button>
-                                 {selectedJobReport && (
-                                     <button onClick={handlePrintReport} className="btn-primary text-sm flex items-center gap-2">
-                                        <Printer size={16} /> Print / Save PDF
-                                     </button>
-                                 )}
-                             </div>
-                        </div>
-
-                        {/* Report Preview / Print Area */}
-                        {selectedJobReport ? (
-                            <div className="bg-white p-8 shadow-2xl mx-auto print:shadow-none print:w-full print:max-w-none print:p-0 print:m-0" style={{ maxWidth: '210mm', minHeight: '297mm' }}>
-                                {/* Print CSS Styles */}
-                                <style>{`
-                                    @media print {
-                                        @page { size: A4; margin: 10mm; }
-                                        body * { visibility: hidden; }
-                                        #printable-report, #printable-report * { visibility: visible; }
-                                        #printable-report { position: absolute; left: 0; top: 0; width: 100%; }
-                                        .no-print { display: none !important; }
-                                    }
-                                `}</style>
-
-                                <div id="printable-report" className="font-serif text-black">
-                                    {/* Header */}
-                                    <div className="border-b-2 border-black pb-4 mb-6 flex justify-between items-end">
-                                        <div>
-                                            <h1 className="text-2xl font-bold uppercase tracking-wider">Job Order Report</h1>
-                                            <div className="text-sm mt-1">First Gulf Company | Kingdom of Saudi Arabia</div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-xs font-bold uppercase text-gray-500">Report ID</div>
-                                            <div className="font-mono font-bold text-lg">{selectedJobReport.report_id}</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section I: Job ID */}
-                                    <div className="grid grid-cols-3 gap-4 mb-6 border border-black p-4">
-                                        <div>
-                                            <div className="text-xs font-bold uppercase text-gray-500 mb-1">Job Order No.</div>
-                                            <div className="font-bold">{selectedJobReport.job_order_no}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-bold uppercase text-gray-500 mb-1">Control No.</div>
-                                            <div className="font-bold">{selectedJobReport.control_no}</div>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs font-bold uppercase text-gray-500 mb-1">Risk Factor</div>
-                                            <div className="font-bold">{selectedJobReport.risk_factor}</div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section II: Asset & Location */}
-                                    <div className="mb-6">
-                                        <h3 className="font-bold uppercase bg-gray-100 p-2 border-t border-l border-r border-black text-sm">Asset & Location Details</h3>
-                                        <div className="border border-black grid grid-cols-2">
-                                            <div className="p-2 border-r border-b border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Equipment Name</span>
-                                                {selectedJobReport.asset.name}
-                                            </div>
-                                            <div className="p-2 border-b border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Manufacturer</span>
-                                                {selectedJobReport.asset.manufacturer}
-                                            </div>
-                                            <div className="p-2 border-r border-b border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Model</span>
-                                                {selectedJobReport.asset.model}
-                                            </div>
-                                            <div className="p-2 border-b border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Serial No.</span>
-                                                {selectedJobReport.asset.serial_no}
-                                            </div>
-                                            <div className="p-2 border-r border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Department</span>
-                                                {selectedJobReport.location.department}
-                                            </div>
-                                            <div className="p-2 border-black">
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Location / Room</span>
-                                                {selectedJobReport.location.room}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section III: Fault & Remedy */}
-                                    <div className="mb-6">
-                                        <h3 className="font-bold uppercase bg-gray-100 p-2 border-t border-l border-r border-black text-sm">Fault & Remedy</h3>
-                                        <div className="border border-black p-4 space-y-4">
-                                            <div className="flex justify-between">
-                                                <div>
-                                                    <span className="text-[10px] uppercase font-bold text-gray-500">Failed Date</span>
-                                                    <div className="font-bold">{selectedJobReport.fault_details.failed_date}</div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[10px] uppercase font-bold text-gray-500">Repair Date</span>
-                                                    <div className="font-bold">{selectedJobReport.fault_details.repair_date}</div>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[10px] uppercase font-bold text-gray-500">Technician</span>
-                                                    <div className="font-bold">{selectedJobReport.fault_details.technician_name}</div>
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Fault Description</span>
-                                                <p className="text-sm">{selectedJobReport.fault_details.fault_description}</p>
-                                            </div>
-                                            <div>
-                                                <span className="block text-[10px] uppercase font-bold text-gray-500">Work Done / Remedy</span>
-                                                <p className="text-sm">{selectedJobReport.fault_details.remedy_work_done}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Section IV: QC Analysis */}
-                                    <div className="mb-6">
-                                        <h3 className="font-bold uppercase bg-gray-100 p-2 border-t border-l border-r border-black text-sm">Quality Control Analysis</h3>
-                                        <div className="border border-black p-4 grid grid-cols-4 gap-4 text-xs">
-                                            <label className="flex items-center gap-2"><input type="checkbox" checked={selectedJobReport.qc_analysis.need_calibration} readOnly/> Need Calibration</label>
-                                            <label className="flex items-center gap-2"><input type="checkbox" checked={selectedJobReport.qc_analysis.user_errors} readOnly/> User Errors</label>
-                                            <label className="flex items-center gap-2"><input type="checkbox" checked={selectedJobReport.qc_analysis.unrepairable} readOnly/> Unrepairable</label>
-                                            <label className="flex items-center gap-2"><input type="checkbox" checked={selectedJobReport.qc_analysis.incident} readOnly/> Incident</label>
-                                        </div>
-                                    </div>
-
-                                    {/* Section V: Approvals */}
-                                    <div className="mt-8 border-t-2 border-black pt-6">
-                                        <div className="grid grid-cols-3 gap-8 text-center">
-                                            <div>
-                                                <div className="h-16 border-b border-gray-400 mb-2 flex items-end justify-center pb-2">
-                                                    <span className="font-script text-xl">{selectedJobReport.approvals.dept_head.name}</span>
-                                                </div>
-                                                <div className="text-xs font-bold uppercase">Department Head</div>
-                                                <div className="text-[10px] text-gray-500">{selectedJobReport.approvals.dept_head.date}</div>
-                                            </div>
-                                            <div>
-                                                <div className="h-16 border-b border-gray-400 mb-2 flex items-end justify-center pb-2">
-                                                    <span className="font-script text-xl">{selectedJobReport.approvals.site_supervisor.name}</span>
-                                                </div>
-                                                <div className="text-xs font-bold uppercase">Site Supervisor</div>
-                                                <div className="text-[10px] text-gray-500">{selectedJobReport.approvals.site_supervisor.date}</div>
-                                            </div>
-                                            <div>
-                                                <div className="h-16 border-b border-gray-400 mb-2 flex items-end justify-center pb-2">
-                                                    <span className="font-script text-xl">{selectedJobReport.approvals.site_admin.name}</span>
-                                                </div>
-                                                <div className="text-xs font-bold uppercase">Site Admin</div>
-                                                <div className="text-[10px] text-gray-500">{selectedJobReport.approvals.site_admin.date}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl">
-                                <FileText size={48} className="mb-4 opacity-50"/>
-                                <p>No report loaded.</p>
-                            </div>
-                        )}
-                    </div>
-                )}
-
+                {/* 7. Capital Budget */}
                 {activeTab === 'tab_budget' && (
-                    <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
-                            <h3 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
-                                <Coins size={20} className="text-brand"/> {t('forecast_5y')}
-                            </h3>
-                            <ResponsiveContainer width="100%" height={300}>
+                    <div className="bg-white p-6 rounded-2xl border border-border shadow-soft animate-in fade-in">
+                        <h3 className="font-bold text-gray-900 mb-6">{t('forecast_5y')}</h3>
+                        <div className="h-[300px]">
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={analyticsData.budgetForecast}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                    <XAxis dataKey="year" axisLine={false} tickLine={false} fontSize={12}/>
-                                    <YAxis axisLine={false} tickLine={false} fontSize={12}/>
-                                    <Tooltip cursor={{fill: 'transparent'}}/>
-                                    <Bar dataKey="amount" fill="#10B981" radius={[4, 4, 0, 0]} name="Estimated Replacement Cost ($)"/>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false}/>
+                                    <XAxis dataKey="year"/>
+                                    <YAxis/>
+                                    <Tooltip formatter={(value) => `$${value}`}/>
+                                    <Bar dataKey="amount" fill="#2563eb" radius={[4,4,0,0]} name="Est. Replacement Cost" />
                                 </BarChart>
                             </ResponsiveContainer>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                                {analyticsData.budgetForecast.map(item => (
-                                    <div key={item.year} className="p-4 bg-gray-50 rounded-xl border border-gray-100 text-center">
-                                        <div className="text-xs font-bold text-gray-500 uppercase">{item.year}</div>
-                                        <div className="text-xl font-black text-gray-900">${item.amount.toLocaleString()}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    // 7. USERS & ROLES
-    if (currentView === 'users' && isAdmin) {
-        return (
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold text-gray-900">{t('nav_users')}</h2>
-                    <div className="flex gap-2">
-                        <button onClick={() => setUserMgmtTab('users')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'users' ? 'bg-brand text-white' : 'text-gray-500 bg-gray-100'}`}>Users</button>
-                        <button onClick={() => setUserMgmtTab('roles')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${userMgmtTab === 'roles' ? 'bg-brand text-white' : 'text-gray-500 bg-gray-100'}`}>Roles & Permissions</button>
-                    </div>
-                </div>
-
-                {userMgmtTab === 'users' ? (
-                    <>
-                        <div className="flex justify-end mb-4">
-                            <button onClick={() => setIsAddUserModalOpen(true)} className="btn-primary py-2 px-4 text-sm"><UserPlus size={18}/> {t('add_user')}</button>
-                        </div>
-                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
-                            <table className="w-full text-left">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_name')}</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_role')}</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_dept')}</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">{t('user_email')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {users.map(u => (
-                                        <tr key={u.user_id} className="hover:bg-gray-50">
-                                            <td className="p-4 font-bold text-gray-900 text-sm">{u.name}</td>
-                                            <td className="p-4"><span className="bg-gray-100 px-2 py-1 rounded text-xs font-bold text-gray-600">{u.role}</span></td>
-                                            <td className="p-4 text-sm text-gray-600">{u.department || '-'}</td>
-                                            <td className="p-4 text-sm text-gray-600">{u.email}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {roles.map(role => (
-                            <div key={role.id} className="bg-white p-6 rounded-2xl border border-border shadow-soft hover:shadow-md transition-all">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-brand/10 text-brand rounded-xl">
-                                        <ShieldCheckIcon size={24}/>
-                                    </div>
-                                    {role.is_system_role && <span className="bg-gray-100 text-gray-500 text-[10px] uppercase font-bold px-2 py-1 rounded">System</span>}
-                                </div>
-                                <h3 className="font-bold text-lg text-gray-900">{role.name}</h3>
-                                <p className="text-sm text-gray-500 mt-1 mb-4 h-10">{role.description}</p>
-                                <button 
-                                    onClick={() => openRoleEditor(role)}
-                                    className="w-full btn-secondary text-sm"
-                                >
-                                    Edit Permissions
-                                </button>
-                            </div>
-                        ))}
-                        <button className="border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center p-6 text-gray-400 hover:text-brand hover:border-brand hover:bg-brand/5 transition-all">
-                            <Plus size={32} className="mb-2"/>
-                            <span className="font-bold text-sm">Create Custom Role</span>
-                        </button>
-                    </div>
-                )}
-
-                {/* Role Editor Modal */}
-                {isRoleEditorOpen && editingRole && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 className="text-xl font-bold text-gray-900">Edit Permissions: {editingRole.name}</h3>
-                                <button onClick={() => setIsRoleEditorOpen(false)}><X size={20}/></button>
-                            </div>
-                            
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-50">
-                                        <tr>
-                                            <th className="p-3 font-bold text-gray-600">Resource</th>
-                                            <th className="p-3 text-center font-bold text-gray-600">View</th>
-                                            <th className="p-3 text-center font-bold text-gray-600">Create</th>
-                                            <th className="p-3 text-center font-bold text-gray-600">Edit</th>
-                                            <th className="p-3 text-center font-bold text-gray-600">Delete</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {(['assets', 'work_orders', 'inventory', 'reports', 'users', 'settings'] as Resource[]).map(res => (
-                                            <tr key={res}>
-                                                <td className="p-3 font-bold text-gray-800 capitalize">{res.replace('_', ' ')}</td>
-                                                {(['view', 'create', 'edit', 'delete'] as Action[]).map(act => {
-                                                    const isChecked = editingRole.permissions[res]?.includes(act);
-                                                    return (
-                                                        <td key={act} className="p-3 text-center">
-                                                            <input 
-                                                                type="checkbox" 
-                                                                checked={isChecked} 
-                                                                onChange={() => togglePermission(res, act)}
-                                                                className="rounded border-gray-300 text-brand focus:ring-brand w-4 h-4"
-                                                            />
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div className="flex justify-end gap-3 mt-6">
-                                <button onClick={() => setIsRoleEditorOpen(false)} className="btn-secondary">Cancel</button>
-                                <button onClick={() => { /* Save logic would go here via API */ setIsRoleEditorOpen(false); }} className="btn-primary">Save Changes</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Add User Modal */}
-                {isAddUserModalOpen && (
-                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-2xl p-6 w-full max-w-lg animate-in zoom-in-95">
-                            <h3 className="font-bold text-lg mb-4">{t('modal_add_user')}</h3>
-                            <form onSubmit={handleAddUserSubmit} className="space-y-3">
-                                <input placeholder={t('user_name')} className="input-modern" value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} required/>
-                                <input placeholder={t('user_email')} className="input-modern" type="email" value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} required/>
-                                <input placeholder={t('user_phone')} className="input-modern" value={newUserForm.phone} onChange={e => setNewUserForm({...newUserForm, phone: e.target.value})}/>
-                                <input placeholder={t('user_password')} className="input-modern" type="password" value={newUserForm.password} onChange={e => setNewUserForm({...newUserForm, password: e.target.value})} required/>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <select className="input-modern" value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value})}>
-                                        <option value={UserRole.TECHNICIAN}>{UserRole.TECHNICIAN}</option>
-                                        <option value={UserRole.ENGINEER}>{UserRole.ENGINEER}</option>
-                                        <option value={UserRole.SUPERVISOR}>{UserRole.SUPERVISOR}</option>
-                                        <option value={UserRole.NURSE}>{UserRole.NURSE}</option>
-                                    </select>
-                                    <input placeholder={t('user_dept')} className="input-modern" value={newUserForm.department} onChange={e => setNewUserForm({...newUserForm, department: e.target.value})}/>
-                                </div>
-                                <div className="flex justify-end gap-3 pt-2">
-                                    <button type="button" onClick={() => setIsAddUserModalOpen(false)} className="btn-secondary">{t('btn_cancel')}</button>
-                                    <button type="submit" className="btn-primary">{t('btn_create_user')}</button>
-                                </div>
-                            </form>
                         </div>
                     </div>
                 )}
@@ -1877,7 +1617,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     // 8. RFID
     if (currentView === 'rfid') {
         return (
-            <div className="space-y-6">
+            <div className="space-y-6 animate-in slide-in-from-right-4">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold text-gray-900">{t('nav_rfid')}</h2>
                     <div className={`px-3 py-1 rounded-full text-xs font-bold flex items-center gap-2 ${zebraStatus !== 'disconnected' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -1887,8 +1627,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 </div>
 
                 <div className="bg-white p-1 rounded-xl border border-border inline-flex shadow-sm mb-4">
-                    <button onClick={() => setRfidTab('audit')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${rfidTab === 'audit' ? 'bg-brand text-white shadow-md' : 'text-gray-500'}`}>Audit Inventory</button>
-                    <button onClick={() => setRfidTab('gate')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${rfidTab === 'gate' ? 'bg-brand text-white shadow-md' : 'text-gray-500'}`}>Gate Monitor</button>
+                    <button onClick={() => setRfidTab('audit')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${rfidTab === 'audit' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Audit Inventory</button>
+                    <button onClick={() => setRfidTab('gate')} className={`px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${rfidTab === 'gate' ? 'bg-brand text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>Gate Monitor</button>
                 </div>
 
                 {rfidTab === 'audit' && (
@@ -1896,22 +1636,22 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         <div className="bg-white p-6 rounded-2xl border border-border shadow-soft flex items-center justify-between">
                             <div>
                                 <h3 className="font-bold text-gray-900 text-lg">Active Audit: ICU Dept</h3>
-                                <p className="text-sm text-gray-500">Progress: {activeAudit ? Math.round((activeAudit.total_scanned / activeAudit.total_expected) * 100) : 0}%</p>
+                                {activeAudit ? (
+                                    <div className="mt-2">
+                                        <div className="text-sm text-gray-500 mb-1">Progress: {activeAudit.total_scanned} / {activeAudit.total_expected} Assets</div>
+                                        <div className="w-64 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-brand transition-all duration-500" style={{ width: `${(activeAudit.total_scanned / activeAudit.total_expected) * 100}%` }}></div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-gray-500 mt-1">Select a department to begin auditing.</p>
+                                )}
                             </div>
                             <div className="flex gap-2">
                                 {activeAudit && (
-                                    <button 
-                                        onClick={handleSimulateScan} 
-                                        className="btn-secondary text-xs"
-                                    >
-                                        Simulate Scan
-                                    </button>
+                                    <button onClick={handleSimulateScan} className="btn-secondary text-xs">Simulate Scan</button>
                                 )}
-                                <button 
-                                    onClick={() => !activeAudit && handleStartAudit('ICU')} 
-                                    disabled={!!activeAudit}
-                                    className="btn-primary py-2 px-4 text-sm disabled:opacity-50"
-                                >
+                                <button onClick={() => !activeAudit && handleStartAudit('ICU')} disabled={!!activeAudit} className="btn-primary py-2 px-4 text-sm disabled:opacity-50">
                                     {activeAudit ? 'Audit In Progress' : 'Start Audit'}
                                 </button>
                             </div>
@@ -1919,16 +1659,18 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         {activeAudit && (
                             <div className="grid grid-cols-2 gap-6">
                                 <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                                    <h4 className="font-bold text-green-800 mb-2">Found Assets ({activeAudit.found_assets.length})</h4>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    <h4 className="font-bold text-green-800 mb-2 flex items-center gap-2"><Check size={16}/> Found Assets ({activeAudit.found_assets.length})</h4>
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                         {activeAudit.found_assets.map(id => (
-                                            <div key={id} className="bg-white p-2 rounded border border-green-100 text-xs font-mono flex items-center gap-2"><Check size={12} className="text-green-500"/> {id}</div>
+                                            <div key={id} className="bg-white p-2 rounded border border-green-100 text-xs font-mono flex items-center gap-2 shadow-sm animate-in zoom-in">
+                                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>{id}
+                                            </div>
                                         ))}
                                     </div>
                                 </div>
                                 <div className="bg-red-50 p-4 rounded-xl border border-red-100">
-                                    <h4 className="font-bold text-red-800 mb-2">Missing Assets ({activeAudit.missing_assets.length})</h4>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2"><AlertCircle size={16}/> Missing Assets ({activeAudit.missing_assets.length})</h4>
+                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                         {activeAudit.missing_assets.map(id => (
                                             <div key={id} className="bg-white p-2 rounded border border-red-100 text-xs font-mono opacity-60">{id}</div>
                                         ))}
@@ -1943,11 +1685,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-gray-900">Live Gate Activity</h3>
-                            <button 
-                                onClick={() => setIsGateMonitoring(!isGateMonitoring)}
-                                className={`btn-secondary py-2 px-4 text-sm ${isGateMonitoring ? 'text-red-600 border-red-200 bg-red-50' : ''}`}
-                            >
-                                {isGateMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
+                            <button onClick={() => setIsGateMonitoring(!isGateMonitoring)} className={`btn-secondary py-2 px-4 text-sm flex items-center gap-2 ${isGateMonitoring ? 'text-red-600 border-red-200 bg-red-50' : 'text-green-600 border-green-200 bg-green-50'}`}>
+                                <Radio size={16} className={isGateMonitoring ? 'animate-pulse' : ''}/> {isGateMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
                             </button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1964,29 +1703,17 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Time</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Gate</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Asset</th>
-                                        <th className="p-4 text-xs font-bold text-gray-500 uppercase">Direction</th>
-                                    </tr>
+                                    <tr><th className="p-4 text-xs font-bold text-gray-500 uppercase">Time</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Gate</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Asset</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Direction</th></tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {gateLogs.map(log => (
                                         <tr key={log.id} className="animate-in slide-in-from-left-2">
                                             <td className="p-4 text-xs text-gray-500 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                                            <td className="p-4 text-sm font-bold text-gray-800">{gateReaders.find(r => r.id === log.gate_location_id)?.name}</td>
+                                            <td className="p-4 text-sm font-bold text-gray-800">{gateReaders.find(r => r.id === log.gate_location_id)?.name || 'Unknown Gate'}</td>
                                             <td className="p-4 text-sm text-gray-600">{assets.find(a => a.asset_id === log.asset_id)?.name || log.rfid_tag}</td>
-                                            <td className="p-4">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.direction === 'ENTER' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>
-                                                    {log.direction}
-                                                </span>
-                                            </td>
+                                            <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.direction === 'ENTER' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{log.direction}</span></td>
                                         </tr>
                                     ))}
-                                    {gateLogs.length === 0 && (
-                                        <tr><td colSpan={4} className="p-8 text-center text-gray-400 italic">No activity detected yet.</td></tr>
-                                    )}
                                 </tbody>
                             </table>
                         </div>

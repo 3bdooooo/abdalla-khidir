@@ -225,6 +225,10 @@ export const authenticateUser = async (email: string, pass: string): Promise<Use
                 .single();
             
             if (error || !data) return null;
+            
+            // Simple password check (In real app, use Supabase Auth or hashed passwords)
+            if (data.password_hash && data.password_hash !== pass) return null;
+            
             return data as User;
         } catch (e) {
             console.error("Auth error", e);
@@ -274,7 +278,9 @@ export const seedDatabaseIfEmpty = async () => {
                 risk_score: Math.floor(Math.random() * 100),
                 purchase_cost: 5000 + Math.floor(Math.random() * 50000),
                 accumulated_maintenance_cost: Math.floor(Math.random() * 5000),
-                image: type.image
+                image: type.image,
+                control_number: `${loc.department.substring(0,3).toUpperCase()}/${type.name.substring(0,3).toUpperCase()}/${1000+i}`,
+                classification: 'General Medical'
             });
         }
 
