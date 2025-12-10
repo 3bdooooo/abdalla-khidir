@@ -5,7 +5,7 @@ import { suggestDiagnosisAndParts } from '../services/geminiService';
 import { analyzeHistoricalPatterns, HistoricalInsight } from '../services/predictiveService';
 import { getAssets, getAssetDocuments, findRelevantDocuments } from '../services/mockDb';
 import * as api from '../services/api';
-import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Box, Eye, CheckCircle2, Search, ClipboardList, BookOpen, Activity, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit, History, User as UserIcon } from 'lucide-react';
+import { ArrowRight, Check, Scan, Sparkles, ChevronLeft, PenTool, FileText, Box, Eye, CheckCircle2, Search, ClipboardList, BookOpen, Activity, Plus, X, Calendar, MapPin, Wrench, QrCode, BrainCircuit, History, User as UserIcon, HelpCircle, Smartphone, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface TechnicianProps {
@@ -26,7 +26,10 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
     const [filterStatus, setFilterStatus] = useState<string>('All');
     const [filterType, setFilterType] = useState<string>('All');
     const [activeDetailTab, setActiveDetailTab] = useState<'diagnosis' | 'parts' | 'visual' | 'history' | 'finish'>('diagnosis');
-    const { t } = useLanguage();
+    const { t, dir } = useLanguage();
+    
+    // Training Manual State
+    const [isTrainingOpen, setIsTrainingOpen] = useState(false);
     
     // Detail View State
     const [symptoms, setSymptoms] = useState('');
@@ -263,12 +266,20 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                         <h2 className="text-2xl font-bold text-gray-900">{t('tech_dashboard')}</h2>
                         <div className="text-sm text-text-muted mt-1">{t('welcome')}, {currentUser.name}</div>
                     </div>
-                    <button 
-                        onClick={() => setIsCreateModalOpen(true)}
-                        className="btn-primary py-2 px-4 text-sm shadow-brand/20"
-                    >
-                        <Plus size={18} /> {t('create_wo')}
-                    </button>
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setIsTrainingOpen(true)}
+                            className="btn-secondary py-2 px-3 text-sm flex items-center gap-1 bg-blue-50 text-blue-600 border-blue-100"
+                        >
+                            <HelpCircle size={18} /> Training
+                        </button>
+                        <button 
+                            onClick={() => setIsCreateModalOpen(true)}
+                            className="btn-primary py-2 px-4 text-sm shadow-brand/20"
+                        >
+                            <Plus size={18} /> {t('create_wo')}
+                        </button>
+                    </div>
                 </div>
 
                 {/* Main Tabs */}
@@ -452,6 +463,11 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                     </div>
                 )}
                 
+                {/* TRAINING MANUAL MODAL */}
+                {isTrainingOpen && (
+                    <TrainingManualModal onClose={() => setIsTrainingOpen(false)} />
+                )}
+
                 {/* Scan Overlay */}
                 {isStartingJob && (
                     <div className="fixed inset-0 bg-gray-900/80 z-[60] flex flex-col items-center justify-center text-white backdrop-blur-sm">
@@ -896,6 +912,159 @@ export const TechnicianView: React.FC<TechnicianProps> = ({ currentUser, userWor
                      </div>
                  </div>
              )}
+        </div>
+    );
+};
+
+// --- TRAINING MANUAL SUB-COMPONENT ---
+const TrainingManualModal = ({ onClose }: { onClose: () => void }) => {
+    const [step, setStep] = useState(0);
+    const { dir } = useLanguage();
+
+    const PhoneMockup = ({ children }: { children: React.ReactNode }) => (
+        <div className="relative border-8 border-gray-900 rounded-[2rem] h-[400px] w-[220px] bg-white overflow-hidden shadow-2xl mx-auto flex flex-col">
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 h-4 w-24 bg-gray-900 rounded-b-xl z-20"></div>
+            <div className="flex-1 overflow-hidden relative font-sans text-xs">
+                {children}
+            </div>
+        </div>
+    );
+
+    const steps = [
+        {
+            title: "Welcome to A2M Field Training",
+            desc: "This guide covers the standard operating procedure for executing corrective maintenance work orders using the A2M mobile app.",
+            visual: (
+                <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-brand to-brand-dark text-white p-4 text-center">
+                    <Activity size={48} className="mb-4"/>
+                    <h2 className="font-bold text-lg mb-2">Technician Guide</h2>
+                    <p className="text-xs opacity-80">Version 2.0</p>
+                </div>
+            )
+        },
+        {
+            title: "Step 1: Start Job & Scan",
+            desc: "Locate your assigned task on the dashboard. Click the 'Scan NFC' button. This is required to verify you are physically at the device.",
+            visual: (
+                <div className="h-full bg-gray-50 p-2 pt-6">
+                    <div className="bg-white p-2 rounded-lg border shadow-sm mb-2">
+                        <div className="flex justify-between mb-1">
+                            <span className="font-bold text-[8px] bg-red-50 text-red-600 px-1 rounded">CRITICAL</span>
+                            <span className="text-[8px] text-gray-400">#5002</span>
+                        </div>
+                        <div className="font-bold text-[10px] mb-2">Ventilator Servo-U</div>
+                        <div className="bg-gray-900 text-white text-[10px] py-1 rounded text-center font-bold flex items-center justify-center gap-1">
+                            <Scan size={8}/> Scan NFC
+                        </div>
+                    </div>
+                    <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                        <div className="bg-white/90 p-2 rounded-full border-2 border-brand animate-pulse">
+                            <Smartphone size={24} className="text-brand"/>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            title: "Step 2: Verification",
+            desc: "The system identifies the asset. Verify the photo matches the real device. If manuals are found, they will appear here. Click 'Continue Work'.",
+            visual: (
+                <div className="h-full bg-black/60 flex items-center justify-center p-2">
+                    <div className="bg-white rounded-lg p-2 w-full">
+                        <div className="flex flex-col items-center">
+                            <div className="w-12 h-12 bg-gray-200 rounded mb-2 flex items-center justify-center"><Box size={16}/></div>
+                            <div className="font-bold text-[10px]">Servo-U</div>
+                            <div className="text-[8px] text-green-600 font-bold mb-2 flex items-center"><CheckCircle2 size={8}/> Verified</div>
+                            <div className="w-full bg-brand text-white text-[10px] py-1 rounded text-center">Continue</div>
+                        </div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            title: "Step 3: Diagnosis & AI",
+            desc: "Enter observed symptoms. Use the 'AI Suggestion' button to get immediate analysis and part recommendations based on historical data.",
+            visual: (
+                <div className="h-full bg-white p-2 pt-6">
+                    <div className="mb-2">
+                        <div className="text-[8px] font-bold text-gray-500 uppercase">Symptoms</div>
+                        <div className="h-8 border rounded bg-gray-50 text-[8px] p-1">Screen flickering...</div>
+                    </div>
+                    <div className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-[10px] py-1.5 rounded flex items-center justify-center gap-1 mb-2">
+                        <Sparkles size={10}/> Get AI Diagnosis
+                    </div>
+                    <div className="bg-indigo-50 p-2 rounded border border-indigo-100">
+                        <div className="text-[8px] font-bold text-indigo-800">Diagnosis: Power Supply</div>
+                    </div>
+                </div>
+            )
+        },
+        {
+            title: "Step 4: Closure & Signature",
+            desc: "Enter operating hours, confirm parts used, and digitally sign the screen to complete the work order.",
+            visual: (
+                <div className="h-full bg-white p-2 pt-6">
+                    <div className="mb-2">
+                        <div className="text-[8px] font-bold text-gray-500 uppercase">Signature</div>
+                        <div className="h-12 border-2 border-dashed rounded bg-gray-50 flex items-center justify-center">
+                            <PenTool size={16} className="text-gray-300"/>
+                        </div>
+                    </div>
+                    <div className="bg-green-500 text-white text-[10px] py-2 rounded text-center font-bold">
+                        Submit & Close
+                    </div>
+                </div>
+            )
+        }
+    ];
+
+    return (
+        <div className="fixed inset-0 bg-gray-900/90 z-[80] flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+            <div className="bg-white rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col md:flex-row overflow-hidden shadow-2xl">
+                {/* Visual Side */}
+                <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-8 relative">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-200 via-gray-100 to-gray-200"></div>
+                    <PhoneMockup>
+                        {steps[step].visual}
+                    </PhoneMockup>
+                </div>
+
+                {/* Content Side */}
+                <div className="w-full md:w-1/2 p-8 flex flex-col">
+                    <div className="flex justify-between items-center mb-8">
+                        <h3 className="font-bold text-gray-400 text-xs uppercase tracking-widest">Training Module</h3>
+                        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20}/></button>
+                    </div>
+
+                    <div className="flex-1 flex flex-col justify-center">
+                        <h1 className="text-3xl font-black text-gray-900 mb-4 leading-tight">{steps[step].title}</h1>
+                        <p className="text-gray-600 text-lg leading-relaxed">{steps[step].desc}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between mt-8 pt-8 border-t border-gray-100">
+                        <div className="flex gap-1">
+                            {steps.map((_, i) => (
+                                <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i === step ? 'bg-brand scale-125' : 'bg-gray-300'}`}></div>
+                            ))}
+                        </div>
+                        <div className="flex gap-4">
+                            <button 
+                                onClick={() => setStep(Math.max(0, step - 1))}
+                                disabled={step === 0}
+                                className="p-3 rounded-full hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                            >
+                                <ChevronLeft size={24}/>
+                            </button>
+                            <button 
+                                onClick={() => step < steps.length - 1 ? setStep(step + 1) : onClose()}
+                                className="px-6 py-3 bg-brand text-white rounded-full font-bold flex items-center gap-2 hover:bg-brand-dark transition-all shadow-lg shadow-brand/20"
+                            >
+                                {step === steps.length - 1 ? "Finish" : "Next"} <ChevronRight size={20}/>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };

@@ -1,375 +1,174 @@
 
 import { Asset, AssetStatus, User, UserRole, WorkOrder, WorkOrderType, Priority, InventoryPart, Location, AssetDocument, MovementLog, DetailedJobOrderReport, PreventiveMaintenanceReport, SystemAlert, RoleDefinition, Resource, Action } from '../types';
 
-// DEVICE IMAGES MAPPING (High Resolution, Realistic Medical Equipment)
-export const DEVICE_IMAGES: Record<string, string> = {
-    // MRI & Imaging
-    'Magnetom Vida': 'https://images.unsplash.com/photo-1516549655169-df83a063b36c?auto=format&fit=crop&w=800&q=80', // MRI Tunnel
-    'Somatom Force': 'https://images.unsplash.com/photo-1581594693702-fbdc51b2763b?auto=format&fit=crop&w=800&q=80', // CT Scanner
-    'Mobilett Elara': 'https://images.unsplash.com/photo-1532938911079-1b06ac7ceec7?auto=format&fit=crop&w=800&q=80', // Portable X-Ray
-    'OEC Elite': 'https://images.unsplash.com/photo-1612268615927-4a0fb773323a?auto=format&fit=crop&w=800&q=80', // C-Arm (Surgical)
-    'Voluson E10': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80', // Ultrasound Console
-
-    // Life Support & Anesthesia
-    'Servo-U': 'https://images.unsplash.com/photo-1616391182219-e080b4d1043a?auto=format&fit=crop&w=800&q=80', // Ventilator
-    'Drager Fabius': 'https://images.unsplash.com/photo-1516574187841-693083f0498c?auto=format&fit=crop&w=800&q=80', // Anesthesia Workstation
-    'Isolette 8000': 'https://plus.unsplash.com/premium_photo-1661573537877-33a57df35649?auto=format&fit=crop&w=800&q=80', // Incubator
-
-    // Monitoring & Defib
-    'IntelliVue MX40': 'https://images.unsplash.com/photo-1551076805-e1869033e561?auto=format&fit=crop&w=800&q=80', // Patient Monitor
-    'LifePak 15': 'https://plus.unsplash.com/premium_photo-1681487814233-a3df46932473?auto=format&fit=crop&w=800&q=80', // Defibrillator
-    'MAC 2000': 'https://images.unsplash.com/photo-1584036561566-b93a901e3ae6?auto=format&fit=crop&w=800&q=80', // ECG Machine
-    'Avalon FM30': 'https://images.unsplash.com/photo-1583912268237-7756f772ba63?auto=format&fit=crop&w=800&q=80', // Fetal Monitor
-
-    // Pumps & Dialysis
-    'Alaris System': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=800&q=80', // Infusion Pump Stack
-    '4008S Classix': 'https://images.unsplash.com/photo-1579165466741-7f35a4755657?auto=format&fit=crop&w=800&q=80', // Dialysis Machine
-
-    // Lab & Sterilization
-    'XN-1000': 'https://images.unsplash.com/photo-1579154204628-245fc0fb6612?auto=format&fit=crop&w=800&q=80', // Lab Analyzer
-    'Steris AMSCO': 'https://images.unsplash.com/photo-1581093588401-fbb07366f955?auto=format&fit=crop&w=800&q=80', // Autoclave/Sterilizer
-    
-    // Other
-    'A-dec 500': 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&w=800&q=80', // Dental Chair
-    'Evis X1': 'https://images.unsplash.com/photo-1581595220892-b0739db3ba8c?auto=format&fit=crop&w=800&q=80', // Endoscopy Tower
-
-    // Fallbacks
-    'Generic': 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80' // Modern Med Background
-};
-
-// GMDN Classifications Mapping
-const DEVICE_CLASSIFICATIONS: Record<string, string> = {
-    'Magnetom Vida': 'Magnetic Resonance Imaging system, full-body',
-    'Somatom Force': 'Computed Tomography system, full-body',
-    'Mobilett Elara': 'Mobile general-purpose X-ray system',
-    'OEC Elite': 'Mobile fluoroscopic C-arm system',
-    'Voluson E10': 'General-purpose diagnostic ultrasound system',
-    'Servo-U': 'Intensive care ventilator',
-    'Drager Fabius': 'General inhalation anaesthesia system',
-    'Isolette 8000': 'Infant incubator, mobile',
-    'IntelliVue MX40': 'Multiparameter patient monitoring system',
-    'LifePak 15': 'Defibrillator/monitor, external, automated/manual',
-    'MAC 2000': 'Electrocardiograph, multichannel',
-    'Avalon FM30': 'Foetal heart rate monitor',
-    'Alaris System': 'Infusion pump, general-purpose',
-    '4008S Classix': 'Haemodialysis unit, single-patient',
-    'XN-1000': 'Haematology analyser, automated',
-    'Steris AMSCO': 'Steam steriliser, large-chamber',
-    'A-dec 500': 'Dental treatment unit',
-    'Evis X1': 'Video endoscopy system processor'
-};
-
-export const getModelImage = (model: string): string => {
-    if (!model) return DEVICE_IMAGES['Generic'];
-    const m = model.trim();
-    if (DEVICE_IMAGES[m]) return DEVICE_IMAGES[m];
-    const lowerM = m.toLowerCase();
-    
-    if (lowerM.includes('magnetom') || lowerM.includes('mri')) return DEVICE_IMAGES['Magnetom Vida'];
-    if (lowerM.includes('somatom') || lowerM.includes('ct ')) return DEVICE_IMAGES['Somatom Force'];
-    if (lowerM.includes('servo') || lowerM.includes('ventilator')) return DEVICE_IMAGES['Servo-U'];
-    if (lowerM.includes('alaris') || lowerM.includes('pump') || lowerM.includes('infusion')) return DEVICE_IMAGES['Alaris System'];
-    if (lowerM.includes('mx40') || lowerM.includes('intellivue') || lowerM.includes('monitor')) return DEVICE_IMAGES['IntelliVue MX40'];
-    if (lowerM.includes('drager') || lowerM.includes('fabius') || lowerM.includes('anesthesia')) return DEVICE_IMAGES['Drager Fabius'];
-    if (lowerM.includes('lifepak') || lowerM.includes('defib')) return DEVICE_IMAGES['LifePak 15'];
-    if (lowerM.includes('voluson') || lowerM.includes('ultrasound') || lowerM.includes('echo')) return DEVICE_IMAGES['Voluson E10'];
-    if (lowerM.includes('mobilett') || lowerM.includes('x-ray')) return DEVICE_IMAGES['Mobilett Elara'];
-    if (lowerM.includes('4008') || lowerM.includes('dialysis')) return DEVICE_IMAGES['4008S Classix'];
-    if (lowerM.includes('isolette') || lowerM.includes('incubator') || lowerM.includes('warmer')) return DEVICE_IMAGES['Isolette 8000'];
-    if (lowerM.includes('mac') || lowerM.includes('ecg') || lowerM.includes('ekg')) return DEVICE_IMAGES['MAC 2000'];
-    if (lowerM.includes('oec') || lowerM.includes('c-arm') || lowerM.includes('fluoroscopy')) return DEVICE_IMAGES['OEC Elite'];
-    if (lowerM.includes('evis') || lowerM.includes('endoscop')) return DEVICE_IMAGES['Evis X1'];
-    if (lowerM.includes('steris') || lowerM.includes('autoclave') || lowerM.includes('sterilizer')) return DEVICE_IMAGES['Steris AMSCO'];
-    if (lowerM.includes('xn') || lowerM.includes('hematology') || lowerM.includes('analyzer')) return DEVICE_IMAGES['XN-1000'];
-    if (lowerM.includes('dec') || lowerM.includes('dental')) return DEVICE_IMAGES['A-dec 500'];
-    if (lowerM.includes('avalon') || lowerM.includes('fetal')) return DEVICE_IMAGES['Avalon FM30'];
-    
-    return DEVICE_IMAGES['Generic'];
-};
-
+// Constants
 export const LOCATIONS: Location[] = [
-  { location_id: 101, name: 'ICU Bed 1', department: 'ICU', building: 'Main Wing', room: '101' },
-  { location_id: 102, name: 'ICU Bed 2', department: 'ICU', building: 'Main Wing', room: '102' },
-  { location_id: 201, name: 'X-Ray Room', department: 'Radiology', building: 'East Wing', room: 'R1' },
-  { location_id: 202, name: 'MRI Suite', department: 'Radiology', building: 'East Wing', room: 'R2' },
-  { location_id: 301, name: 'Triage 1', department: 'Emergency', building: 'Main Wing', room: 'E1' },
-  { location_id: 302, name: 'Trauma Bay', department: 'Emergency', building: 'Main Wing', room: 'E2' },
-  { location_id: 401, name: 'Hematology Lab', department: 'Laboratory', building: 'North Wing', room: 'L1' },
-  { location_id: 402, name: 'Microbiology', department: 'Laboratory', building: 'North Wing', room: 'L2' },
-  { location_id: 501, name: 'Dispensing', department: 'Pharmacy', building: 'Main Wing', room: 'P1' },
-  { location_id: 601, name: 'OR 1 (General)', department: 'Surgery', building: 'West Wing', room: 'OR1' },
-  { location_id: 602, name: 'OR 2 (Neuro)', department: 'Surgery', building: 'West Wing', room: 'OR2' },
-  { location_id: 701, name: 'Cath Lab', department: 'Cardiology', building: 'East Wing', room: 'C1' },
-  { location_id: 801, name: 'Stroke Unit', department: 'Neurology', building: 'North Wing', room: 'N1' },
-  { location_id: 901, name: 'NICU A', department: 'NICU', building: 'Maternity Wing', room: 'NI1' },
-  { location_id: 1001, name: 'Delivery Room', department: 'Maternity', building: 'Maternity Wing', room: 'M1' },
-  { location_id: 1101, name: 'Dialysis Stn 1', department: 'Dialysis', building: 'South Wing', room: 'D1' },
-  { location_id: 1201, name: 'Chemo Bay', department: 'Oncology', building: 'South Wing', room: 'O1' },
-  { location_id: 1301, name: 'Pediatric Ward', department: 'Pediatrics', building: 'Main Wing', room: 'PD1' },
-  { location_id: 1401, name: 'Rehab Gym', department: 'Orthopedics', building: 'East Wing', room: 'OT1' },
-  { location_id: 1501, name: 'General Ward A', department: 'General Ward', building: 'Main Wing', room: 'G1' },
-  { location_id: 1601, name: 'Sterile Processing', department: 'CSSD', building: 'Basement', room: 'S1' },
-  { location_id: 1701, name: 'Dental Clinic', department: 'Dental', building: 'Outpatient', room: 'DC1' },
-  { location_id: 1801, name: 'ENT Exam Room', department: 'ENT', building: 'Outpatient', room: 'ENT1' },
+    { location_id: 101, name: 'ICU Bed 1', department: 'ICU', building: 'Main Wing', room: '101' },
+    { location_id: 102, name: 'ICU Bed 2', department: 'ICU', building: 'Main Wing', room: '102' },
+    { location_id: 201, name: 'ER Triage', department: 'Emergency', building: 'Main Wing', room: 'ER-1' },
+    { location_id: 301, name: 'MRI Suite', department: 'Radiology', building: 'East Wing', room: 'RAD-01' },
+    { location_id: 401, name: 'Lab Processing', department: 'Laboratory', building: 'East Wing', room: 'LAB-05' },
+    { location_id: 501, name: 'OR 1', department: 'Surgery', building: 'Main Wing', room: 'OR-01' },
 ];
 
 export const MOCK_USERS: User[] = [
-  { user_id: 1, name: 'Dr. Sarah Connor', role: UserRole.ADMIN, email: 'admin@hospital.com', password: 'password', location_id: 101, department: 'Management', phone_number: '555-0001' },
-  { user_id: 2, name: 'John Supervisor', role: UserRole.SUPERVISOR, email: 'supervisor@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0002' },
-  { user_id: 3, name: 'Mike Tech', role: UserRole.TECHNICIAN, email: 'tech@hospital.com', password: 'password', location_id: 101, department: 'Biomedical', phone_number: '555-0003' },
-  { user_id: 4, name: 'Nurse Joy', role: UserRole.NURSE, email: 'nurse@hospital.com', password: 'password', location_id: 101, department: 'ICU', phone_number: '555-0004' },
-  { user_id: 5, name: 'Vendor Rep', role: UserRole.VENDOR, email: 'vendor@hospital.com', password: 'password', location_id: 101, department: 'External', phone_number: '555-0005' },
-  { user_id: 6, name: 'Inspector Gadget', role: UserRole.INSPECTOR, email: 'audit@hospital.com', password: 'password', location_id: 101, department: 'Quality & Compliance', phone_number: '555-0006' },
+    { user_id: 1, name: 'Dr. Sarah Admin', email: 'admin@hospital.com', role: UserRole.ADMIN, location_id: 101, department: 'Management' },
+    { user_id: 2, name: 'John Supervisor', email: 'super@hospital.com', role: UserRole.SUPERVISOR, location_id: 101, department: 'Maintenance' },
+    { user_id: 3, name: 'Mike Tech', email: 'tech@hospital.com', role: UserRole.TECHNICIAN, location_id: 101, department: 'Biomedical' },
+    { user_id: 4, name: 'Nurse Joy', email: 'nurse@hospital.com', role: UserRole.NURSE, location_id: 101, department: 'ICU' },
+    { user_id: 5, name: 'Vendor Rep', email: 'vendor@company.com', role: UserRole.VENDOR, location_id: 101, department: 'External' },
+    { user_id: 6, name: 'Inspector Gadget', email: 'audit@gov.sa', role: UserRole.INSPECTOR, location_id: 101, department: 'Compliance' },
 ];
 
-// RBAC DEFINITIONS
 export const MOCK_ROLES: RoleDefinition[] = [
     {
-        id: '1',
-        name: 'Admin',
-        description: 'Complete system control. Can manage all users, settings, and view executive analytics.',
-        is_system_role: true,
+        id: '1', name: 'Administrator', description: 'Full System Access', is_system_role: true,
         permissions: { assets: ['view', 'create', 'edit', 'delete'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit', 'delete'], reports: ['view', 'create', 'edit', 'delete'], users: ['view', 'create', 'edit', 'delete'], settings: ['view', 'create', 'edit', 'delete'] }
     },
     {
-        id: '2',
-        name: 'Supervisor',
-        description: 'Departmental oversight. Can approve work orders, manage inventory, and view reports.',
-        is_system_role: true,
-        permissions: { assets: ['view', 'create', 'edit'], work_orders: ['view', 'create', 'edit', 'delete'], inventory: ['view', 'create', 'edit'], reports: ['view', 'create'], users: ['view', 'create', 'edit'], settings: ['view'] }
-    },
-    {
-        id: '3',
-        name: 'Technician',
-        description: 'Field execution role. Can view assigned tasks, update work order status, and log parts.',
-        is_system_role: true,
-        permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: ['view'], reports: [], users: [], settings: [] }
-    },
-    {
-        id: '4',
-        name: 'Nurse',
-        description: 'Requester role. Can report faults, view department assets, and verify completed repairs.',
-        is_system_role: true,
-        permissions: { assets: ['view'], work_orders: ['view', 'create'], inventory: [], reports: [], users: [], settings: [] }
-    },
-    {
-        id: '5',
-        name: 'Vendor',
-        description: 'External partner access. Limited to viewing and updating assigned outsourced tasks.',
-        is_system_role: true,
-        permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: [], reports: [], users: [], settings: [] }
-    },
-    {
-        id: '6',
-        name: 'Inspector',
-        description: 'Audit and compliance role. Read-only access to all assets, logs, and certificates.',
-        is_system_role: true,
-        permissions: { assets: ['view'], work_orders: ['view'], inventory: ['view'], reports: ['view'], users: ['view'], settings: ['view'] }
+        id: '2', name: 'Technician', description: 'Field Maintenance Access', is_system_role: true,
+        permissions: { assets: ['view', 'edit'], work_orders: ['view', 'edit'], inventory: ['view'], reports: ['create'], users: [], settings: [] }
     }
 ];
 
-// --- VENDOR & ASSET GENERATION ---
-
-const VENDORS = [
-    { name: 'GE Healthcare', reliability: 0.95, speed: 1.2 }, 
-    { name: 'Siemens Healthineers', reliability: 0.94, speed: 1.1 },
-    { name: 'Philips Medical', reliability: 0.92, speed: 1.0 },
-    { name: 'Drager', reliability: 0.96, speed: 0.9 }, 
-    { name: 'Mindray', reliability: 0.85, speed: 1.1 }, 
-    { name: 'Getinge', reliability: 0.90, speed: 1.0 },
-    { name: 'Stryker', reliability: 0.93, speed: 1.3 },
-    { name: 'Olympus', reliability: 0.91, speed: 0.8 },
-    { name: 'Nihon Kohden', reliability: 0.88, speed: 0.9 },
-    { name: 'Baxter', reliability: 0.89, speed: 1.0 }
+// Mock Data Generators
+const generateAssets = (): Asset[] => [
+    {
+        asset_id: 'AST-1001', nfc_tag_id: 'NFC-1001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens',
+        serial_number: 'SN-998877', location_id: 301, status: AssetStatus.RUNNING,
+        manufacturing_date: '2020-01-01', purchase_date: '2020-06-01', installation_date: '2020-06-15', warranty_expiration: '2025-06-15',
+        expected_lifespan: 10, operating_hours: 14500, risk_score: 15, purchase_cost: 1500000, accumulated_maintenance_cost: 45000,
+        image: 'https://images.unsplash.com/photo-1516549655169-df83a092dd14?auto=format&fit=crop&q=80&w=300'
+    },
+    {
+        asset_id: 'AST-1002', nfc_tag_id: 'NFC-1002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge',
+        serial_number: 'SN-112233', location_id: 101, status: AssetStatus.RUNNING,
+        manufacturing_date: '2021-03-01', purchase_date: '2021-04-01', installation_date: '2021-04-05', warranty_expiration: '2024-04-05',
+        expected_lifespan: 7, operating_hours: 8200, risk_score: 5, purchase_cost: 45000, accumulated_maintenance_cost: 2100,
+        image: 'https://images.unsplash.com/photo-1584036561566-b93a9499d6d3?auto=format&fit=crop&q=80&w=300'
+    },
+    {
+        asset_id: 'AST-1003', nfc_tag_id: 'NFC-1003', name: 'Infusion Pump', model: 'Alaris PC', manufacturer: 'BD',
+        serial_number: 'SN-445566', location_id: 101, status: AssetStatus.DOWN,
+        manufacturing_date: '2019-11-01', purchase_date: '2020-01-10', installation_date: '2020-01-15', warranty_expiration: '2023-01-15',
+        expected_lifespan: 5, operating_hours: 22000, risk_score: 85, purchase_cost: 3500, accumulated_maintenance_cost: 1200,
+        image: 'https://images.unsplash.com/photo-1583946099397-9954d183d237?auto=format&fit=crop&q=80&w=300'
+    },
+     {
+        asset_id: 'AST-1004', nfc_tag_id: 'NFC-1004', name: 'Patient Monitor', model: 'Intellivue MX800', manufacturer: 'Philips',
+        serial_number: 'SN-778899', location_id: 102, status: AssetStatus.UNDER_MAINT,
+        manufacturing_date: '2022-01-01', purchase_date: '2022-02-01', installation_date: '2022-02-05', warranty_expiration: '2025-02-05',
+        expected_lifespan: 8, operating_hours: 4500, risk_score: 30, purchase_cost: 12000, accumulated_maintenance_cost: 500,
+        image: 'https://plus.unsplash.com/premium_photo-1661766569022-1b7f918ac3f3?auto=format&fit=crop&q=80&w=300'
+    }
 ];
 
-let assets: Asset[] = [];
-// Generate 500 Assets
-for (let i = 1; i <= 500; i++) {
-    const type = Object.keys(DEVICE_IMAGES)[i % (Object.keys(DEVICE_IMAGES).length - 1)]; // Skip 'Generic'
-    const model = type; 
-    const loc = LOCATIONS[i % LOCATIONS.length];
-    
-    // Realistic Dates
-    const currentYear = new Date().getFullYear();
-    const manufactureYear = currentYear - (i % 10) - 1; 
-    const purchaseYear = manufactureYear + (Math.random() > 0.5 ? 0 : 1);
-    const installYear = purchaseYear;
-    
-    const manufDate = `${manufactureYear}-${(i % 12) + 1}-15`;
-    const purchDate = `${purchaseYear}-${(i % 12) + 1}-20`;
-    const installDate = `${installYear}-${(i % 12) + 1}-25`;
-    const warrantyExp = `${installYear + 3}-${(i % 12) + 1}-25`;
-
-    let vendor = VENDORS[i % VENDORS.length].name;
-    if (model.includes('Magnetom') || model.includes('Somatom')) vendor = 'Siemens Healthineers';
-    else if (model.includes('IntelliVue') || model.includes('EPIQ')) vendor = 'Philips Medical';
-    else if (model.includes('Drager') || model.includes('Fabius')) vendor = 'Drager';
-    else if (model.includes('GE') || model.includes('Voluson')) vendor = 'GE Healthcare';
-
-    // Generate Distinctive Control Number: SITE/DEPT/ID
-    const siteCode = "UMLUJ";
-    const deptCode = loc.department.substring(0, 3).toUpperCase();
-    const uniqueId = 5000 + i;
-    const controlNo = `${siteCode}/${deptCode}/${uniqueId}`;
-
-    assets.push({
-        asset_id: `AST-${1000 + i}`,
-        nfc_tag_id: `NFC-${1000 + i}`,
-        name: type.includes('Scanner') ? type : `${type}`,
-        model: model,
-        manufacturer: vendor,
-        serial_number: `SN-${10000 + i}`,
-        location_id: loc.location_id,
-        status: i % 20 === 0 ? AssetStatus.DOWN : (i % 15 === 0 ? AssetStatus.UNDER_MAINT : AssetStatus.RUNNING),
-        
-        // NEW FIELDS
-        classification: DEVICE_CLASSIFICATIONS[model] || 'General Medical Device',
-        control_number: controlNo,
-
-        manufacturing_date: manufDate,
-        purchase_date: purchDate,
-        installation_date: installDate,
-        warranty_expiration: warrantyExp,
-        expected_lifespan: 10,
-
-        operating_hours: Math.floor(Math.random() * 20000),
-        risk_score: Math.floor(Math.random() * 100),
-        last_calibration_date: `${currentYear}-05-01`,
-        next_calibration_date: `${currentYear+1}-05-01`,
-        image: getModelImage(model),
-        purchase_cost: 5000 + (Math.random() * 50000),
-        accumulated_maintenance_cost: 500 + (Math.random() * 5000)
-    });
-}
-
-// INVENTORY GENERATION
-let inventory: InventoryPart[] = [
-    { part_id: 1, part_name: 'MRI Coil', current_stock: 3, min_reorder_level: 2, cost: 5000 },
-    { part_id: 2, part_name: 'Ventilator Filter', current_stock: 45, min_reorder_level: 20, cost: 25 },
+const generateInventory = (): InventoryPart[] => [
+    { part_id: 1, part_name: 'Flow Sensor', current_stock: 5, min_reorder_level: 10, cost: 150 },
+    { part_id: 2, part_name: 'O2 Cell', current_stock: 20, min_reorder_level: 5, cost: 45 },
+    { part_id: 3, part_name: 'Battery Pack (Li-Ion)', current_stock: 2, min_reorder_level: 3, cost: 200 },
+    { part_id: 4, part_name: 'Patient Circuit', current_stock: 50, min_reorder_level: 20, cost: 15 },
+    { part_id: 5, part_name: 'ECG Lead Set', current_stock: 12, min_reorder_level: 10, cost: 85 },
 ];
-for (let i = 16; i <= 100; i++) {
-    inventory.push({
-        part_id: i,
-        part_name: `Generic Spare Part #${i}`,
-        current_stock: Math.floor(Math.random() * 50),
-        min_reorder_level: 10,
-        cost: Math.floor(Math.random() * 500)
-    });
-}
 
-// WORK ORDER GENERATION WITH BIAS
-let workOrders: WorkOrder[] = [];
-for (let i = 1; i <= 200; i++) {
-    const asset = assets[i % assets.length];
-    const tech = MOCK_USERS.find(u => u.role === UserRole.TECHNICIAN) || MOCK_USERS[2];
-    const isClosed = i > 20; 
-    let type = i % 3 === 0 ? WorkOrderType.PREVENTIVE : WorkOrderType.CORRECTIVE;
-    
-    const vendorProfile = VENDORS.find(v => v.name === asset.manufacturer);
-    if (vendorProfile && type === WorkOrderType.CORRECTIVE) {
-        if (Math.random() > vendorProfile.reliability) { 
-        } else {
-            if (Math.random() > 0.5) type = WorkOrderType.PREVENTIVE; 
-        }
+const generateWorkOrders = (): WorkOrder[] => [
+    {
+        wo_id: 2236, asset_id: 'AST-1002', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3,
+        description: 'Ventilator failing self-test (Code E045)', status: 'Closed',
+        created_at: '2023-10-24T09:00:00', start_time: '2023-10-24T10:00:00', close_time: '2023-10-25T14:00:00',
+        failure_type: 'Technical', parts_used: [{ part_id: 1, quantity: 1 }]
+    },
+    {
+        wo_id: 5002, asset_id: 'AST-1001', type: WorkOrderType.PREVENTIVE, priority: Priority.MEDIUM, assigned_to_id: 3,
+        description: 'Quarterly PM Inspection', status: 'Open',
+        created_at: new Date().toISOString()
+    },
+    {
+        wo_id: 5003, asset_id: 'AST-1004', type: WorkOrderType.CORRECTIVE, priority: Priority.CRITICAL, assigned_to_id: 3,
+        description: 'SpO2 sensor not reading', status: 'Assigned',
+        created_at: new Date().toISOString()
     }
+];
 
-    const baseDurationHours = 4;
-    const speedFactor = vendorProfile ? vendorProfile.speed : 1.0;
-    const actualDuration = baseDurationHours / speedFactor + (Math.random() * 2);
-    
-    const startTime = new Date('2023-10-01T09:00:00Z');
-    const closeTime = new Date(startTime.getTime() + actualDuration * 60 * 60 * 1000);
+// Mutable state for mock DB
+let assets = generateAssets();
+let inventory = generateInventory();
+let workOrders = generateWorkOrders();
+let users = [...MOCK_USERS];
+let roles = [...MOCK_ROLES];
 
-    const rand = Math.random();
-    let failureType: 'Technical' | 'UserError' | 'WearTear' = 'Technical';
-    if (type === WorkOrderType.CORRECTIVE) {
-        if (rand > 0.7) failureType = 'UserError';
-        else if (rand > 0.5) failureType = 'WearTear';
-    }
+// --- Exports ---
 
-    workOrders.push({
-        wo_id: 1000 + i,
-        asset_id: asset.asset_id,
-        type: type,
-        priority: i % 10 === 0 ? Priority.CRITICAL : (i % 5 === 0 ? Priority.HIGH : Priority.MEDIUM),
-        assigned_to_id: tech.user_id,
-        description: type === WorkOrderType.PREVENTIVE ? `Scheduled PM for ${asset.name}` : `Reported fault in ${asset.name}`,
-        status: isClosed ? 'Closed' : (i % 2 === 0 ? 'In Progress' : 'Open'),
-        start_time: startTime.toISOString(),
-        close_time: isClosed ? closeTime.toISOString() : undefined,
-        created_at: '2023-09-25T08:00:00Z',
-        is_first_time_fix: Math.random() > 0.3,
-        nurse_rating: isClosed ? Math.floor(Math.random() * 2) + 3 : undefined,
-        failure_type: failureType
-    });
-}
-
-// --- DYNAMIC DOCUMENT GENERATION (100 DOCS) ---
-let kbDocs: any[] = [];
-const docTypes = ['Service Manual', 'User Guide', 'Calibration Protocol', 'Safety Datasheet'];
-const docCategories = ['Imaging', 'Life Support', 'Monitoring', 'General'];
-
-for (let i = 1; i <= 100; i++) {
-    const asset = assets[i % assets.length];
-    const docType = docTypes[i % docTypes.length];
-    const category = docCategories[i % docCategories.length];
-    
-    kbDocs.push({
-        id: i,
-        title: `${asset.manufacturer} ${asset.model} - ${docType}`,
-        category: category,
-        type: docType,
-        updated: `2023-${(i % 12) + 1}-15`,
-        fileSize: `${(Math.random() * 10 + 1).toFixed(1)} MB`,
-        url: '#'
-    });
-}
-
+// Getters
 export const getAssets = () => assets;
 export const getInventory = () => inventory;
 export const getWorkOrders = () => workOrders;
+export const getUsers = () => users;
+export const getRoles = () => roles;
 export const getLocations = () => LOCATIONS;
-export const getUsers = () => MOCK_USERS;
-export const getRoles = () => MOCK_ROLES;
 
+// Helpers
 export const getLocationName = (id: number) => {
-  const loc = LOCATIONS.find(l => l.location_id === id);
-  return loc ? `${loc.building} - ${loc.department} (${loc.room})` : 'Unknown';
-};
-
-export const getTechnicianWorkOrders = (userId: number) => {
-  return workOrders.filter(wo => wo.assigned_to_id === userId);
+    const loc = LOCATIONS.find(l => l.location_id === id);
+    return loc ? `${loc.department} - ${loc.room}` : 'Unknown';
 };
 
 export const getAssetDocuments = (assetId: string): AssetDocument[] => {
-  const asset = assets.find(a => a.asset_id === assetId);
-  const model = asset?.model || 'Generic';
-  return [
-    { doc_id: 1, asset_id: assetId, title: `${model} Service Manual v2.0`, type: 'Manual', url: '#', date: '2021-01-01' },
-    { doc_id: 2, asset_id: assetId, title: 'Calibration Cert 2023', type: 'Certificate', url: '#', date: '2023-01-15' },
-    { doc_id: 3, asset_id: assetId, title: 'Maintenance Log 2023', type: 'Report', url: '#', date: '2023-12-01' },
-  ];
+    return [
+        { doc_id: 1, asset_id: assetId, title: 'Service Manual', type: 'Manual', url: '#', date: '2022-01-01' },
+        { doc_id: 2, asset_id: assetId, title: 'Calibration Cert', type: 'Certificate', url: '#', date: '2023-05-01' },
+        { doc_id: 3, asset_id: assetId, title: 'User Guide', type: 'Manual', url: '#', date: '2022-02-15' }
+    ];
 };
 
-export const findRelevantDocuments = (model: string, manufacturer: string): AssetDocument[] => {
-    const matches = kbDocs.filter(d => 
-        d.title.toLowerCase().includes(model.toLowerCase()) || 
-        d.title.toLowerCase().includes(manufacturer.toLowerCase())
-    );
-    
-    return matches.map((d, idx) => ({
-        doc_id: 1000 + idx,
-        asset_id: '',
-        title: d.title,
-        type: 'Manual' as const,
-        url: '#',
-        date: d.updated
-    })).slice(0, 3);
+export const findRelevantDocuments = (model: string, manufacturer: string) => {
+    // Mock logic to "search" docs
+    return [
+        { doc_id: 101, asset_id: 'generic', title: `${manufacturer} ${model} Service Manual`, type: 'Manual', url: '#', date: '2022-01-01' } as AssetDocument
+    ];
 };
 
 export const getMovementLogs = (): MovementLog[] => [
-    { log_id: 1, asset_id: 'AST-1002', from_location_id: 101, to_location_id: 201, timestamp: '2023-10-25T10:00:00', user_id: 3 }
+    { log_id: 1, asset_id: 'AST-1003', from_location_id: 101, to_location_id: 201, timestamp: '2023-11-01T10:00:00', user_id: 4 },
+    { log_id: 2, asset_id: 'AST-1004', from_location_id: 102, to_location_id: 301, timestamp: '2023-11-02T14:30:00', user_id: 3 }
+];
+
+export const getSystemAlerts = (): SystemAlert[] => [
+    { id: 1, type: 'STOCK', message: 'Low stock: Flow Sensor', timestamp: new Date().toISOString(), severity: 'medium', status: 'active' },
+    { id: 2, type: 'BOUNDARY_CROSSING', message: 'Infusion Pump AST-1003 left ICU', timestamp: new Date(Date.now() - 3600000).toISOString(), severity: 'high', status: 'active' }
+];
+
+export const getKnowledgeBaseDocs = () => [
+    { id: 'KB-001', title: 'Servo-U Service Manual', tags: ['ventilator', 'getinge'] },
+    { id: 'KB-002', title: 'Magnetom Vida Troubleshooting', tags: ['mri', 'siemens'] },
+    { id: 'KB-003', title: 'Alaris PC Pump Maintenance', tags: ['pump', 'bd'] },
+    { id: 'KB-004', title: 'Intellivue MX800 Config Guide', tags: ['monitor', 'philips'] }
+];
+
+// Reports
+export const getPMReports = (): PreventiveMaintenanceReport[] => [
+     {
+        pm_id: "PM-5002",
+        wo_id: 5002,
+        scheduled_date: "2023-11-01",
+        completion_date: "2023-11-01T14:30:00",
+        technician_name: "Mike Tech",
+        asset: {
+            name: "MRI Scanner Magnetom Vida",
+            model: "Magnetom Vida",
+            serial_no: "SN-998877",
+            asset_id: "AST-1001",
+            location: "Radiology - MRI Suite"
+        },
+        checklist: [
+            { id: 1, task: "Check Cryogen Level", status: "Pass" },
+            { id: 2, task: "Clean Filters", status: "Pass" }
+        ],
+        vital_data: { operating_hours: 14500, last_calibration: "2023-05-01", electrical_safety_pass: true },
+        calibration_results: { required: false, status: "N/A" },
+        next_due_date: "2024-05-01",
+        approvals: { technician_sign: "Digitally Signed: Mike Tech", supervisor_sign: "Digitally Signed: John Supervisor", date: "2023-11-02" }
+    }
 ];
 
 export const getDetailedReports = (): DetailedJobOrderReport[] => [
@@ -379,109 +178,16 @@ export const getDetailedReports = (): DetailedJobOrderReport[] => [
         control_no: "CN-7782",
         priority: "High",
         risk_factor: "Critical",
-        asset: {
-            name: "Ventilator Servo-U",
-            model: "Servo-U",
-            manufacturer: "Getinge",
-            serial_no: "SN-112233",
-            asset_id: "AST-1002"
-        },
-        location: {
-            site: "Main Hospital",
-            building: "Main Wing",
-            department: "ICU",
-            room: "101"
-        },
-        fault_details: {
-            failed_date: "2023-10-24",
-            fault_description: "Unit failed self-test. Error code E045 (Flow Sensor).",
-            repair_date: "2023-10-25",
-            technician_name: "Mike Tech",
-            remedy_work_done: "Replaced flow sensor cassette. Calibrated flow offset. Performed full functionality test."
-        },
-        spare_parts: [
-            { part_name: "Flow Sensor Cassette", part_no: "GT-9988", quantity: 1 }
-        ],
-        qc_analysis: {
-            need_spare_parts: "Yes",
-            need_calibration: true,
-            user_errors: false,
-            unrepairable: false,
-            agent_repair: false,
-            partially_working: false,
-            incident: true
-        },
-        approvals: {
-            caller: { name: "Nurse Joy", contact: "Ext 101" },
-            dept_head: { name: "Dr. House", date: "2023-10-25" },
-            site_supervisor: { name: "John Supervisor", date: "2023-10-25" },
-            site_admin: { name: "Sarah Connor", date: "2023-10-26" }
-        }
+        asset: { name: "Ventilator Servo-U", model: "Servo-U", manufacturer: "Getinge", serial_no: "SN-112233", asset_id: "AST-1002" },
+        location: { site: "Main Hospital", building: "Main Wing", department: "ICU", room: "101" },
+        fault_details: { failed_date: "2023-10-24", fault_description: "Unit failed self-test.", repair_date: "2023-10-25", technician_name: "Mike Tech", remedy_work_done: "Replaced flow sensor." },
+        spare_parts: [{ part_name: "Flow Sensor", part_no: "GT-9988", quantity: 1 }],
+        qc_analysis: { need_spare_parts: "Yes", need_calibration: true, user_errors: false, unrepairable: false, agent_repair: false, partially_working: false, incident: true },
+        approvals: { caller: { name: "Nurse Joy", contact: "Ext 101" }, dept_head: { name: "Dr. House", date: "2023-10-25" }, site_supervisor: { name: "John Supervisor", date: "2023-10-25" }, site_admin: { name: "Sarah Connor", date: "2023-10-26" } }
     }
 ];
 
-export const getPMReports = (): PreventiveMaintenanceReport[] => [];
-
-export const getSystemAlerts = (): SystemAlert[] => [
-    { id: 1, type: 'BOUNDARY_CROSSING', message: 'Asset AST-1002 (Ventilator) moved out of ICU without authorization.', timestamp: '2023-10-26T14:30:00Z', asset_id: 'AST-1002', severity: 'high', status: 'active' },
-    { id: 2, type: 'STOCK', message: 'Low stock for "Power Supply Unit" (2 remaining).', timestamp: '2023-10-25T09:00:00Z', severity: 'medium', status: 'active' }
-];
-
-export const getKnowledgeBaseDocs = () => kbDocs;
-
-// Mutators (Mock DB Actions)
-export const startWorkOrder = (woId: number) => {
-  workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, status: 'In Progress', start_time: new Date().toISOString() } : w);
-};
-
-export const closeWorkOrder = (woId: number) => {
-  workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, status: 'Awaiting Approval', close_time: new Date().toISOString() } : w);
-};
-
-export const updateStock = (partId: number, quantityUsed: number) => {
-  inventory = inventory.map(i => i.part_id === partId ? { ...i, current_stock: i.current_stock - quantityUsed } : i);
-};
-
-export const addAsset = (asset: Asset) => {
-  assets.push(asset);
-};
-
-export const updateAssetStatus = (assetId: string, status: AssetStatus) => {
-  assets = assets.map(a => a.asset_id === assetId ? { ...a, status } : a);
-};
-
-export const restockPart = (partId: number, qty: number) => {
-  inventory = inventory.map(i => i.part_id === partId ? { ...i, current_stock: i.current_stock + qty } : i);
-};
-
-export const createWorkOrder = (wo: WorkOrder) => {
-  workOrders.push(wo);
-};
-
-export const updateAssetCalibration = (assetId: string, lastCal: string, nextCal: string) => {
-  assets = assets.map(a => a.asset_id === assetId ? { ...a, last_calibration_date: lastCal, next_calibration_date: nextCal } : a);
-};
-
-export const assignWorkOrder = (woId: number, userId: number) => {
-  workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, assigned_to_id: userId, status: 'Assigned' } : w);
-};
-
-export const addUser = (user: User) => {
-  MOCK_USERS.push(user);
-};
-
-export const nurseRateWorkOrder = (woId: number, rating: number) => {
-    workOrders = workOrders.map(w => w.wo_id === woId ? { ...w, nurse_rating: rating } : w);
-};
-
-// ROLE MUTATORS
-export const createRole = (role: RoleDefinition) => {
-    MOCK_ROLES.push(role);
-};
-
-export const updateRole = (updatedRole: RoleDefinition) => {
-    const idx = MOCK_ROLES.findIndex(r => r.id === updatedRole.id);
-    if (idx !== -1) {
-        MOCK_ROLES[idx] = updatedRole;
-    }
-};
+// Setters (for Mock API)
+export const addAsset = (asset: Asset) => { assets.push(asset); };
+export const addUser = (user: User) => { users.push(user); };
+export const createWorkOrder = (wo: WorkOrder) => { workOrders.push(wo); };

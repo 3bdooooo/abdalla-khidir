@@ -31,12 +31,13 @@ const AppContent: React.FC = () => {
             api.fetchWorkOrders(),
             api.fetchUsers()
         ]);
-        setAssets(a);
-        setInventory(i);
-        setWorkOrders(w);
-        setUsers(u);
+        setAssets(a || []);
+        setInventory(i || []);
+        setWorkOrders(w || []);
+        setUsers(u || []);
     } catch (e) {
         console.error("Failed to load data", e);
+        // Don't crash, just log. UI will show empty states.
     }
   };
 
@@ -62,8 +63,13 @@ const AppContent: React.FC = () => {
         setUser(selectedUser);
         
         // Seed DB if needed and fetch all data
-        await api.seedDatabaseIfEmpty();
-        await refreshData();
+        // We wrap this in try-catch so a data fetch failure doesn't block login
+        try {
+            await api.seedDatabaseIfEmpty();
+            await refreshData();
+        } catch (dataError) {
+            console.error("Data sync failed:", dataError);
+        }
 
         // Route based on role
         if (selectedUser.role === UserRole.SUPERVISOR || selectedUser.role === UserRole.ADMIN) setCurrentView('dashboard');
