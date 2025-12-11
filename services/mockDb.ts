@@ -43,6 +43,30 @@ export const DEVICE_CATALOG = [
     { name: 'Endoscope', model: 'Evis Exera III', manufacturer: 'Olympus', image: 'https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&q=80&w=300' },
 ];
 
+// 20 Real Vendors with Performance Bias
+export const MOCK_VENDORS = [
+    { id: 'V01', name: 'Siemens Healthineers', reliability: 98, support: 4.8 },
+    { id: 'V02', name: 'GE Healthcare', reliability: 97, support: 4.9 },
+    { id: 'V03', name: 'Philips Healthcare', reliability: 96, support: 4.7 },
+    { id: 'V04', name: 'Dräger', reliability: 99, support: 4.5 },
+    { id: 'V05', name: 'Medtronic', reliability: 95, support: 4.6 },
+    { id: 'V06', name: 'Stryker', reliability: 94, support: 4.8 },
+    { id: 'V07', name: 'Baxter', reliability: 92, support: 4.2 },
+    { id: 'V08', name: 'B. Braun', reliability: 93, support: 4.3 },
+    { id: 'V09', name: 'Olympus', reliability: 96, support: 4.1 },
+    { id: 'V10', name: 'Getinge', reliability: 95, support: 4.4 },
+    { id: 'V11', name: 'Mindray', reliability: 89, support: 3.9 },
+    { id: 'V12', name: 'Canon Medical', reliability: 94, support: 4.2 },
+    { id: 'V13', name: 'Fujifilm', reliability: 91, support: 4.0 },
+    { id: 'V14', name: 'Abbott', reliability: 95, support: 4.6 },
+    { id: 'V15', name: 'Boston Scientific', reliability: 93, support: 4.3 },
+    { id: 'V16', name: 'Johnson & Johnson', reliability: 97, support: 4.5 },
+    { id: 'V17', name: 'Terumo', reliability: 92, support: 4.1 },
+    { id: 'V18', name: 'ResMed', reliability: 94, support: 4.7 },
+    { id: 'V19', name: 'Smith & Nephew', reliability: 91, support: 4.0 },
+    { id: 'V20', name: 'Zimmer Biomet', reliability: 93, support: 4.2 }
+];
+
 export const MOCK_USERS: User[] = [
     { user_id: 1, name: 'Dr. Sarah Admin', email: 'admin@hospital.com', role: UserRole.ADMIN, location_id: 101, department: 'Management' },
     { user_id: 2, name: 'John Supervisor', email: 'super@hospital.com', role: UserRole.SUPERVISOR, location_id: 101, department: 'Maintenance' },
@@ -60,12 +84,16 @@ export const MOCK_ROLES: RoleDefinition[] = [
     {
         id: '2', name: 'Technician', description: 'Field Maintenance Access', is_system_role: true,
         permissions: { assets: ['view', 'edit'], work_orders: ['view', 'edit'], inventory: ['view'], reports: ['create'], users: [], settings: [] }
-    }
+    },
+    { id: '3', name: 'Supervisor', description: 'Department Oversight & Reports', is_system_role: true, permissions: { assets: ['view', 'edit'], work_orders: ['view', 'create', 'edit'], inventory: ['view', 'edit'], reports: ['view', 'create'], users: ['view'], settings: [] } },
+    { id: '4', name: 'Nurse', description: 'Reporting & Verification', is_system_role: true, permissions: { assets: ['view'], work_orders: ['create'], inventory: [], reports: [], users: [], settings: [] } },
+    { id: '5', name: 'Vendor', description: 'External Contractor Access', is_system_role: false, permissions: { assets: ['view'], work_orders: ['view', 'edit'], inventory: [], reports: [], users: [], settings: [] } },
+    { id: '6', name: 'Inspector', description: 'Read-only Audit Access', is_system_role: false, permissions: { assets: ['view'], work_orders: ['view'], inventory: ['view'], reports: ['view'], users: ['view'], settings: [] } }
 ];
 
 // Mock Data Generators
 const generateAssets = (): Asset[] => {
-    // 1. Core fixed assets to ensure test consistency
+    // 1. Core fixed assets
     const coreAssets: Asset[] = [
         {
             asset_id: 'AST-1001', nfc_tag_id: 'NFC-1001', name: 'MRI Scanner', model: 'Magnetom Vida', manufacturer: 'Siemens',
@@ -104,12 +132,8 @@ const generateAssets = (): Asset[] => {
     const generatedAssets: Asset[] = [];
     let idCounter = 1005;
 
-    // 2. Loop through ALL locations to ensure coverage
     LOCATIONS.forEach(loc => {
-        // Skip locations already covered by core assets if desired, or just add more
-        // Add 5-8 assets per department
         const count = 5 + Math.floor(Math.random() * 4); 
-        
         for (let i = 0; i < count; i++) {
             const type = DEVICE_CATALOG[Math.floor(Math.random() * DEVICE_CATALOG.length)];
             const year = 2018 + Math.floor(Math.random() * 6);
@@ -147,18 +171,44 @@ const generateAssets = (): Asset[] => {
     return [...coreAssets, ...generatedAssets];
 };
 
-const generateInventory = (): InventoryPart[] => [
-    { part_id: 1, part_name: 'Flow Sensor', current_stock: 5, min_reorder_level: 10, cost: 150 },
-    { part_id: 2, part_name: 'O2 Cell', current_stock: 20, min_reorder_level: 5, cost: 45 },
-    { part_id: 3, part_name: 'Battery Pack (Li-Ion)', current_stock: 2, min_reorder_level: 3, cost: 200 },
-    { part_id: 4, part_name: 'Patient Circuit', current_stock: 50, min_reorder_level: 20, cost: 15 },
-    { part_id: 5, part_name: 'ECG Lead Set', current_stock: 12, min_reorder_level: 10, cost: 85 },
-    { part_id: 6, part_name: 'SpO2 Sensor', current_stock: 8, min_reorder_level: 15, cost: 120 },
-    { part_id: 7, part_name: 'NIBP Cuff (Adult)', current_stock: 30, min_reorder_level: 10, cost: 25 },
-    { part_id: 8, part_name: 'Main Board PCB', current_stock: 1, min_reorder_level: 2, cost: 1200 },
-    { part_id: 9, part_name: 'Power Supply Unit', current_stock: 3, min_reorder_level: 3, cost: 450 },
-    { part_id: 10, part_name: 'Touch Screen Assembly', current_stock: 2, min_reorder_level: 2, cost: 800 },
-];
+// Generate 500 Spare Parts
+const generateInventory = (): InventoryPart[] => {
+    const parts: InventoryPart[] = [];
+    const baseNames = ['Sensor', 'Valve', 'Filter', 'PCB Main', 'Power Supply', 'Battery', 'Cable', 'Motor', 'Pump', 'Display', 'Probe', 'Gasket', 'Fuse', 'Switch', 'Control Board'];
+    const modifiers = ['Assembly', 'Module', 'Unit', 'Kit', 'Connector', 'Harness', 'Pack'];
+    const types = ['Digital', 'Analog', 'High-Pressure', 'Low-Voltage', 'Optical', 'Thermal', 'Magnetic'];
+
+    // Add core parts first
+    const coreParts = [
+        { part_id: 1, part_name: 'Flow Sensor', current_stock: 5, min_reorder_level: 10, cost: 150 },
+        { part_id: 2, part_name: 'O2 Cell', current_stock: 20, min_reorder_level: 5, cost: 45 },
+        { part_id: 3, part_name: 'Battery Pack (Li-Ion)', current_stock: 2, min_reorder_level: 3, cost: 200 },
+        { part_id: 4, part_name: 'Patient Circuit', current_stock: 50, min_reorder_level: 20, cost: 15 },
+        { part_id: 5, part_name: 'ECG Lead Set', current_stock: 12, min_reorder_level: 10, cost: 85 },
+        { part_id: 6, part_name: 'SpO2 Sensor', current_stock: 8, min_reorder_level: 15, cost: 120 },
+        { part_id: 7, part_name: 'NIBP Cuff (Adult)', current_stock: 30, min_reorder_level: 10, cost: 25 },
+        { part_id: 8, part_name: 'Main Board PCB', current_stock: 1, min_reorder_level: 2, cost: 1200 },
+        { part_id: 9, part_name: 'Power Supply Unit', current_stock: 3, min_reorder_level: 3, cost: 450 },
+        { part_id: 10, part_name: 'Touch Screen Assembly', current_stock: 2, min_reorder_level: 2, cost: 800 },
+    ];
+    
+    parts.push(...coreParts);
+
+    for (let i = 11; i <= 500; i++) {
+        const base = baseNames[Math.floor(Math.random() * baseNames.length)];
+        const mod = modifiers[Math.floor(Math.random() * modifiers.length)];
+        const type = types[Math.floor(Math.random() * types.length)];
+        
+        parts.push({
+            part_id: i,
+            part_name: `${type} ${base} ${mod}`,
+            current_stock: Math.floor(Math.random() * 50),
+            min_reorder_level: Math.floor(Math.random() * 10) + 1,
+            cost: Math.floor(Math.random() * 500) + 10
+        });
+    }
+    return parts;
+};
 
 const generateWorkOrders = (): WorkOrder[] => [
     {
@@ -188,7 +238,6 @@ let roles = [...MOCK_ROLES];
 
 // --- Exports ---
 
-// Getters
 export const getAssets = () => assets;
 export const getInventory = () => inventory;
 export const getWorkOrders = () => workOrders;
@@ -196,22 +245,24 @@ export const getUsers = () => users;
 export const getRoles = () => roles;
 export const getLocations = () => LOCATIONS;
 
-// Helpers
 export const getLocationName = (id: number) => {
     const loc = LOCATIONS.find(l => l.location_id === id);
     return loc ? `${loc.department} - ${loc.room}` : 'Unknown';
 };
 
 export const getAssetDocuments = (assetId: string): AssetDocument[] => {
-    return [
+    const asset = assets.find(a => a.asset_id === assetId);
+    const docs: AssetDocument[] = [
         { doc_id: 1, asset_id: assetId, title: 'Service Manual', type: 'Manual', url: '#', date: '2022-01-01' },
         { doc_id: 2, asset_id: assetId, title: 'Calibration Cert', type: 'Certificate', url: '#', date: '2023-05-01' },
-        { doc_id: 3, asset_id: assetId, title: 'User Guide', type: 'Manual', url: '#', date: '2022-02-15' }
     ];
+    if (asset) {
+        docs.push({ doc_id: 3, asset_id: assetId, title: `${asset.manufacturer} ${asset.model} User Guide`, type: 'Manual', url: '#', date: '2022-02-15' });
+    }
+    return docs;
 };
 
 export const findRelevantDocuments = (model: string, manufacturer: string) => {
-    // Mock logic to "search" docs
     return [
         { doc_id: 101, asset_id: 'generic', title: `${manufacturer} ${model} Service Manual`, type: 'Manual', url: '#', date: '2022-01-01' } as AssetDocument
     ];
@@ -227,15 +278,34 @@ export const getSystemAlerts = (): SystemAlert[] => [
     { id: 2, type: 'BOUNDARY_CROSSING', message: 'Infusion Pump AST-1003 left ICU', timestamp: new Date(Date.now() - 3600000).toISOString(), severity: 'high', status: 'active' }
 ];
 
-export const getKnowledgeBaseDocs = () => [
-    { id: 'KB-001', title: 'Servo-U Service Manual', tags: ['ventilator', 'getinge'] },
-    { id: 'KB-002', title: 'Magnetom Vida Troubleshooting', tags: ['mri', 'siemens'] },
-    { id: 'KB-003', title: 'Alaris PC Pump Maintenance', tags: ['pump', 'bd'] },
-    { id: 'KB-004', title: 'Intellivue MX800 Config Guide', tags: ['monitor', 'philips'] },
-    { id: 'KB-005', title: 'Aisys CS2 Anesthesia Machine Technical Reference', tags: ['anesthesia', 'ge'] },
-    { id: 'KB-006', title: 'Voluson E10 User Manual', tags: ['ultrasound', 'ge'] },
-    { id: 'KB-007', title: 'LifePak 15 Service Manual', tags: ['defibrillator', 'stryker'] },
-    { id: 'KB-008', title: 'Isolette 8000 Maintenance Guide', tags: ['incubator', 'drager'] }
+// Generate 500 Knowledge Base Docs
+export const getKnowledgeBaseDocs = () => {
+    const docs = [];
+    const docTypes = ['Service Manual', 'User Guide', 'Schematics', 'Parts List', 'Calibration Procedure'];
+    
+    for (let i = 0; i < 500; i++) {
+        const device = DEVICE_CATALOG[i % DEVICE_CATALOG.length];
+        const type = docTypes[i % docTypes.length];
+        docs.push({
+            id: `KB-${1000+i}`,
+            title: `${device.manufacturer} ${device.model} - ${type}`,
+            tags: [device.name.toLowerCase(), device.manufacturer.toLowerCase(), type.toLowerCase()]
+        });
+    }
+    return docs;
+};
+
+export const TRAINING_SCENARIOS = [
+    { department: "ICU", error: "Monitor Cable Damaged (Pulled)", count: 12, recommendation: "Cable Management Training" },
+    { department: "ER", error: "Battery Drained (Not Plugged In)", count: 9, recommendation: "Power Protocol Review" },
+    { department: "Surgery", error: "Fluid Spill on Console", count: 5, recommendation: "Fluid Safety Procedures" },
+    { department: "Pediatrics", error: "Probe Sensor Bent", count: 4, recommendation: "Handling Delicate Sensors" },
+    { department: "Radiology", error: "Coil Connector Force", count: 3, recommendation: "Connector Alignment Tips" },
+    { department: "Laboratory", error: "Filter Clogged (User Maint)", count: 8, recommendation: "Daily Cleaning Checklist" },
+    { department: "Oncology", error: "Infusion Door Jammed", count: 6, recommendation: "Proper Loading Technique" },
+    { department: "Dialysis", error: "Screen Impact Damage", count: 2, recommendation: "Equipment Positioning" },
+    { department: "Maternity", error: "Transducer Dropped", count: 7, recommendation: "Secure Storage Habits" },
+    { department: "Outpatient", error: "Printer Paper Jam (Force)", count: 15, recommendation: "Consumable Replacement Guide" }
 ];
 
 // Reports

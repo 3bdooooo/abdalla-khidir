@@ -2,12 +2,12 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, PieChart, Pie, Cell, BarChart, Bar, AreaChart, Area, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Asset, AssetStatus, InventoryPart, WorkOrder, DetailedJobOrderReport, Priority, WorkOrderType, User, UserRole, AuditSession, RfidGateLog, RoleDefinition, Resource, Action } from '../types';
-import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getKnowledgeBaseDocs } from '../services/mockDb';
+import { getLocationName, getAssetDocuments, getMovementLogs, getLocations, getDetailedReports, getKnowledgeBaseDocs, MOCK_VENDORS, TRAINING_SCENARIOS } from '../services/mockDb';
 import * as api from '../services/api';
 import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Package, ChevronLeft, X, Download, Printer, ShieldCheck as ShieldCheckIcon, Plus, Check, Users as UsersIcon, GraduationCap, Sparkles, Book, Coins, Box, ArrowRight, User as UserIcon, UserPlus, Image as ImageIcon, LayoutGrid, List, Radio, TrendingUp, DollarSign, Calendar, Lock, Unlock, PenTool, CheckCircle2, Sliders } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Package, ChevronLeft, X, Download, Printer, ShieldCheck as ShieldCheckIcon, Plus, Check, Users as UsersIcon, GraduationCap, Sparkles, Book, Coins, Box, ArrowRight, User as UserIcon, UserPlus, Image as ImageIcon, LayoutGrid, List, Radio, TrendingUp, DollarSign, Calendar, Lock, Unlock, PenTool, CheckCircle2, Sliders, Briefcase, ThumbsUp, Timer } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -36,6 +36,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     
     // Asset Search
     const [assetSearch, setAssetSearch] = useState('');
+
+    // Vendor Search
+    const [vendorSearch, setVendorSearch] = useState('');
 
     // Modals & Forms
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -124,7 +127,6 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         if (!currentAudit) return;
         
         const cleanId = scannedId.trim();
-        // Check if scanned ID matches an asset ID or NFC/RFID tag
         const asset = assetsRef.current.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
         const targetId = asset ? asset.asset_id : cleanId;
 
@@ -247,21 +249,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             hours: parseFloat((mttrByMonth[m].total / mttrByMonth[m].count / (1000 * 60 * 60)).toFixed(1)) 
         })).slice(0, 6);
 
-        // 2. Vendor Analysis
-        const vendorStats = assets.reduce((acc, asset) => {
-            const vendor = asset.manufacturer || 'Unknown';
-            if (!acc[vendor]) acc[vendor] = { name: vendor, totalAssets: 0, defects: 0 };
-            acc[vendor].totalAssets++;
-            const defects = workOrders.filter(wo => wo.asset_id === asset.asset_id && wo.type === WorkOrderType.CORRECTIVE).length;
-            acc[vendor].defects += defects;
-            return acc;
-        }, {} as Record<string, any>);
-        
-        const vendorData = Object.values(vendorStats).map((v: any) => ({
-            ...v,
-            score: Math.max(0, 100 - (v.defects * 5)), // Mock score logic
-            reliability: v.totalAssets > 0 ? (1 - (v.defects / v.totalAssets)) * 100 : 100
-        })).sort((a: any, b: any) => b.score - a.score);
+        // 2. Vendor Analysis (Using MOCK_VENDORS for metadata, mapping assets to them)
+        const vendorData = MOCK_VENDORS.map(vendor => {
+            const vendorAssets = assets.filter(a => a.manufacturer === vendor.name || a.manufacturer?.includes(vendor.name.split(' ')[0]));
+            const totalAssets = vendorAssets.length;
+            const vendorWOs = workOrders.filter(wo => vendorAssets.some(a => a.asset_id === wo.asset_id));
+            const defects = vendorWOs.filter(wo => wo.type === WorkOrderType.CORRECTIVE).length;
+            
+            // Adjust score based on actual defects vs baseline reliability
+            const adjustedReliability = Math.max(0, vendor.reliability - (defects * 2));
+            
+            return {
+                ...vendor,
+                totalAssets,
+                defects,
+                score: adjustedReliability,
+            };
+        }).sort((a, b) => b.score - a.score);
 
         // 3. TCO Analysis
         const tcoData = assets
@@ -334,24 +338,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             return { year, amount: replacementCost };
         });
 
-        // 7. User Error Analysis (Training Data)
-        const userErrors = workOrders
-            .filter(wo => wo.failure_type === 'UserError')
-            .reduce((acc, wo) => {
-                const asset = assets.find(a => a.asset_id === wo.asset_id);
-                if (asset) {
-                    const loc = getLocations().find(l => l.location_id === asset.location_id);
-                    const dept = loc?.department || 'Unknown';
-                    acc[dept] = (acc[dept] || 0) + 1;
-                }
-                return acc;
-            }, {} as Record<string, number>);
-        
-        const trainingData = Object.entries(userErrors).map(([dept, count]) => ({
-            department: dept,
-            errors: count,
-            recommendation: count > 1 ? 'Schedule Training' : 'Monitor'
-        })).sort((a,b) => b.errors - a.errors);
+        // 7. Training Data (Using specific scenarios from mockDb)
+        const trainingData = TRAINING_SCENARIOS.sort((a,b) => b.count - a.count);
 
         return { mttrTrend, vendorData, tcoData, technicianStats, costAnalysis, budgetForecast, trainingData };
     }, [workOrders, users, assets, inventory]);
@@ -1396,6 +1384,8 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
     // 7. ANALYSIS & REPORTS
     if (currentView === 'analysis') {
+        const filteredVendors = analyticsData.vendorData.filter((v:any) => v.name.toLowerCase().includes(vendorSearch.toLowerCase()));
+
         return (
             <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-gray-900">{t('nav_analysis')}</h2>
@@ -1458,14 +1448,14 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             )}
                             <div className="bg-white p-6 rounded-2xl border border-border shadow-soft">
                                 <h3 className="font-bold text-gray-900 mb-4">{t('kb_library')}</h3>
-                                <div className="space-y-2">
-                                    {filteredKbDocs.map(doc => (
-                                        <div key={doc.id} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-colors cursor-pointer">
+                                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2">
+                                    {filteredKbDocs.slice(0, 50).map((doc, idx) => ( // Limit rendering for performance
+                                        <div key={idx} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-lg border border-transparent hover:border-gray-200 transition-colors cursor-pointer">
                                             <div className="flex items-center gap-3">
                                                 <Book size={20} className="text-gray-400"/>
                                                 <div>
                                                     <div className="font-bold text-sm text-gray-900">{doc.title}</div>
-                                                    <div className="flex gap-2 mt-1">{doc.tags.map(tag => <span key={tag} className="text-[10px] bg-gray-100 px-2 rounded text-gray-500 uppercase">{tag}</span>)}</div>
+                                                    <div className="flex gap-2 mt-1">{doc.tags.map((tag, i) => <span key={i} className="text-[10px] bg-gray-100 px-2 rounded text-gray-500 uppercase">{tag}</span>)}</div>
                                                 </div>
                                             </div>
                                             <ChevronLeft size={16} className="text-gray-400 rtl:rotate-180"/>
@@ -1534,16 +1524,16 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2"><GraduationCap size={20} className="text-brand"/> {t('training_dashboard')}</h3>
                             {analyticsData.trainingData.length > 0 ? (
                                 <div className="space-y-4">
-                                    {analyticsData.trainingData.map((d, i) => (
-                                        <div key={d.department} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                    {analyticsData.trainingData.slice(0, 10).map((d: any, i: number) => (
+                                        <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center font-bold text-brand shadow-sm">{i + 1}</div>
                                                 <div>
-                                                    <div className="font-bold text-gray-900">{d.department}</div>
-                                                    <div className="text-xs text-gray-500">{t('error_frequency')}: {d.errors}</div>
+                                                    <div className="font-bold text-gray-900">{d.error}</div>
+                                                    <div className="text-xs text-gray-500">{d.department} • Count: {d.count}</div>
                                                 </div>
                                             </div>
-                                            <span className={`px-2 py-1 text-xs font-bold rounded ${d.recommendation.includes('Training') ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>{d.recommendation}</span>
+                                            <span className={`px-2 py-1 text-[10px] font-bold rounded bg-red-50 text-red-600`}>{d.recommendation}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -1577,16 +1567,57 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                 {/* 6. Vendor Ratings */}
                 {activeTab === 'tab_vendor' && (
                     <div className="space-y-6 animate-in fade-in">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            {analyticsData.vendorData.slice(0,3).map((v: any, i) => (
-                                <div key={v.name} className="bg-white p-6 rounded-2xl border border-border shadow-soft relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4 font-black text-6xl text-gray-100 -z-10">#{i+1}</div>
-                                    <h3 className="font-bold text-gray-900 text-lg">{v.name}</h3>
-                                    <div className="flex gap-4 mt-4">
-                                        <div><div className="text-xs text-gray-500 uppercase font-bold">Reliability</div><div className="text-xl font-bold text-brand">{v.reliability.toFixed(1)}%</div></div>
-                                        <div><div className="text-xs text-gray-500 uppercase font-bold">Defects</div><div className="text-xl font-bold text-gray-800">{v.defects}</div></div>
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-gray-900 text-lg">Vendor Performance Matrix</h3>
+                            <div className="relative w-64">
+                                <Search className="absolute left-3 top-2.5 text-gray-400" size={16}/>
+                                <input 
+                                    type="text" 
+                                    className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand"
+                                    placeholder="Search vendors..."
+                                    value={vendorSearch}
+                                    onChange={(e) => setVendorSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {filteredVendors.map((v: any, i: number) => (
+                                <div key={v.id} className="bg-white p-5 rounded-2xl border border-border shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-2 opacity-10 font-black text-6xl group-hover:opacity-20 transition-opacity">#{i+1}</div>
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center font-bold text-gray-500">{v.name[0]}</div>
+                                        <div>
+                                            <h3 className="font-bold text-gray-900 text-sm line-clamp-1">{v.name}</h3>
+                                            <div className="flex gap-1 mt-0.5">
+                                                {Array.from({length: 5}).map((_, starI) => (
+                                                    <div key={starI} className={`w-2 h-2 rounded-full ${starI < Math.round(v.support) ? 'bg-yellow-400' : 'bg-gray-200'}`}></div>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2 text-sm font-bold text-green-600"><CheckCircle2 size={16}/> Recommended Partner</div>
+                                    
+                                    <div className="space-y-3">
+                                        <div>
+                                            <div className="flex justify-between text-xs font-bold text-gray-500 mb-1">
+                                                <span>Reliability</span>
+                                                <span>{v.reliability}%</span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                                                <div className={`h-full ${v.reliability > 95 ? 'bg-green-500' : v.reliability > 90 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{width: `${v.reliability}%`}}></div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                                            <div className="text-xs text-gray-500">Defects: <span className="font-bold text-gray-800">{v.defects}</span></div>
+                                            <div className="text-xs text-gray-500">Assets: <span className="font-bold text-gray-800">{v.totalAssets}</span></div>
+                                        </div>
+                                    </div>
+
+                                    {v.score > 90 && (
+                                        <div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded w-fit">
+                                            <ThumbsUp size={12}/> Recommended
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
