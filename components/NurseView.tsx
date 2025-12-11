@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import * as api from '../services/api';
 import { LOCATIONS, getAssetDocuments } from '../services/mockDb';
 import { Priority, WorkOrderType, Asset, User, AssetStatus, WorkOrder } from '../types';
-import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star, QrCode, Camera, Lightbulb, BookOpen, ChevronDown, ChevronUp, FileText, Smartphone, UserCheck, Clock } from 'lucide-react';
+import { AlertTriangle, MapPin, CheckCircle2, Activity, AlertCircle, HeartPulse, Wrench, Scan, Wifi, X, Image as ImageIcon, ClipboardCheck, PenTool, Star, QrCode, Camera, Lightbulb, BookOpen, ChevronDown, ChevronUp, FileText, Smartphone, UserCheck, Clock, HelpCircle, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface NurseViewProps {
@@ -20,7 +20,10 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
   const [selectedAssetId, setSelectedAssetId] = useState<string>('');
   const [isScanning, setIsScanning] = useState(false);
   const [scanMethod, setScanMethod] = useState<'nfc' | 'qr'>('nfc');
-  const { t } = useLanguage();
+  const { t, dir } = useLanguage();
+
+  // Training Manual State
+  const [isTrainingOpen, setIsTrainingOpen] = useState(false);
 
   // Smart Point State
   const [showSmartPoint, setShowSmartPoint] = useState(false);
@@ -241,6 +244,155 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
       )
   };
 
+  // --- NURSE TRAINING MANUAL COMPONENT ---
+  const NurseTrainingModal = ({ onClose }: { onClose: () => void }) => {
+      const [step, setStep] = useState(0);
+      const { dir } = useLanguage();
+
+      const PhoneMockup = ({ children }: { children: React.ReactNode }) => (
+          <div className="relative border-8 border-gray-900 rounded-[2rem] h-[400px] w-[220px] bg-white overflow-hidden shadow-2xl mx-auto flex flex-col">
+              <div className="absolute top-0 left-1/2 transform -translate-x-1/2 h-4 w-24 bg-gray-900 rounded-b-xl z-20"></div>
+              <div className="flex-1 overflow-hidden relative font-sans text-xs">
+                  {children}
+              </div>
+          </div>
+      );
+
+      const steps = [
+          {
+              title: "Nurse Training: Quick Reporting",
+              desc: "This guide explains how to quickly report equipment faults using the NFC scan feature.",
+              visual: (
+                  <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-4 text-center">
+                      <HeartPulse size={48} className="mb-4"/>
+                      <h2 className="font-bold text-lg mb-2">Nurse Guide</h2>
+                      <p className="text-xs opacity-80">v1.5</p>
+                  </div>
+              )
+          },
+          {
+              title: "1. Locate 'Report' Tab",
+              desc: "Tap the 'Report Issue' tab at the top of your dashboard, or use the bottom navigation bar on mobile.",
+              visual: (
+                  <div className="h-full bg-gray-50 p-2 pt-6">
+                      <div className="flex bg-white p-1 rounded-lg border mb-4">
+                          <div className="flex-1 text-center py-1 text-[8px] text-gray-400">Overview</div>
+                          <div className="flex-1 text-center py-1 text-[8px] text-gray-400">Verify</div>
+                          <div className="flex-1 text-center py-1 text-[8px] bg-brand text-white rounded font-bold">Report</div>
+                      </div>
+                      <div className="absolute inset-0 bg-black/10 flex items-start justify-center pt-8">
+                          <div className="w-6 h-6 border-2 border-red-500 rounded-full animate-ping absolute top-8 right-12"></div>
+                      </div>
+                  </div>
+              )
+          },
+          {
+              title: "2. Scan Asset NFC",
+              desc: "Tap the large 'Scan Device NFC' button. Hold your phone near the asset's tag to identify it instantly.",
+              visual: (
+                  <div className="h-full bg-white p-4 flex flex-col items-center justify-center">
+                      <div className="p-4 border-2 border-dashed border-brand rounded-xl mb-2 bg-brand/5">
+                          <Scan size={32} className="text-brand"/>
+                      </div>
+                      <div className="font-bold text-[10px]">Scanning...</div>
+                      <div className="absolute inset-0 bg-black/10 flex items-center justify-center">
+                          <div className="bg-white/90 p-2 rounded-full border-2 border-brand animate-pulse">
+                              <Smartphone size={24} className="text-brand"/>
+                          </div>
+                      </div>
+                  </div>
+              )
+          },
+          {
+              title: "3. Smart Maintenance Point",
+              desc: "Before filing a report, try the suggested troubleshooting steps. If it fixes the issue, click 'Yes, Solved'.",
+              visual: (
+                  <div className="h-full bg-gray-900 p-3 text-white pt-6">
+                      <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb size={12} className="text-yellow-400"/>
+                          <span className="font-bold text-[10px]">Troubleshooting</span>
+                      </div>
+                      <div className="bg-white/10 rounded p-2 mb-2">
+                          <div className="text-[8px]">1. Check Power Cord</div>
+                      </div>
+                      <div className="bg-white/10 rounded p-2">
+                          <div className="text-[8px]">2. Reset Alarm</div>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                          <div className="flex-1 bg-green-500 py-1 rounded text-center text-[8px] font-bold">Solved</div>
+                          <div className="flex-1 bg-gray-600 py-1 rounded text-center text-[8px] font-bold">Report</div>
+                      </div>
+                  </div>
+              )
+          },
+          {
+              title: "4. Submit Report",
+              desc: "If the issue persists, describe the fault briefly and tap 'Report Fault Now' to alert the engineering team.",
+              visual: (
+                  <div className="h-full bg-white p-3 pt-6">
+                      <div className="text-[10px] font-bold mb-1">Description</div>
+                      <div className="bg-gray-50 border rounded h-16 p-2 text-[8px] text-gray-500 mb-4">
+                          Screen is frozen and not responding to touch...
+                      </div>
+                      <div className="bg-red-500 text-white py-2 rounded-lg text-center font-bold text-[10px] flex items-center justify-center gap-1">
+                          <AlertTriangle size={10}/> REPORT FAULT
+                      </div>
+                  </div>
+              )
+          }
+      ];
+
+      return (
+          <div className="fixed inset-0 bg-gray-900/90 z-[80] flex items-center justify-center p-4 backdrop-blur-sm animate-in zoom-in-95">
+              <div className="bg-white rounded-3xl w-full max-w-4xl h-[80vh] flex flex-col md:flex-row overflow-hidden shadow-2xl">
+                  {/* Visual Side */}
+                  <div className="w-full md:w-1/2 bg-gray-100 flex items-center justify-center p-8 relative">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-gray-200 via-gray-100 to-gray-200"></div>
+                      <PhoneMockup>
+                          {steps[step].visual}
+                      </PhoneMockup>
+                  </div>
+
+                  {/* Content Side */}
+                  <div className="w-full md:w-1/2 p-8 flex flex-col">
+                      <div className="flex justify-between items-center mb-8">
+                          <h3 className="font-bold text-gray-400 text-xs uppercase tracking-widest">Training Module</h3>
+                          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={20}/></button>
+                      </div>
+
+                      <div className="flex-1 flex flex-col justify-center">
+                          <h1 className="text-3xl font-black text-gray-900 mb-4 leading-tight">{steps[step].title}</h1>
+                          <p className="text-gray-600 text-lg leading-relaxed">{steps[step].desc}</p>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-8 pt-8 border-t border-gray-100">
+                          <div className="flex gap-1">
+                              {steps.map((_, i) => (
+                                  <div key={i} className={`w-2 h-2 rounded-full transition-colors ${i === step ? 'bg-brand scale-125' : 'bg-gray-300'}`}></div>
+                              ))}
+                          </div>
+                          <div className="flex gap-4">
+                              <button 
+                                  onClick={() => setStep(Math.max(0, step - 1))}
+                                  disabled={step === 0}
+                                  className="p-3 rounded-full hover:bg-gray-100 disabled:opacity-30 transition-colors"
+                              >
+                                  <ChevronLeft size={24}/>
+                              </button>
+                              <button 
+                                  onClick={() => step < steps.length - 1 ? setStep(step + 1) : onClose()}
+                                  className="px-6 py-3 bg-brand text-white rounded-full font-bold flex items-center gap-2 hover:bg-brand-dark transition-all shadow-lg shadow-brand/20"
+                              >
+                                  {step === steps.length - 1 ? "Finish" : "Next"} <ChevronRight size={20}/>
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
   if (isSubmitted) {
     return (
         <div className="flex flex-col items-center justify-center h-[60vh] animate-in zoom-in duration-300 font-sans">
@@ -255,6 +407,11 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
 
   return (
     <div className="space-y-4 pb-16 font-sans">
+      {/* TRAINING MODAL */}
+      {isTrainingOpen && (
+          <NurseTrainingModal onClose={() => setIsTrainingOpen(false)} />
+      )}
+
       {/* SMART POINT OVERLAY */}
       {showSmartPoint && identifiedAsset && (
           <SmartPointOverlay 
@@ -278,8 +435,16 @@ export const NurseView: React.FC<NurseViewProps> = ({ user, assets, workOrders, 
                 <MapPin size={12} /> {t('my_dept')}
             </div>
         </div>
-        <div className="bg-white border border-border px-3 py-1 rounded-full text-brand-dark text-xs font-bold shadow-sm">
-            {user.name}
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={() => setIsTrainingOpen(true)}
+                className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 flex items-center gap-1 shadow-sm hover:bg-blue-100"
+            >
+                <HelpCircle size={14}/> Guide
+            </button>
+            <div className="bg-white border border-border px-3 py-1 rounded-full text-brand-dark text-xs font-bold shadow-sm">
+                {user.name}
+            </div>
         </div>
       </div>
 

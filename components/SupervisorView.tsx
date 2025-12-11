@@ -113,6 +113,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     ]);
 
     // ZEBRA SCANNER INTEGRATION
+    // Refs are used to access the latest state inside the event listener callback without stale closures
     const activeAuditRef = useRef(activeAudit);
     useEffect(() => { activeAuditRef.current = activeAudit; }, [activeAudit]);
 
@@ -122,14 +123,20 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
     const assetsRef = useRef(assets);
     useEffect(() => { assetsRef.current = assets; }, [assets]);
 
+    const gateReadersRef = useRef(gateReaders);
+    useEffect(() => { gateReadersRef.current = gateReaders; }, [gateReaders]);
+
+    // Handler for Audit Mode
     const handleRealScan = useCallback((scannedId: string) => {
         const currentAudit = activeAuditRef.current;
         if (!currentAudit) return;
         
         const cleanId = scannedId.trim();
+        // Try to match Asset ID, NFC ID, or RFID Tag
         const asset = assetsRef.current.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
         const targetId = asset ? asset.asset_id : cleanId;
 
+        // Only update if it's a missing asset that hasn't been scanned yet
         if (currentAudit.missing_assets.includes(targetId)) {
             setActiveAudit(prev => prev ? {
                 ...prev,
@@ -140,27 +147,36 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         }
     }, []);
 
+    // Handler for Gate Mode
     const handleGateScan = useCallback((scannedId: string, locationId: number) => {
         const cleanId = scannedId.trim();
         const currentAssets = assetsRef.current;
         const asset = currentAssets.find(a => a.asset_id === cleanId || a.nfc_tag_id === cleanId || a.rfid_tag_id === cleanId);
+        
         if (asset) {
+            // Update Gate Log
             setGateLogs(prev => [{
                 id: Date.now(),
                 asset_id: asset.asset_id,
                 rfid_tag: cleanId,
                 gate_location_id: locationId,
-                direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT',
+                direction: Math.random() > 0.5 ? 'ENTER' : 'EXIT', // Simulate direction for now
                 timestamp: new Date().toISOString()
             }, ...prev.slice(0, 49)]); 
+
+            // Update Reader Status visually
+            setGateReaders(prev => prev.map(r => r.id === locationId ? { ...r, status: 'online', lastPing: new Date().toLocaleTimeString() } : r));
         }
     }, []);
 
+    // Master Handler routed by active Tab
     const handleScannerInput = useCallback((scannedTag: string) => {
         if (rfidTabRef.current === 'audit') {
             handleRealScan(scannedTag);
         } else if (rfidTabRef.current === 'gate') {
-            handleGateScan(scannedTag, 101); // Simulate Gate 101
+            // In a real scenario, the reader ID comes from the hardware source.
+            // Here we simulate it coming from the "Main ICU" gate for demo.
+            handleGateScan(scannedTag, 101); 
         }
     }, [handleRealScan, handleGateScan]);
 
@@ -231,6 +247,23 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
         return () => clearInterval(interval); 
     }, [isSimulationActive, currentView, assets, refreshData]);
 
+    // Gate Monitor Simulation Effect
+    useEffect(() => {
+        let interval: ReturnType<typeof setInterval>;
+        if (isGateMonitoring && currentView === 'rfid' && rfidTab === 'gate') {
+            interval = setInterval(() => {
+                // Pick a random asset and "scan" it at a random gate
+                const randomAsset = assets[Math.floor(Math.random() * assets.length)];
+                const randomGate = gateReaders[Math.floor(Math.random() * gateReaders.length)];
+                if (randomAsset) {
+                    handleGateScan(randomAsset.asset_id, randomGate.id);
+                }
+            }, 4000);
+        }
+        return () => clearInterval(interval);
+    }, [isGateMonitoring, currentView, rfidTab, assets, gateReaders, handleGateScan]);
+
+
     // Analytics Calculations
     const analyticsData = useMemo(() => {
         const closedWOs = workOrders.filter(wo => wo.status === 'Closed' && wo.start_time && wo.close_time);
@@ -249,7 +282,7 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             hours: parseFloat((mttrByMonth[m].total / mttrByMonth[m].count / (1000 * 60 * 60)).toFixed(1)) 
         })).slice(0, 6);
 
-        // 2. Vendor Analysis (Using MOCK_VENDORS for metadata, mapping assets to them)
+        // 2. Vendor Analysis
         const vendorData = MOCK_VENDORS.map(vendor => {
             const vendorAssets = assets.filter(a => a.manufacturer === vendor.name || a.manufacturer?.includes(vendor.name.split(' ')[0]));
             const totalAssets = vendorAssets.length;
@@ -1739,9 +1772,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                         </div>
                         {activeAudit && (
                             <div className="grid grid-cols-2 gap-6">
-                                <div className="bg-green-50 p-4 rounded-xl border border-green-100">
+                                <div className="bg-green-50 p-4 rounded-xl border border-green-100 h-96 flex flex-col">
                                     <h4 className="font-bold text-green-800 mb-2 flex items-center gap-2"><Check size={16}/> Found Assets ({activeAudit.found_assets.length})</h4>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                    <div className="space-y-2 overflow-y-auto pr-2 flex-1">
                                         {activeAudit.found_assets.map(id => (
                                             <div key={id} className="bg-white p-2 rounded border border-green-100 text-xs font-mono flex items-center gap-2 shadow-sm animate-in zoom-in">
                                                 <div className="w-2 h-2 bg-green-500 rounded-full"></div>{id}
@@ -1749,9 +1782,9 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                         ))}
                                     </div>
                                 </div>
-                                <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                                <div className="bg-red-50 p-4 rounded-xl border border-red-100 h-96 flex flex-col">
                                     <h4 className="font-bold text-red-800 mb-2 flex items-center gap-2"><AlertCircle size={16}/> Missing Assets ({activeAudit.missing_assets.length})</h4>
-                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                                    <div className="space-y-2 overflow-y-auto pr-2 flex-1">
                                         {activeAudit.missing_assets.map(id => (
                                             <div key={id} className="bg-white p-2 rounded border border-red-100 text-xs font-mono opacity-60">{id}</div>
                                         ))}
@@ -1781,18 +1814,18 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
                                 </div>
                             ))}
                         </div>
-                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden">
+                        <div className="bg-white rounded-2xl border border-border shadow-soft overflow-hidden h-96 flex flex-col">
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr><th className="p-4 text-xs font-bold text-gray-500 uppercase">Time</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Gate</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Asset</th><th className="p-4 text-xs font-bold text-gray-500 uppercase">Direction</th></tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
+                                <tbody className="divide-y divide-gray-100 overflow-y-auto block h-80 w-full">
                                     {gateLogs.map(log => (
-                                        <tr key={log.id} className="animate-in slide-in-from-left-2">
-                                            <td className="p-4 text-xs text-gray-500 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                                            <td className="p-4 text-sm font-bold text-gray-800">{gateReaders.find(r => r.id === log.gate_location_id)?.name || 'Unknown Gate'}</td>
-                                            <td className="p-4 text-sm text-gray-600">{assets.find(a => a.asset_id === log.asset_id)?.name || log.rfid_tag}</td>
-                                            <td className="p-4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.direction === 'ENTER' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{log.direction}</span></td>
+                                        <tr key={log.id} className="animate-in slide-in-from-left-2 w-full table fixed-table-layout">
+                                            <td className="p-4 text-xs text-gray-500 font-mono w-1/4">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                                            <td className="p-4 text-sm font-bold text-gray-800 w-1/4">{gateReaders.find(r => r.id === log.gate_location_id)?.name || 'Unknown Gate'}</td>
+                                            <td className="p-4 text-sm text-gray-600 w-1/4">{assets.find(a => a.asset_id === log.asset_id)?.name || log.rfid_tag}</td>
+                                            <td className="p-4 w-1/4"><span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${log.direction === 'ENTER' ? 'bg-green-50 text-green-700' : 'bg-orange-50 text-orange-700'}`}>{log.direction}</span></td>
                                         </tr>
                                     ))}
                                 </tbody>
