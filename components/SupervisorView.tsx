@@ -7,7 +7,7 @@ import * as api from '../services/api';
 import { searchKnowledgeBase, generateAssetThumbnail } from '../services/geminiService';
 import { calculateAssetRiskScore, recommendTechnicians, TechRecommendation } from '../services/predictiveService';
 import { useZebraScanner } from '../services/zebraService';
-import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Package, ChevronLeft, X, Download, Printer, ShieldCheck as ShieldCheckIcon, Plus, Check, Users as UsersIcon, GraduationCap, Sparkles, Book, Coins, Box, ArrowRight, User as UserIcon, UserPlus, Image as ImageIcon, LayoutGrid, List, Radio, TrendingUp, DollarSign, Calendar, Lock, Unlock, PenTool, CheckCircle2, Sliders, Briefcase, ThumbsUp, Timer } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, Activity, MapPin, FileText, Search, Package, ChevronLeft, X, Download, Printer, ShieldCheck as ShieldCheckIcon, Plus, Check, Users as UsersIcon, GraduationCap, Sparkles, Book, Coins, Box, ArrowRight, User as UserIcon, UserPlus, Image as ImageIcon, LayoutGrid, List, Radio, TrendingUp, DollarSign, Calendar, Lock, Unlock, PenTool, CheckCircle2, Sliders, Briefcase, ThumbsUp, Timer, Server, Database, Wifi } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface SupervisorProps {
@@ -519,6 +519,18 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
             { name: t('maintenance'), value: stats.maint, color: '#F59E0B' },
         ];
 
+        // Calculated values for Admin Dashboard
+        const totalAssetValue = assets.reduce((sum, a) => sum + (a.purchase_cost || 0), 0);
+        const totalMaintSpend = assets.reduce((sum, a) => sum + (a.accumulated_maintenance_cost || 0), 0);
+        
+        const mockActivity = [
+            { user: 'Mike Tech', action: 'Closed WO #2236', time: '10m ago' },
+            { user: 'System', action: 'Backup Completed', time: '1h ago' },
+            { user: 'Nurse Joy', action: 'Reported Fault (ICU)', time: '2h ago' },
+            { user: 'John Supervisor', action: 'Approved Restock', time: '3h ago' },
+            { user: 'System', action: 'High Risk Alert: CT Scanner', time: '5h ago' },
+        ];
+
         return (
             <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -536,30 +548,68 @@ export const SupervisorView: React.FC<SupervisorProps> = ({ currentView, current
 
                 {/* Admin Only: Executive Overview */}
                 {isAdmin && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2 animate-in fade-in">
-                        <div className="bg-slate-900 text-white p-4 rounded-xl shadow-lg flex items-center justify-between">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6 animate-in fade-in">
+                        {/* System Health */}
+                        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xl flex flex-col justify-between relative overflow-hidden">
+                            <div className="absolute top-0 right-0 p-4 opacity-10"><Activity size={64}/></div>
                             <div>
-                                <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">System Health</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
-                                    <span className="font-bold">Online</span>
+                                <h3 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">System Status</h3>
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium flex items-center gap-2"><div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div> Supabase DB</span>
+                                        <span className="text-emerald-400 text-xs font-bold">Connected</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium flex items-center gap-2"><div className="w-2 h-2 bg-emerald-400 rounded-full"></div> Gemini AI</span>
+                                        <span className="text-emerald-400 text-xs font-bold">Operational</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium flex items-center gap-2"><div className="w-2 h-2 bg-blue-400 rounded-full"></div> Zebra IoT</span>
+                                        <span className="text-blue-400 text-xs font-bold">Listening</span>
+                                    </div>
                                 </div>
                             </div>
-                            <Activity size={24} className="text-slate-500"/>
-                        </div>
-                        <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
-                            <div>
-                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Financial Exposure</p>
-                                <h4 className="font-black text-xl text-gray-900 mt-1">$4.2M</h4>
+                            <div className="mt-4 pt-3 border-t border-slate-700">
+                                <span className="text-xs text-slate-500">Last heartbeat: Just now</span>
                             </div>
-                            <Coins size={24} className="text-brand"/>
                         </div>
-                        <div className="bg-white p-4 rounded-xl border border-border shadow-sm flex items-center justify-between">
-                            <div>
-                                <p className="text-text-muted text-xs font-bold uppercase tracking-wider">Active Users</p>
-                                <h4 className="font-black text-xl text-gray-900 mt-1">{users.length}</h4>
+
+                        {/* Financial Snapshot */}
+                        <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex flex-col">
+                            <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Financial Overview</h3>
+                            <div className="flex-1 flex flex-col justify-center">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className="text-3xl font-black text-gray-900">${(totalAssetValue / 1000000).toFixed(1)}M</span>
+                                    <span className="text-xs text-gray-500 mb-1">Total Assets</span>
+                                </div>
+                                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden mb-4">
+                                    <div className="h-full bg-brand" style={{width: '100%'}}></div>
+                                </div>
+                                
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className="text-2xl font-bold text-red-500">${(totalMaintSpend / 1000).toFixed(1)}k</span>
+                                    <span className="text-xs text-gray-500 mb-1">Maint. Spend (YTD)</span>
+                                </div>
+                                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                    <div className="h-full bg-red-500" style={{width: `${(totalMaintSpend / (totalAssetValue || 1)) * 100}%`}}></div>
+                                </div>
                             </div>
-                            <UsersIcon size={24} className="text-green-500"/>
+                        </div>
+
+                        {/* Live Activity Feed */}
+                        <div className="bg-white p-5 rounded-2xl border border-border shadow-soft flex flex-col">
+                            <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest mb-4">Live Activity</h3>
+                            <div className="space-y-3 overflow-y-auto max-h-32 pr-2 custom-scrollbar">
+                                {mockActivity.map((act, i) => (
+                                    <div key={i} className="flex gap-3 items-start text-sm">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300 mt-1.5 shrink-0"></div>
+                                        <div>
+                                            <p className="font-bold text-gray-800 leading-none">{act.action}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{act.user} • {act.time}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
