@@ -101,7 +101,8 @@ const generateAssets = (): Asset[] => {
             manufacturing_date: '2020-01-01', purchase_date: '2020-06-01', installation_date: '2020-06-15', warranty_expiration: '2025-06-15',
             expected_lifespan: 10, operating_hours: 14500, risk_score: 15, purchase_cost: 1500000, accumulated_maintenance_cost: 45000,
             image: 'https://images.unsplash.com/photo-1516549655169-df83a092dd14?auto=format&fit=crop&q=80&w=300',
-            control_number: 'RAD/MRI/001', classification: 'Diagnostic Imaging'
+            control_number: 'RAD/MRI/001', classification: 'Diagnostic Imaging',
+            last_calibration_date: '2023-01-15', next_calibration_date: '2024-01-15'
         },
         {
             asset_id: 'AST-1002', nfc_tag_id: 'NFC-1002', name: 'Ventilator', model: 'Servo-U', manufacturer: 'Getinge',
@@ -109,7 +110,8 @@ const generateAssets = (): Asset[] => {
             manufacturing_date: '2021-03-01', purchase_date: '2021-04-01', installation_date: '2021-04-05', warranty_expiration: '2024-04-05',
             expected_lifespan: 7, operating_hours: 8200, risk_score: 5, purchase_cost: 45000, accumulated_maintenance_cost: 2100,
             image: 'https://images.unsplash.com/photo-1584036561566-b93a9499d6d3?auto=format&fit=crop&q=80&w=300',
-            control_number: 'ICU/VENT/005', classification: 'Life Support'
+            control_number: 'ICU/VENT/005', classification: 'Life Support',
+            last_calibration_date: '2023-06-01', next_calibration_date: '2023-12-01'
         },
         {
             asset_id: 'AST-1003', nfc_tag_id: 'NFC-1003', name: 'Infusion Pump', model: 'Alaris PC', manufacturer: 'BD',
@@ -125,7 +127,8 @@ const generateAssets = (): Asset[] => {
             manufacturing_date: '2022-01-01', purchase_date: '2022-02-01', installation_date: '2022-02-05', warranty_expiration: '2025-02-05',
             expected_lifespan: 8, operating_hours: 4500, risk_score: 30, purchase_cost: 12000, accumulated_maintenance_cost: 500,
             image: 'https://plus.unsplash.com/premium_photo-1661766569022-1b7f918ac3f3?auto=format&fit=crop&q=80&w=300',
-            control_number: 'ICU/MON/003', classification: 'Monitoring'
+            control_number: 'ICU/MON/003', classification: 'Monitoring',
+            last_calibration_date: '2022-02-05', next_calibration_date: '2023-02-05' // Overdue example
         }
     ];
 
@@ -141,6 +144,19 @@ const generateAssets = (): Asset[] => {
             let status = AssetStatus.RUNNING;
             if (statusRoll > 0.92) status = AssetStatus.DOWN;
             else if (statusRoll > 0.85) status = AssetStatus.UNDER_MAINT;
+
+            // Calibration Logic: ~20% of assets have calibration data
+            let lastCal = undefined;
+            let nextCal = undefined;
+            if (Math.random() > 0.8) {
+                const now = new Date();
+                const pastDate = new Date(now.getFullYear(), now.getMonth() - Math.floor(Math.random() * 14), 1);
+                lastCal = pastDate.toISOString().split('T')[0];
+                
+                const nextDate = new Date(pastDate);
+                nextDate.setFullYear(nextDate.getFullYear() + 1);
+                nextCal = nextDate.toISOString().split('T')[0];
+            }
 
             generatedAssets.push({
                 asset_id: `AST-${idCounter}`,
@@ -162,7 +178,9 @@ const generateAssets = (): Asset[] => {
                 accumulated_maintenance_cost: Math.floor(Math.random() * 5000),
                 image: type.image,
                 control_number: `${loc.department.substring(0,3).toUpperCase()}/${type.name.substring(0,3).toUpperCase()}/${idCounter}`,
-                classification: 'General Medical'
+                classification: 'General Medical',
+                last_calibration_date: lastCal,
+                next_calibration_date: nextCal
             });
             idCounter++;
         }
@@ -210,24 +228,84 @@ const generateInventory = (): InventoryPart[] => {
     return parts;
 };
 
-const generateWorkOrders = (): WorkOrder[] => [
-    {
-        wo_id: 2236, asset_id: 'AST-1002', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3,
-        description: 'Ventilator failing self-test (Code E045)', status: 'Closed',
-        created_at: '2023-10-24T09:00:00', start_time: '2023-10-24T10:00:00', close_time: '2023-10-25T14:00:00',
-        failure_type: 'Technical', parts_used: [{ part_id: 1, quantity: 1 }]
-    },
-    {
-        wo_id: 5002, asset_id: 'AST-1001', type: WorkOrderType.PREVENTIVE, priority: Priority.MEDIUM, assigned_to_id: 3,
-        description: 'Quarterly PM Inspection', status: 'Open',
-        created_at: new Date().toISOString()
-    },
-    {
-        wo_id: 5003, asset_id: 'AST-1004', type: WorkOrderType.CORRECTIVE, priority: Priority.CRITICAL, assigned_to_id: 3,
-        description: 'SpO2 sensor not reading', status: 'Assigned',
-        created_at: new Date().toISOString()
+// Generate 50 Randomized Work Orders
+const generateWorkOrders = (): WorkOrder[] => {
+    const wos: WorkOrder[] = [];
+    
+    // Static critical ones for demo visibility
+    wos.push(
+        {
+            wo_id: 2236, asset_id: 'AST-1002', type: WorkOrderType.CORRECTIVE, priority: Priority.HIGH, assigned_to_id: 3,
+            description: 'Ventilator failing self-test (Code E045)', status: 'Closed',
+            created_at: '2023-10-24T09:00:00', start_time: '2023-10-24T10:00:00', close_time: '2023-10-25T14:00:00',
+            failure_type: 'Technical', parts_used: [{ part_id: 1, quantity: 1 }]
+        },
+        {
+            wo_id: 5002, asset_id: 'AST-1001', type: WorkOrderType.PREVENTIVE, priority: Priority.MEDIUM, assigned_to_id: 3,
+            description: 'Quarterly PM Inspection', status: 'Open',
+            created_at: new Date().toISOString()
+        },
+        {
+            wo_id: 5003, asset_id: 'AST-1004', type: WorkOrderType.CORRECTIVE, priority: Priority.CRITICAL, assigned_to_id: 3,
+            description: 'SpO2 sensor not reading', status: 'Assigned',
+            created_at: new Date().toISOString()
+        }
+    );
+
+    // Algorithm to generate 47 more
+    const statuses = ['Open', 'In Progress', 'Assigned', 'Closed', 'Awaiting Approval', 'Manager Approved'];
+    const priorities = [Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.CRITICAL];
+    const types = [WorkOrderType.CORRECTIVE, WorkOrderType.PREVENTIVE, WorkOrderType.CALIBRATION];
+    
+    const descriptions = [
+        "Battery not charging", "Screen flickering", "No power on startup", "Calibration check due",
+        "Leaking fluid", "Noisy operation", "Data transfer failed", "Filter replacement needed",
+        "Software update required", "Physical damage to casing"
+    ];
+
+    let id = 6000;
+    for (let i = 0; i < 47; i++) {
+        const type = types[Math.floor(Math.random() * types.length)];
+        const status = statuses[Math.floor(Math.random() * statuses.length)];
+        // Ensure some are assigned to "Mike Tech" (user_id 3)
+        const assignee = Math.random() > 0.5 ? 3 : 2; 
+        
+        // Random date in last 3 months
+        const date = new Date();
+        date.setDate(date.getDate() - Math.floor(Math.random() * 90));
+
+        let closedData = {};
+        if (status === 'Closed') {
+            const start = new Date(date);
+            start.setHours(start.getHours() + 1);
+            const end = new Date(start);
+            end.setHours(end.getHours() + Math.floor(Math.random() * 4) + 1);
+            closedData = {
+                start_time: start.toISOString(),
+                close_time: end.toISOString(),
+                parts_used: Math.random() > 0.5 ? [{ part_id: Math.floor(Math.random() * 20) + 1, quantity: 1 }] : []
+            };
+        }
+
+        // Pick a random asset (using simplified logic, assume IDs exist)
+        const assetId = `AST-${1005 + Math.floor(Math.random() * 50)}`; // Picking from first 50 generated
+
+        wos.push({
+            wo_id: id++,
+            asset_id: assetId,
+            type: type,
+            priority: priorities[Math.floor(Math.random() * priorities.length)],
+            assigned_to_id: status !== 'Open' ? assignee : undefined as any,
+            description: descriptions[Math.floor(Math.random() * descriptions.length)],
+            status: status as any,
+            created_at: date.toISOString(),
+            failure_type: type === WorkOrderType.CORRECTIVE ? (Math.random() > 0.3 ? 'Technical' : 'UserError') : undefined,
+            ...closedData
+        });
     }
-];
+
+    return wos;
+};
 
 // Mutable state for mock DB
 let assets = generateAssets();
@@ -308,47 +386,86 @@ export const TRAINING_SCENARIOS = [
     { department: "Outpatient", error: "Printer Paper Jam (Force)", count: 15, recommendation: "Consumable Replacement Guide" }
 ];
 
-// Reports
-export const getPMReports = (): PreventiveMaintenanceReport[] => [
-     {
-        pm_id: "PM-5002",
-        wo_id: 5002,
-        scheduled_date: "2023-11-01",
-        completion_date: "2023-11-01T14:30:00",
-        technician_name: "Mike Tech",
-        asset: {
-            name: "MRI Scanner Magnetom Vida",
-            model: "Magnetom Vida",
-            serial_no: "SN-998877",
-            asset_id: "AST-1001",
-            location: "Radiology - MRI Suite"
-        },
-        checklist: [
-            { id: 1, task: "Check Cryogen Level", status: "Pass" },
-            { id: 2, task: "Clean Filters", status: "Pass" }
-        ],
-        vital_data: { operating_hours: 14500, last_calibration: "2023-05-01", electrical_safety_pass: true },
-        calibration_results: { required: false, status: "N/A" },
-        next_due_date: "2024-05-01",
-        approvals: { technician_sign: "Digitally Signed: Mike Tech", supervisor_sign: "Digitally Signed: John Supervisor", date: "2023-11-02" }
+// Reports Generators
+export const getPMReports = (): PreventiveMaintenanceReport[] => {
+    const reports: PreventiveMaintenanceReport[] = [];
+    // Generate 5 PM Reports
+    for (let i=0; i<5; i++) {
+        const asset = assets[i] || assets[0];
+        reports.push({
+            pm_id: `PM-${5000+i}`,
+            wo_id: 5000+i,
+            scheduled_date: "2023-11-01",
+            completion_date: "2023-11-01T14:30:00",
+            technician_name: "Mike Tech",
+            asset: {
+                name: asset.name,
+                model: asset.model,
+                serial_no: asset.serial_number || 'N/A',
+                asset_id: asset.asset_id,
+                location: getLocationName(asset.location_id)
+            },
+            checklist: [
+                { id: 1, task: "Check Physical Condition", status: "Pass" },
+                { id: 2, task: "Electrical Safety Test", status: "Pass" },
+                { id: 3, task: "Performance Verification", status: "Pass" }
+            ],
+            vital_data: { operating_hours: asset.operating_hours, last_calibration: asset.last_calibration_date || "N/A", electrical_safety_pass: true },
+            calibration_results: { required: false, status: "N/A" },
+            next_due_date: "2024-05-01",
+            approvals: { technician_sign: "Digitally Signed: Mike Tech", supervisor_sign: "Digitally Signed: John Supervisor", date: "2023-11-02" }
+        });
     }
-];
+    return reports;
+};
 
-export const getDetailedReports = (): DetailedJobOrderReport[] => [
-    {
-        job_order_no: 2236,
-        report_id: "RPT-2023-089",
-        control_no: "CN-7782",
-        priority: "High",
-        risk_factor: "Critical",
-        asset: { name: "Ventilator Servo-U", model: "Servo-U", manufacturer: "Getinge", serial_no: "SN-112233", asset_id: "AST-1002" },
-        location: { site: "Main Hospital", building: "Main Wing", department: "ICU", room: "101" },
-        fault_details: { failed_date: "2023-10-24", fault_description: "Unit failed self-test.", repair_date: "2023-10-25", technician_name: "Mike Tech", remedy_work_done: "Replaced flow sensor." },
-        spare_parts: [{ part_name: "Flow Sensor", part_no: "GT-9988", quantity: 1 }],
-        qc_analysis: { need_spare_parts: "Yes", need_calibration: true, user_errors: false, unrepairable: false, agent_repair: false, partially_working: false, incident: true },
-        approvals: { caller: { name: "Nurse Joy", contact: "Ext 101" }, dept_head: { name: "Dr. House", date: "2023-10-25" }, site_supervisor: { name: "John Supervisor", date: "2023-10-25" }, site_admin: { name: "Sarah Connor", date: "2023-10-26" } }
+export const getDetailedReports = (): DetailedJobOrderReport[] => {
+    const reports: DetailedJobOrderReport[] = [];
+    const closedCMs = workOrders.filter(w => w.status === 'Closed' && w.type === 'Corrective');
+    
+    // Generate 5 CM Reports based on closed WOs
+    closedCMs.slice(0, 5).forEach((wo, idx) => {
+        const asset = assets.find(a => a.asset_id === wo.asset_id) || assets[0];
+        reports.push({
+            job_order_no: wo.wo_id,
+            report_id: `RPT-2023-0${80+idx}`,
+            control_no: asset.control_number || `CN-${wo.wo_id}`,
+            priority: wo.priority,
+            risk_factor: "Medium",
+            asset: { name: asset.name, model: asset.model, manufacturer: asset.manufacturer || 'Generic', serial_no: asset.serial_number || 'N/A', asset_id: asset.asset_id },
+            location: { site: "Main Hospital", building: "Main Wing", department: "ICU", room: "101" }, // Simplified
+            fault_details: { 
+                failed_date: wo.created_at.split('T')[0], 
+                fault_description: wo.description, 
+                repair_date: wo.close_time?.split('T')[0] || new Date().toISOString().split('T')[0], 
+                technician_name: "Mike Tech", 
+                remedy_work_done: "Replaced faulty component and tested." 
+            },
+            spare_parts: wo.parts_used ? wo.parts_used.map(p => ({ part_name: "Spare Part", part_no: `P-${p.part_id}`, quantity: p.quantity })) : [],
+            qc_analysis: { need_spare_parts: wo.parts_used?.length ? "Yes" : "No", need_calibration: false, user_errors: wo.failure_type === 'UserError', unrepairable: false, agent_repair: false, partially_working: false, incident: false },
+            approvals: { caller: { name: "Nurse Joy", contact: "Ext 101" }, dept_head: { name: "Dr. House", date: "2023-10-25" }, site_supervisor: { name: "John Supervisor", date: "2023-10-25" }, site_admin: { name: "Sarah Connor", date: "2023-10-26" } }
+        });
+    });
+    
+    // Fallback if no closed WOs
+    if (reports.length === 0) {
+        reports.push({
+            job_order_no: 2236,
+            report_id: "RPT-2023-089",
+            control_no: "CN-7782",
+            priority: "High",
+            risk_factor: "Critical",
+            asset: { name: "Ventilator Servo-U", model: "Servo-U", manufacturer: "Getinge", serial_no: "SN-112233", asset_id: "AST-1002" },
+            location: { site: "Main Hospital", building: "Main Wing", department: "ICU", room: "101" },
+            fault_details: { failed_date: "2023-10-24", fault_description: "Unit failed self-test.", repair_date: "2023-10-25", technician_name: "Mike Tech", remedy_work_done: "Replaced flow sensor." },
+            spare_parts: [{ part_name: "Flow Sensor", part_no: "GT-9988", quantity: 1 }],
+            qc_analysis: { need_spare_parts: "Yes", need_calibration: true, user_errors: false, unrepairable: false, agent_repair: false, partially_working: false, incident: true },
+            approvals: { caller: { name: "Nurse Joy", contact: "Ext 101" }, dept_head: { name: "Dr. House", date: "2023-10-25" }, site_supervisor: { name: "John Supervisor", date: "2023-10-25" }, site_admin: { name: "Sarah Connor", date: "2023-10-26" } }
+        });
     }
-];
+
+    return reports;
+};
 
 // Setters (for Mock API)
 export const addAsset = (asset: Asset) => { assets.push(asset); };
